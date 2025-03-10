@@ -2,9 +2,11 @@
 
 ## Setup of runtime environment
 This code base was developed within the context of a Python3 virtual environment which
-supports Python 3.9-3.12, Scikit-Learn, TensorFlow, Keras, lightkurve, astropy and the
-ebopmaven & deblib upon which the code is dependent. The dependencies are documented in
-the [requirements.txt](../blob/main/requirements.txt) file.
+supports Python 3.9-3.12, Scikit-Learn, TensorFlow, Keras, lightkurve, astropy, and the
+custom [ebopmaven](https://github.com/SteveOv/ebop_maven) &
+[deblib](https://github.com/SteveOv/deblib) packages upon which the code is dependent.
+The dependencies are documented in the [requirements.txt](../main/requirements.txt)
+file.
 
 Having first cloned this GitHub repo, open a Terminal at the root of the local repo
 and run the following commands. First to create and activate the venv;
