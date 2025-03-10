@@ -1,0 +1,16 @@
+name: platodebcat
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python >=3.9,<=3.12
+
+  - pip
+  - pip:
+    - -r requirements.txt
+
+variables:
+  JKTEBOP_DIR: ~/jktebop/
+  JKTEBOP_SUPPORT_NEG_L3: false
+  TF_CPP_MIN_LOG_LEVEL: 2         # Suppress TF info/warn messages
+  CUDA_VISIBLE_DEVICES: -1        # Hide GPUs so we get repeatable results

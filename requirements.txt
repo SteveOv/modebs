@@ -1,0 +1,23 @@
+numpy<2.0
+pathlib
+scipy
+matplotlib
+astropy>=5.1
+lightkurve>=2.4
+numba
+scikit-learn>=1.0
+uncertainties
+
+# For jupyter notebook support
+ipykernel
+ipympl
+jupyter
+
+# We don't have a code dependency on pandas but it's useful to have for data wrangler support in VSCode
+pandas
+
+# dEB characterisation support library
+git+https://github.com/SteveOv/deblib
+
+# dEB jktebop parameter estimator
+git+https://github.com/SteveOv/ebop_maven

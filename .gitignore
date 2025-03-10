@@ -169,3 +169,9 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Ignore vscode devtime/runtime files
+.vscode
+
+# Ignore the venv
+.platodebcat
