@@ -1,7 +1,8 @@
 """
 Low level utility functions for light curve ingest, pre-processing, estimation and fitting.
 """
-from typing import Union, List, Tuple, Generator
+# pylint: disable=no-member
+from typing import Union, List, Iterable, Tuple, Generator
 from pathlib import Path
 
 import numpy as np
@@ -94,21 +95,26 @@ def append_magnitude_columns(lc: LightCurve,
 
 def find_lightcurve_segments(lc: LightCurve,
                              threshold: TimeDelta,
-                             return_times: bool=False) \
-                                -> Generator[Union[Tuple[int, int], Tuple[Time, Time]], any, None]:
+                             yield_times: bool=False) \
+                                -> Generator[Union[slice, Tuple[Time, Time]], any, None]:
     """
-    Finds the start and end of contiguous segments in the passed LightCurve. These are subsets of
-    where the gaps between bins does not exceed the passed threshold. Gaps greater then the
-    threshold are treated as boundaries between segments.
+    Finds the start and end of contiguous segments in the passed LightCurve. These are contiguous
+    regions where the gaps between bins does not exceed the passed threshold. Gaps greater then the
+    threshold are treated as boundaries between segments. If no gaps found this will yield a single
+    segment for the whole LightCurve.
 
     :lc: the source LightCurve to parse for gaps/segments.
     :threshold: the threshold gap time beyond which a segment break is triggered
-    :return_times: if true start/end times will be yielded, otherwise the indices
-    :returns: a generator of segment (start, end).
-    If no gaps found this will yield a single (start, end) for the whole LightCurve.
+    :yield_times: if true start/end times will be yielded, otherwise slices
+    :returns: generator of slice(start, end, 1) or tuple(start Time, end Time) if yield_times==True
     """
-    if not isinstance(threshold, TimeDelta):
+    if isinstance(threshold, TimeDelta):
+        pass
+    elif isinstance(threshold, u.Quantity):
+        threshold = TimeDelta(threshold)
+    else:
         threshold = TimeDelta(threshold * u.d)
+
 
     # Much quicker if we use primatives - make sure we work in days
     threshold = threshold.to(u.d).value
@@ -118,10 +124,10 @@ def find_lightcurve_segments(lc: LightCurve,
     segment_start_ix = 0
     for this_ix, previous_time in enumerate(times, start = 1):
         if this_ix > last_ix or times[this_ix] - previous_time > threshold:
-            if return_times:
+            if yield_times:
                 yield (lc.time[segment_start_ix], lc.time[this_ix - 1])
             else:
-                yield (segment_start_ix, this_ix - 1)
+                yield slice(segment_start_ix, this_ix, 1)
             segment_start_ix = this_ix
 
 
@@ -187,3 +193,31 @@ def fit_polynomial(times: Time,
                       f"(sigma(fit_ydata)={np.std(fit_ydata):.6e})")
 
     return (fit_ydata, coeffs) if include_coeffs else fit_ydata
+
+
+def to_lc_time(value: Union[Time, np.double, Tuple[np.double], List[np.double,]], lc: LightCurve) \
+                -> Time:
+    """
+    Converts the passed numeric value to an astropy Time. The magnitude of the time will be used to
+    interpret the format and scale to match LC (<4e4: btjd, else modifed jd, except >2.4e6: jd).
+
+    :value: the value or values to be converted
+    :lc: the light-curve to match format with
+    """
+    if isinstance(value, Time):
+        if value.format == lc.time.format and value.scale == lc.time.scale:
+            return value
+        raise ValueError("Value's time format/scale does not match the Lightcurve's")
+
+    if isinstance(value, Iterable):
+        return Time([to_lc_time(v, lc) for v in value])
+
+    # Otherwise try to match the time format and scale to the Lightcurve
+    if value < 4e4:
+        if lc.time.format == "btjd":
+            return Time(value, format="btjd", scale=lc.time.scale)
+        raise ValueError(f"Unexpected value/format ({value}/{lc.time.format}) combination.")
+
+    if value < 2.4e6:
+        value += 2.4e6
+    return Time(value, format="jd", scale=lc.time.scale)
