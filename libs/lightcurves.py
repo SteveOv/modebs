@@ -6,9 +6,10 @@ from typing import Union, List, Iterable, Tuple, Generator
 from pathlib import Path
 
 import numpy as np
+from scipy import interpolate
 import astropy.units as u
 from astropy.time import Time, TimeDelta
-from lightkurve import LightCurve, LightCurveCollection, SearchResult
+from lightkurve import LightCurve, LightCurveCollection, FoldedLightCurve, SearchResult
 
 
 def load_lightcurves(results: SearchResult,
@@ -221,3 +222,53 @@ def to_lc_time(value: Union[Time, np.double, Tuple[np.double], List[np.double,]]
     if value < 2.4e6:
         value += 2.4e6
     return Time(value, format="jd", scale=lc.time.scale)
+
+
+def get_sampled_phase_mags_data(flc: FoldedLightCurve,
+                                num_bins: int = 1024,
+                                phase_pivot: Union[u.Quantity, float]=0.75,
+                                flc_rollover: int = 200,
+                                interp_kind: str="linear") \
+                                    -> Tuple[u.Quantity, u.Quantity]:
+    """
+    A data reduction function which gets a reduced set of phase and delta magnitude data in
+    the requested number of equal size bins. 
+    
+    The data is sourced by sampling the passed FoldedLightCurve.  In case this does not extend over
+    a complete phase, rows are copied over from opposite ends of the phase space data to extend the
+    coverage.  The number of rows copied is controlled by the flc_rollover argument.
+
+    :flc: the source FoldedLightCurve
+    :num_bins: the number of equally spaced rows to return
+    :phase_pivot: the pivot point about which the fold phase was wrapped to < 0.
+    :flc_rollover: the number of row to extend the ends of the source phases by
+    :interp_kind: the 1d interpolation algorithm to use when reducing the fold
+    :returns: a tuple with requested number or phases and delta magnitudes
+    """
+    source_phases = np.concatenate([
+        flc.phase[-flc_rollover:] -1.,
+        flc.phase,
+        flc.phase[:flc_rollover] +1.
+    ])
+
+    source_delta_mags = np.concatenate([
+        flc["delta_mag"][-flc_rollover:],
+        flc["delta_mag"],
+        flc["delta_mag"][:flc_rollover]
+    ])
+
+    # If there is a phase wrap then phases above the pivot will have been
+    # wrapped around to <0. Work out what the expected minimum phase should be.
+    # Also, ensure we don't try to interpolate beyond the start of the data!
+    min_phase = u.Quantity(0)
+    if phase_pivot is not None:
+        if isinstance(phase_pivot, u.Quantity) and phase_pivot.value:
+            min_phase = phase_pivot.value - 1
+        elif phase_pivot:
+            min_phase = u.Quantity(phase_pivot - 1)
+    min_phase = max(min_phase, source_phases.min())
+
+    interp = interpolate.interp1d(source_phases, source_delta_mags, kind=interp_kind)
+    reduced_phases = np.linspace(min_phase, min_phase + 1., num_bins + 1)[:-1]
+    reduced_mags = interp(reduced_phases)
+    return (reduced_phases, reduced_mags)
