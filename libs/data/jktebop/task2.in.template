@@ -1,0 +1,39 @@
+ 2              ${ring}     Task to do (from 2 to 9)   Integ. ring size (deg)  
+ ${rA_plus_rB}  ${k}        Sum of fractional radii    Ratio of the radii      
+ ${inc}         ${qphot}    Orbital inclination (deg)  Mass ratio of system    
+ ${ecosw}       ${esinw}    ecosw or eccentricity      esinw or periastron long
+ ${gravA}       ${gravB}    Gravity darkening (star A) Grav darkening (star B) 
+ ${J}           ${L3}       Surface brightness ratio   Amount of third light   
+ ${LDA}         ${LDB}      LD law type for star A     LD law type for star B  
+ ${LDA1}        ${LDB1}     LD star A (coeff 1)        LD star B (coeff 1)
+ ${LDA2}        ${LDB2}     LD star A (coeff 2)        LD star B (coeff 2)
+ ${reflA}       ${reflB}    Reflection effect star A   Reflection effect star B
+ 0.000          0.000       Phase of primary eclipse   Light scale factor (mag)
+${out_filename}             Output file name (continuous character string)   
+
+# Enter the appropriate numbers on the left-hand side of each line of this file.
+# Most of the lines require two numerical parameters separated by spaces.       
+  
+# Put a negative number for the mass ratio (qphot) forces stars to be spherical.  
+# The mass ratio will then be irrelevant (it is only used to get deformations). 
+  
+# The reflection coefficients will be taken from the input file. If you want the
+# code to calculate them itself (which will be the usual situation), put a large
+# negative number (e.g. -100) for each reflection coefficient in the input file.
+  
+# To fit for rA and rB instead of (rA+rB) and k, give a negative value for r1+r2
+# Then (rA+rB) will be interpreted to mean rA,  and k will be interpreted as rB.
+# The adjustment indicators will similarly refer to rA,rB rather than (rA+rB),k.
+  
+# If e < 10 then e and omega will be assumed to be e*cos(omega) and e*sin(omega)
+# If e >= 10 then e and omega will be assumed to be (e+10) and omega (degrees). 
+# The first option is in general better unless eccentricity is larger or fixed. 
+  
+# The possible entries for the type of limb darkening law are 'lin' (for linear)
+# 'quad' (quadratic), 'log' (logarithmic), 'sqrt' (square-root), 'cub' (cubic), 
+# 'pow2' (power-2), qrep (quadratic re-parameterisation) lrep (logarithmic re-  
+# parameterisation, srep (square-root re-parameterisation, crep (cubic re-param-
+# eterisation, and 'h1h2' (power-2 with the h1 and h2 parameterisation).        
+# Put 'same' for star B to force its coefficients to be equal those of star A.
+
+# Source Template: /libs/data/jktebop/task2.in.template
