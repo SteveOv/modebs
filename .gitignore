@@ -175,3 +175,8 @@ cython_debug/
 
 # Ignore the venv
 .platodebcat
+
+# Ignore any bulk data carriers - we'll manually add anything we want
+**/data/**/*.zip
+**/data/**/*.tgz
+**/data/**/*.txz
