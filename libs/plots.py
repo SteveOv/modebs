@@ -46,30 +46,38 @@ def plot_lightcurves(lcs: Union[_LCC, _LC, _FLC],
 
     for ix, (ax, lc, title) in enumerate(zip_longest(axes, lcs, ax_titles)):
         if ix < count_lcs:
-            lc.scatter(ax=ax, column=column, s=2.0, marker=".", label=None, normalize=normalize_lcs)
+            plot_lightcurve_on_axes(ax, lc, column, normalize_lcs)
 
-            if lc[column].unit == u.mag:
-                if ix == 0:
-                    ax.invert_yaxis()
-                if column == "delta_mag":
-                    ax.set_ylabel("differential magnitude [mag]")
-
-            # Only want the y-label on the left most column as sharey is in play
-            ax.set_ylabel(None if ix % cols else ax.get_ylabel())
-            ax.set_title(title)
-            ax.tick_params(axis="both", which="both", direction="in",
-                           top=True, bottom=True, left=True, right=True)
+            if ix == 0 and lc[column].unit == u.mag:
+                ax.invert_yaxis()
 
             if ax_func is not None:
                 ax_func(ix, ax)
 
-            if format_kwargs:
-                format_axes(ax, **format_kwargs)
+            # Only want the y-label on the left most column as sharey is in play
+            ax.set_ylabel(None if ix % cols else ax.get_ylabel())
+            format_axes(ax, title=title, **format_kwargs)
         else:
             # Hide any unused axes
             ax.axis("off")
 
     return fig
+
+
+def plot_lightcurve_on_axes(ax: _Axes, lc: Union[_LC, _FLC],
+                            column: str="flux", normalize: bool=False):
+    """
+    Will plot the passed lightcurve on the passed axes with standardized formatting.
+
+    :ax: the Axes
+    :lc: the Lightcurve
+    :column: the lightcurve data column to plot of the y-axis
+    :normalize: whether or not to normalize the y-axis data before plotting
+    """
+    lc.scatter(ax=ax, column=column, s=2.0, marker=".", label=None, normalize=normalize)
+    if lc[column].unit == u.mag:
+        if column == "delta_mag":
+            ax.set_ylabel("differential magnitude [mag]")
 
 
 def format_axes(ax: _Axes, title: str=None,
