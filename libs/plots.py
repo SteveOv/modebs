@@ -1,6 +1,6 @@
 """ Training and testing specific plots. """
 # pylint: disable=too-many-arguments, too-many-locals, too-many-branches, too-many-statements
-from typing import Union, Tuple, Iterable, Generator
+from typing import Union, Tuple, Iterable, Generator, Callable
 from itertools import zip_longest
 
 import numpy as np
@@ -14,15 +14,21 @@ from lightkurve import LightCurve as _LC, FoldedLightCurve as _FLC, LightCurveCo
 
 def plot_lightcurves(lcs: Union[_LCC, _LC, _FLC],
                      column: str="flux",
-                     ax_titles: Iterable[str]=None,
-                     overlays_x: Iterable[float]=None,
-                     overlays_y: Iterable[float]=None,
-                     overlays_labels: Union[str, Iterable[str]]=None,
+                     ax_titles: Union[str, Iterable[str]]=None,
                      normalize_lcs: bool=False,
                      cols: int=2,
+                     ax_func: Callable[[int, _Axes], None]=None,
                      **format_kwargs) -> _Figure:
     """
-    Plots a grid of lightcurves with optional overlay data points.
+    Creates a matplotlib figure and plots a grid of lightcurves on it, one per Axes.
+
+    :lcs: the lightcurves to plot, one per matplotlib Axes
+    :column: the lightcurve data column to plot of the y-axis
+    :ax_titles: the titles to give each Axes
+    :normalize_lcs: whether or not to normalize the y-axis data before plotting
+    :cols: the number of columns on the grid of Axes
+    :ax_func: callback taking (ax index, ax) called for each Axes prior to applying format_kwargs
+    :returns: the final Figure
     """
     # Ensure the data and titles are iterable, even if there is none
     if isinstance(lcs, (_LC, _FLC)):
@@ -33,28 +39,14 @@ def plot_lightcurves(lcs: Union[_LCC, _LC, _FLC],
     elif isinstance(ax_titles, str):
         ax_titles = [ax_titles] * count_lcs
 
-    if overlays_x is None:
-        overlays_x = []
-    if overlays_y is None:
-        overlays_y = []
-    if overlays_labels is None:
-        overlays_labels = []
-    elif isinstance(overlays_labels, str):
-        overlays_labels = [overlays_labels] * count_lcs
-
     # Set up the figure and Axes
     rows = int(np.ceil(count_lcs / cols))
     fig, axes = plt.subplots(rows, cols, figsize=(9, 3*rows), sharey=True, constrained_layout=True)
     axes = [axes] if isinstance(axes, _Axes) else axes.flatten()
 
-    for ix, (ax, lc, title, ox, oy, olabel) in enumerate(
-            zip_longest(axes, lcs, ax_titles, overlays_x, overlays_y, overlays_labels)):
-
+    for ix, (ax, lc, title) in enumerate(zip_longest(axes, lcs, ax_titles)):
         if ix < count_lcs:
             lc.scatter(ax=ax, column=column, s=2.0, marker=".", label=None, normalize=normalize_lcs)
-
-            if ox is not None and oy is not None:
-                ax.scatter(ox, oy, c="k", s=0.33, marker=".", label=olabel)
 
             if lc[column].unit == u.mag:
                 if ix == 0:
@@ -67,6 +59,10 @@ def plot_lightcurves(lcs: Union[_LCC, _LC, _FLC],
             ax.set_title(title)
             ax.tick_params(axis="both", which="both", direction="in",
                            top=True, bottom=True, left=True, right=True)
+
+            if ax_func is not None:
+                ax_func(ix, ax)
+
             if format_kwargs:
                 format_axes(ax, **format_kwargs)
         else:
