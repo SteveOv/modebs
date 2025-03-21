@@ -59,7 +59,9 @@ _param_file_line_beginswith = {
     "omega":            "Periastron longitude omega (degree):",
     "bP":               "Impact parameter (primary eclipse):",
     "bS":               "Impact paramtr (secondary eclipse):",
-    "phiS":             "Phase of secondary eclipse:"
+    "phiS":             "Phase of secondary eclipse:",
+    "LA":               "Primary contribut'n to system light:",
+    "LB":               "Secondary contrib'n to system light:",
 }
 
 # Defines the "columns" of the structured array returned by generate_model_light_curve()
