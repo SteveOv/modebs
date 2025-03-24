@@ -7,6 +7,8 @@ lightkurve>=2.4
 numba
 scikit-learn>=1.0
 uncertainties
+emcee
+corner
 
 # For jupyter notebook support
 ipykernel
