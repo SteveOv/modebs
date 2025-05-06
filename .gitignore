@@ -180,3 +180,9 @@ cython_debug/
 **/data/**/*.zip
 **/data/**/*.tgz
 **/data/**/*.txz
+
+
+
+# MIST isochrones which should be downloaded from source
+libs/data/mist/*.txz
+libs/data/mist/MIST*/*.iso
