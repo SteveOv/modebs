@@ -19,11 +19,15 @@ ipykernel
 ipympl
 jupyter
 
+# Aladin-lite sky viewer widget
+ipyaladin
+
 # We don't have a code dependency on pandas but it's useful to have for data wrangler support in VSCode
 pandas
 
 # For interacting with the LOP sky regions via their MOC/HEALPix sky tessalations 
 mocpy
+regions
 
 # dEB characterisation support library
 git+https://github.com/SteveOv/deblib
