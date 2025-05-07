@@ -10,7 +10,10 @@ uncertainties
 emcee
 corner
 
-# SED fitting and dereddening
+# Astropy affiliated lib for interacting with virtual observatory protocols 
+pyvo
+
+# Astropy affiliated lib for extinction filters
 astroquery>=0.4.8.dev9474  # 2024-09-24 pinned for Gaia column capitalization issue
 dust_extinction
 
@@ -21,13 +24,13 @@ jupyter
 
 # Aladin-lite sky viewer widget
 ipyaladin
+regions
 
 # We don't have a code dependency on pandas but it's useful to have for data wrangler support in VSCode
 pandas
 
 # For interacting with the LOP sky regions via their MOC/HEALPix sky tessalations 
 mocpy
-regions
 
 # dEB characterisation support library
 git+https://github.com/SteveOv/deblib
