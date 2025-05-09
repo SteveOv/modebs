@@ -3,6 +3,7 @@ pathlib
 scipy
 matplotlib
 astropy>=5.1
+astroquery>=0.4.8.dev9474  # 2024-09-24 pinned for Gaia column capitalization issue
 lightkurve>=2.4
 numba
 scikit-learn>=1.0
@@ -13,9 +14,9 @@ corner
 # Astropy affiliated lib for interacting with virtual observatory protocols 
 pyvo
 
-# Astropy affiliated lib for extinction filters
-astroquery>=0.4.8.dev9474  # 2024-09-24 pinned for Gaia column capitalization issue
+# Astropy affiliated libs for extinction maps and filters
 dust_extinction
+dustmaps
 
 # For jupyter notebook support
 ipykernel
