@@ -33,6 +33,10 @@ pandas
 # For interacting with the LOP sky regions via their MOC/HEALPix sky tessalations 
 mocpy
 
+# For NewEra stellar grids
+h5py
+f90nml
+
 # dEB characterisation support library
 git+https://github.com/SteveOv/deblib
 
