@@ -4,6 +4,8 @@ from io import StringIO
 import requests
 
 import numpy as np
+from scipy.interpolate import interp1d
+from deblib.constants import c
 
 #
 #   These handle LowRes NewEra text files
@@ -32,7 +34,7 @@ def iterate_spectra_file(filename: (str|Path), skip: int=0):
             flux_line = line
             yield field_line, flux_line
 
-def parse_lr_spectra_file(filename: (str|Path)):
+def parse_lr_spectra_file(filename: (str|Path), bin_fluxes: bool=True, interp_kind: str="nearest"):
     """
     Will parse the requested text based low res NewEra spectra file into a
     structured numpy array.
@@ -48,29 +50,30 @@ def parse_lr_spectra_file(filename: (str|Path)):
     fields_dtype = [(n, int if n == "lam_steps" else float) for n in fields_names]
 
     # Parse the text file (with fields and fluxes on separate contiguous lines) into a table
-    table = np.empty((spec_count, ), dtype=fields_dtype + [("flux", object)])
+    table = np.empty((spec_count, ), dtype=fields_dtype+[("index", float), ("flux_interp", object)])
     row_num = 0
     for field_line, flux_line in iterate_spectra_file(filename):
         if len(field_line) and len(flux_line):
             fields = np.loadtxt(StringIO(field_line), dtype=fields_dtype, usecols=fields_cols)
             fluxes = np.loadtxt(StringIO(flux_line), dtype=np.dtype(float), unpack=True)
 
-            # Reduce the resolution of the spectrum by a factor of 1000 (from nm to um ramge)
-            lambdas = np.linspace(fields["lam_from"], fields["lam_to"], len(fluxes))    # nm
-            low_cents = np.arange(1e3, len(lambdas), 1e3, dtype=int)[:-1]
-            low_flux = np.array([np.sum(fluxes[cent-499:cent+499]) for cent in low_cents])  # bins
-            #low_flux = np.array([np.sum(fluxes[cent]) for cent in low_cents])           # not-bins
+            lambdas = np.linspace(fields["lam_from"], fields["lam_to"], len(fluxes), endpoint=True)
+            if bin_fluxes:
+                # TODO: appropriate downsampling - scipy resample/interp/decimate) or covolving
+                mid_bins = np.arange(100, len(lambdas)-99, 100, dtype=int)
+                fluxes = np.array([np.sum(fluxes[m-50:m+49]) for m in mid_bins])
+                lambdas = lambdas[mid_bins]
 
-            # Revise the metadata to reflect the reduction in spectral resolution and change
-            # the lambdas from nm to um (rescaling leaves the step size scalar value unchanged).
-            fields["lam_steps"] = len(low_flux)
-            fields["lam_from"] = lambdas[low_cents[0]] / 1e3                            # nm to um
-            fields["lam_to"] = lambdas[low_cents[-1]] / 1e3                             # nm to um
+            lambdas /= 1e3 # nm to um
+            fields["lam_steps"] = len(lambdas)
+            fields["lam_from"] = lambdas.min()
+            fields["lam_to"] = lambdas.max()
 
             # Store this row
             for fn in fields_names:
                 table[row_num][fn] = fields[fn]
-            table[row_num]["flux"] = low_flux
+            table[row_num]["index"] = fields["teff"] + fields["logg"]
+            table[row_num]["flux_interp"] = interp1d(c * 1e6 / lambdas, fluxes, kind=interp_kind)
             row_num += 1
     return table
 
