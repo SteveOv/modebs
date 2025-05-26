@@ -28,14 +28,14 @@ $ ipython kernel install --user --name=.platodebcat
 These codes have a dependency on the JKTEBOP tool for generating and fitting lightcurves. The
 installation media and build instructions can be found
 [here](https://www.astro.keele.ac.uk/jkt/codes/jktebop.html). The `JKTEBOP_DIR` environment
-variable is used by the training and testing code to locate the executable at runtime.
+variable is used to locate the executable at runtime.
 ```sh
 $ export JKTEBOP_DIR=~/jktebop/
 ```
 Set this to match the location where JKTEBOP has been set up.
 
 #### Alternative, conda virtual environment
-To set up an ebop_maven conda environment, from the root of the local repo run the
+To set up an `platodebcat` conda environment, from the root of the local repo run the
 following command;
 ```sh
 $ conda env create -f environment.yaml
