@@ -2,8 +2,8 @@
 
 ## Setup of runtime environment
 This code base was developed within the context of a Python3 virtual environment which
-supports Python 3.9-3.12, Scikit-Learn, TensorFlow, Keras, lightkurve, astropy, and the
-custom [ebopmaven](https://github.com/SteveOv/ebop_maven) &
+supports Python 3.9-3.12, Scikit-Learn, TensorFlow, Keras, numpy, matplotlib, astropy,
+lightkurve, emcee, and the custom [ebopmaven](https://github.com/SteveOv/ebop_maven) &
 [deblib](https://github.com/SteveOv/deblib) packages upon which the code is dependent.
 The dependencies are documented in the [requirements.txt](../main/requirements.txt)
 file.
@@ -22,13 +22,6 @@ $ pip install -r requirements.txt
 You may need to install the jupyter kernel in the new venv:
 ```sh
 $ ipython kernel install --user --name=.platodebcat
-```
-
-Optionally, for completely repeatable estimator predictions it is advisable to avoid
-the use of any CUDA compliant GPU cores. This is done by hiding the cores from the
-TensorFlow library with the following environment variable setting;
-```sh
-$ export CUDA_VISIBLE_DEVICES=-1
 ```
 
 #### JKTEBOP
@@ -52,5 +45,4 @@ Use the following command;
 ```sh
 $ conda activate platodebcat
 ```
-The conda environment sets the JKTEBOP_DIR and CUDA_VISIBLE_DEVICES environment variables
-to ~/jktebop/ and -1 respectively.
+The conda environment sets the JKTEBOP_DIR environment variable to ~/jktebop/.
