@@ -93,9 +93,15 @@ def ln_prior(M1: float, M2: float, age: float, k: float):
             Teff1, logg1, R1, ph1 = mist_isos.stellar_params_for_mass(0, age, M1, MIST_PARAMS)
             Teff2, logg2, R2, ph2 = mist_isos.stellar_params_for_mass(0, age, M2, MIST_PARAMS)
 
-            # Validate the stellar params against the priors
+            # TODO: make this a supplied func as it is specific to the required task
+            # Validate the stellar params against the priors. The value for k (ratio of radii)
+            # is supplied and is likely to be specific to this target. The Phase restriction
+            # is more related to the MIST modelling data. The Teff & logg restrictions are the
+            # bounds of the NewEra spectra we use
             if np.abs((R2 / R1) - k) < 0.1 \
-                and min(ph1, ph2) >= MIN_PHASE and max(ph1, ph2) <= MAX_PHASE:
+                and min(ph1, ph2) >= MIN_PHASE and max(ph1, ph2) <= MAX_PHASE \
+                and min(Teff1, Teff2) >= 2300 and max(Teff1, Teff2) <= 12000 \
+                and min(logg1, logg2) >= 0.5 and max(logg1, logg2) <= 6.0:
                 retval = 0 # params conform to the priors
         except ValueError:
             pass
