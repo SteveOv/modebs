@@ -40,7 +40,7 @@ for sf in spec_files:
 fields_index = { "teff": "teff", "logg": "logg", "mass": "m_sun" }
 fields_dtype = [("teff", float), ("logg", float), ("mass", float),
                 ("lam_from", float), ("lam_to", float), ("lam_steps", int)]
-bandpass = (0.1, 20.0) * u.micron
+bandpass = (0.01, 30.0) * u.micron
 
 points = None       # pylint: disable=invalid-name
 values_3d = None    # pylint: disable=invalid-name
