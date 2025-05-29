@@ -71,53 +71,17 @@ def ln_like(x: np.ndarray,
     return -0.5 * np.sum(((y - y_model_norm) / y_err)**2)
 
 
-def ln_prior(M1: float, M2: float, age: float, k: float):
-    """
-    The MCMC log prior function which evaluates the properties of the stars defined by
-    the current masses and age against known prior constraints; which are k, the previously
-    fitted ratio of the stellar radii, and the mass and phase range that constrain the param space.
-    """
-    # pylint: disable=too-many-locals
-    MIN_MASS, MAX_MASS = 0.1, 270.
-    MIN_AGE, MAX_AGE = 5.0, 10.3        # log(age) range in MIST data
-    MIN_PHASE, MAX_PHASE = 0.0, 2.0     # MIST main sequence to RGB phases
-    MIST_PARAMS = ["Teff", "log_g", "R", "phase"]
-
-    Teff1, Teff2, logg1, logg2 = None, None, None, None
-    retval = -np.inf # failure
-
-    # Basic validation of priors; lookup won't work if these are out of range of MIST values
-    if MIN_MASS <= M1 <= MAX_MASS and MIN_MASS <= M2 <= MAX_MASS and MIN_AGE <= age <= MAX_AGE:
-        try:
-            # Get the T_eff values which we need to generate a SED and to validate the parameters
-            Teff1, logg1, R1, ph1 = mist_isos.stellar_params_for_mass(0, age, M1, MIST_PARAMS)
-            Teff2, logg2, R2, ph2 = mist_isos.stellar_params_for_mass(0, age, M2, MIST_PARAMS)
-
-            # TODO: make this a supplied func as it is specific to the required task
-            # Validate the stellar params against the priors. The value for k (ratio of radii)
-            # is supplied and is likely to be specific to this target. The Phase restriction
-            # is more related to the MIST modelling data. The Teff & logg restrictions are the
-            # bounds of the NewEra spectra we use
-            if np.abs((R2 / R1) - k) < 0.1 \
-                and min(ph1, ph2) >= MIN_PHASE and max(ph1, ph2) <= MAX_PHASE \
-                and min(Teff1, Teff2) >= 2300 and max(Teff1, Teff2) <= 12000 \
-                and min(logg1, logg2) >= 0.5 and max(logg1, logg2) <= 6.0:
-                retval = 0 # params conform to the priors
-        except ValueError:
-            pass
-    return retval, (Teff1, Teff2, logg1, logg2)
-
-
 def ln_prob(theta: Tuple[float, float, float],
             x: np.ndarray,
             y: np.ndarray,
             y_err: np.ndarray,
             k: float,
+            ln_prior_func: Callable[[float, float, float, float], Tuple[float, Tuple[any]]],
             model_func: Callable[[np.ndarray, float, float, float, float],
                                  Tuple[np.ndarray, np.ndarray]]=blackbody_model):
     """
     The ln_prob function to be called by emcee.EnsembleSample to fit models to a SED.
-    Will create the call stack of MCMC ln_prior() and ln_like() functions using the
+    Will create the call stack of MCMC ln_prior_func() and ln_like() functions using the
     chosen model_func to support it.
 
     :theta: the current walker position of the (M1, M2, log_age) parameters
@@ -125,11 +89,13 @@ def ln_prob(theta: Tuple[float, float, float],
     :y: the fluxes of the SED observations
     :y_err: the uncertainties of the flux observations
     :k: the ratio of the stellar radii prior
+    :ln_prior_func: the mmcmc function to evaluate the priors. This should hace the form
+    func(M1, M2, age, k) -> (0 or -np.inf, (Teff1, Teff2, logg1, logg2))
     :model_func: function to produce the model pairs of SEDs to be evaluated. This should have the
     form func(x, Teff1, Teff2, logg1, logg2) -> (sed1, sed2) and defaults to blackbody_model()
     """
     # theta == M1, M2, log_age, blob = Teff1, Teff2, logg1, logg2
-    lp, blob = ln_prior(*theta, k)
+    lp, blob = ln_prior_func(*theta, k)
     if np.isfinite(lp):
         return lp + ln_like(x, y, y_err, *blob, model_func), blob
     return -np.inf, blob
