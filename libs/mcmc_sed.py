@@ -93,12 +93,14 @@ def ln_prob(theta: Tuple[float, float, float],
     func(M1, M2, age, k) -> (0 or -np.inf, (Teff1, Teff2, logg1, logg2))
     :model_func: function to produce the model pairs of SEDs to be evaluated. This should have the
     form func(x, Teff1, Teff2, logg1, logg2) -> (sed1+sed2) and defaults to norm_blackbody_model()
+    :returns: the log probability of this walker position and the unpacked blob returned from the
+    ln_prior_func (which emcee will repack within a numpy array for publication through get_blobs)
     """
     # theta == M1, M2, log_age, blob = Teff1, Teff2, logg1, logg2
     lp, blob = ln_prior_func(*theta, k)
     if np.isfinite(lp):
-        return lp + ln_like(x, y, y_err, *blob, model_func), blob
-    return -np.inf, blob
+        return lp + ln_like(x, y, y_err, *blob, model_func), *blob
+    return -np.inf, *blob
 
 
 def min_max_normalize(vals: np.ndarray, val_errs: np.ndarray=None):
