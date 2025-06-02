@@ -62,7 +62,8 @@ def append_calculated_inc_predictions(preds: np.ndarray[UFloat],
 
 def get_sed_for_target(target: str,
                        search_term: str=None,
-                       radius: float=0.1):
+                       radius: float=0.1,
+                       missing_uncertainty_ratio: float=0.1):
     """
     Gets spectral energy distribution (SED) observations for the target. These data are found and
     downloaded from the VizieR photometry tool (see http://viz-beta.u-strasbg.fr/vizier/sed/doc/).
@@ -77,25 +78,25 @@ def get_sed_for_target(target: str,
     :target: the name of the target object
     :search_term: optional search term, or leave as None to use the target value
     :radius: the search radius in arcsec
+    :missing_uncertainty_rate: uncertainty, as a ratio of the fluxes, to apply where none recorded
     :returns: an astropy Table containing the chosen data, sorted by descending frequency
     """
     sed_cache_dir = Path(".cache/.sed/")
     sed_cache_dir.mkdir(parents=True, exist_ok=True)
 
-    # Read in the SED for this target
-    sed_fname = sed_cache_dir / (re.sub(r"[^\w\d-]", "-", target.lower()) + ".vot")
-    if sed_fname.exists():
-        sed = Table.read(sed_fname)
-    else:
+    # Read in the SED for this target via the cache
+    sed_fname = sed_cache_dir / (re.sub(r"[^\w\d-]", "-", target.lower()) + f"-{radius:f}.vot")
+    if not sed_fname.exists():
         targ = quote_plus(search_term or target)
         sed = Table.read(f"https://vizier.cds.unistra.fr/viz-bin/sed?-c={targ}&-c.rs={radius}")
         sed.write(sed_fname, format="votable") # votable matches that published in link above
 
+    sed = Table.read(sed_fname)
     sed.sort(["sed_freq"], reverse=True)
 
-    # Set flux uncertainties to 10% where none given
+    # Set flux uncertainties where none given
     mask_no_err = (sed["sed_eflux"].value == 0) | np.isnan(sed["sed_eflux"])
-    sed["sed_eflux"][mask_no_err] = sed["sed_flux"][mask_no_err] / 10
+    sed["sed_eflux"][mask_no_err] = sed["sed_flux"][mask_no_err] * missing_uncertainty_ratio
 
     # Get the data into SI units
     sed["sed_flux"] = sed["sed_flux"].to(u.W / u.m**2 / u.Hz)
