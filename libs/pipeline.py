@@ -85,7 +85,7 @@ def get_sed_for_target(target: str,
     sed_cache_dir.mkdir(parents=True, exist_ok=True)
 
     # Read in the SED for this target via the cache
-    sed_fname = sed_cache_dir / (re.sub(r"[^\w\d-]", "-", target.lower()) + f"-{radius:f}.vot")
+    sed_fname = sed_cache_dir / (re.sub(r"[^\w\d-]", "-", target.lower()) + f"-{radius}.vot")
     if not sed_fname.exists():
         targ = quote_plus(search_term or target)
         sed = Table.read(f"https://vizier.cds.unistra.fr/viz-bin/sed?-c={targ}&-c.rs={radius}")
