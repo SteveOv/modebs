@@ -113,11 +113,23 @@ class MistIsochrones():
                                 feh: float,
                                 log_age: float,
                                 mass: float,
+                                min_phase: float=None,
+                                max_phase: float=None,
                                 params: List[str]=["R", "Teff"]) -> np.ndarray:
         # Find the age block nearest the requested value
         iso = self._isos[feh]
         age_block = iso.isos[iso.age_index(log_age)]
-        all_masses = age_block["star_mass"]
+
+        if min_phase or max_phase:
+            # Mask out any rows which do not match any phase criteria
+            mask = np.array([True] * len(age_block))
+            if min_phase is not None:
+                mask &= age_block["phase"] >= min_phase
+            if max_phase is not None:
+                mask &= age_block["phase"] <= max_phase
+            all_masses = age_block[mask]["star_mass"]
+        else:
+            all_masses = age_block["star_mass"]
 
         # Mass gradient can change direction so we only use the nearest 1 or 2 rows to the
         # requested mass and order them by increasing mass.
