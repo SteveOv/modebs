@@ -75,7 +75,6 @@ def ln_prob(theta: Tuple[float, float, float],
             x: np.ndarray,
             y: np.ndarray,
             y_err: np.ndarray,
-            k: float,
             ln_prior_func: Callable[[float, float, float, float], Tuple[float, Tuple[any]]],
             model_func: Callable[[np.ndarray, float, float, float, float],
                                  Tuple[np.ndarray]]=norm_blackbody_model):
@@ -88,7 +87,6 @@ def ln_prob(theta: Tuple[float, float, float],
     :x: the frequencies at which the SED observations were made
     :y: the fluxes of the SED observations
     :y_err: the uncertainties of the flux observations
-    :k: the ratio of the stellar radii prior
     :ln_prior_func: the mmcmc function to evaluate the priors. This should hace the form
     func(M1, M2, age, k) -> (0 or -np.inf, (Teff1, Teff2, logg1, logg2))
     :model_func: function to produce the model pairs of SEDs to be evaluated. This should have the
@@ -97,7 +95,7 @@ def ln_prob(theta: Tuple[float, float, float],
     ln_prior_func (which emcee will repack within a numpy array for publication through get_blobs)
     """
     # theta == M1, M2, log_age, blob = Teff1, Teff2, logg1, logg2
-    lp, blob = ln_prior_func(*theta, k)
+    lp, blob = ln_prior_func(*theta)
     if np.isfinite(lp):
         return lp + ln_like(x, y, y_err, *blob, model_func), *blob
     return -np.inf, *blob
