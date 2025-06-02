@@ -13,21 +13,22 @@ from libs.mistisochrones import MistIsochrones
 mist_isos = MistIsochrones(metallicities=[0])
 
 
-def blackbody_model(x: np.ndarray,
-                    Teff1: float,
-                    Teff2: float,
-                    logg1: float=None,
-                    logg2: float=None) \
+def norm_blackbody_model(x: np.ndarray,
+                         Teff1: float,
+                         Teff2: float,
+                         logg1: float=None,
+                         logg2: float=None) \
         -> Tuple[np.ndarray, np.ndarray]:
     """
     Model a SED on the Planck blackbody function of two stars of the given effective temperatures.
+    The returned model is the min-max normalized sum the the two stars' fluxes.
 
     :x: the frequencies at which the SED observations are required
     :Teff1: the effective temperature of star 1 in K
     :Teff2: the effective temperature of star 2 in K
     :logg1: the surface gravity of star 1 in log(cgs) (not used)
     :logg2: the surface gravity of star 2 in log(cgs) (not used)
-    :returns: the sed fluxes at x for each of the two stars as a tuple (sed1, sed2)
+    :returns: the normalized summed fluxes at x for the two stars
     """
     # pylint: disable=unused-argument
     def bb_spec_brightness(teff):
@@ -40,7 +41,7 @@ def blackbody_model(x: np.ndarray,
         pt1 = (2 * h * x**3) / c**2
         pt2 = exp((h * x) / (k_B * teff)) - 1
         return pt1 / pt2
-    return (bb_spec_brightness(Teff1), bb_spec_brightness(Teff2))
+    return min_max_normalize(np.add(bb_spec_brightness(Teff1), bb_spec_brightness(Teff2)))
 
 
 def ln_like(x: np.ndarray,
@@ -50,7 +51,7 @@ def ln_like(x: np.ndarray,
             Teff2: float,
             logg1: float,
             logg2: float,
-            model_func: Callable=blackbody_model):
+            model_func: Callable=norm_blackbody_model):
     """
     The MCMC likelihood function, which returns a comparison of the x & y (+/-y_err)
     observations with the model produced by the model_func based on the Teffs and loggs.
@@ -66,9 +67,8 @@ def ln_like(x: np.ndarray,
     :logg2: the surface gravity of star 2 in log(cgs)
     :returns: the calculated likelihood value
     """
-    # Compare both in min-max normalized form (y is already normalized)
-    y_model_norm = min_max_normalize(np.add(*model_func(x, Teff1, Teff2, logg1, logg2)))
-    return -0.5 * np.sum(((y - y_model_norm) / y_err)**2)
+    y_model = model_func(x, Teff1, Teff2, logg1, logg2)
+    return -0.5 * np.sum(((y - y_model) / y_err)**2)
 
 
 def ln_prob(theta: Tuple[float, float, float],
@@ -78,7 +78,7 @@ def ln_prob(theta: Tuple[float, float, float],
             k: float,
             ln_prior_func: Callable[[float, float, float, float], Tuple[float, Tuple[any]]],
             model_func: Callable[[np.ndarray, float, float, float, float],
-                                 Tuple[np.ndarray, np.ndarray]]=blackbody_model):
+                                 Tuple[np.ndarray]]=norm_blackbody_model):
     """
     The ln_prob function to be called by emcee.EnsembleSample to fit models to a SED.
     Will create the call stack of MCMC ln_prior_func() and ln_like() functions using the
@@ -92,7 +92,7 @@ def ln_prob(theta: Tuple[float, float, float],
     :ln_prior_func: the mmcmc function to evaluate the priors. This should hace the form
     func(M1, M2, age, k) -> (0 or -np.inf, (Teff1, Teff2, logg1, logg2))
     :model_func: function to produce the model pairs of SEDs to be evaluated. This should have the
-    form func(x, Teff1, Teff2, logg1, logg2) -> (sed1, sed2) and defaults to blackbody_model()
+    form func(x, Teff1, Teff2, logg1, logg2) -> (sed1+sed2) and defaults to norm_blackbody_model()
     """
     # theta == M1, M2, log_age, blob = Teff1, Teff2, logg1, logg2
     lp, blob = ln_prior_func(*theta, k)
