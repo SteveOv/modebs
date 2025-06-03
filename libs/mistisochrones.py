@@ -96,22 +96,25 @@ class MistIsochrones():
         :feh: the chosen metallicity
         :log_age: the chosen age; the nearest matching age block will be used
         :mass: the chosen current stellar mass in M_sun
+        :params: the list of names param values to return
         :min_phase: when set, this will restrict the match to rows of at least this phase
         :max_phase: when set, this will restrict the match to rows up to this phase
-        :params: the list of names param values to return
         """
         # pylint: disable=too-many-arguments, too-many-positional-arguments, too-many-locals
         # Find the age block nearest the requested value
         iso = self._isos[feh]
         age_block = iso.isos[iso.age_index(log_age)]
 
+        # Mask out any rows which do not match any phase criteria
         if min_phase is not None or max_phase is not None:
-            # Mask out any rows which do not match any phase criteria
-            mask = np.array([True] * len(age_block))
-            if min_phase is not None:
-                mask &= age_block["phase"] >= min_phase
-            if max_phase is not None:
-                mask &= age_block["phase"] <= max_phase
+            if min_phase == max_phase: # cannot be None, so optimize when the same
+                mask = age_block["phase"] == min_phase
+            else:
+                mask = np.array([True] * len(age_block))
+                if min_phase is not None:
+                    mask &= age_block["phase"] >= min_phase
+                if max_phase is not None:
+                    mask &= age_block["phase"] <= max_phase
             all_masses = age_block[mask]["star_mass"]
         else:
             all_masses = age_block["star_mass"]
