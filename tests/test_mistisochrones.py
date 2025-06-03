@@ -4,7 +4,7 @@ import numpy as np
 
 from libs.mistisochrones import MistIsochrones
 
-# pylint: disable=too-many-public-methods, line-too-long
+# pylint: disable=too-many-public-methods, line-too-long, invalid-name
 class TestMistIsochrones(unittest.TestCase):
     """ Unit tests for the MistIsochrones class. """
 
@@ -68,16 +68,50 @@ class TestMistIsochrones(unittest.TestCase):
 
 
     #
-    #   stellar_params_for_mass(feh: float, log_age: float, mass: float,
-    #                           min_phase: float=None, max_phase: float=None,
-    #                           params: List[str]=["R", "Teff"]) -> np.ndarray
+    #   stellar_params_for_mass(feh: float, log_age: float, mass: float, params: Iterable[str],
+    #                           min_phase: float=None, max_phase: float=None) -> np.ndarray
     #
-    def test_stellar_params_for_mass_phase_criteria(self):
-        """ Test stellar_params_for_mass(min_phase=0, max_phase=2.0) lists expected range """
+    def test_stellar_params_for_mass_basic_happy_path(self):
+        """ Test stellar_params_for_mass(): asserts handles list of params """
+        misos = MistIsochrones(metallicities=[0])
+        log_Teff, log_L = misos.stellar_params_for_mass(feh=0, log_age=9.6, mass=1.,
+                                                        params=["log_Teff", "log_L"],
+                                                        min_phase=0., max_phase=0.)
+        self.assertAlmostEqual(3.77, log_Teff, 2)
+        self.assertAlmostEqual(0.02, log_L, 2)
+
+    def test_stellar_params_for_mass_single_param(self):
+        """ Test stellar_params_for_mass(): asserts handles a single str param, not as a list """
+        misos = MistIsochrones(metallicities=[0])
+        vals = misos.stellar_params_for_mass(feh=0, log_age=9.6, mass=1., params="log_Teff",
+                                             min_phase=0., max_phase=0.)
+        self.assertAlmostEqual(3.77, vals[0], 2)
+
+    def test_stellar_params_for_mass_undo_log(self):
+        """ Test stellar_params_for_mass(): asserts returns linear value when requested """
+        misos = MistIsochrones(metallicities=[0])
+        vals = misos.stellar_params_for_mass(feh=0, log_age=9.6, mass=1., params=["Teff"],
+                                             min_phase=0., max_phase=0.)
+        self.assertAlmostEqual(5840, vals[0], -2)
+
+    def test_stellar_params_for_mass_mass_outside_phase_criteria(self):
+        """ Test stellar_params_for_mass(): mass too high for age/phase criteria """
         misos = MistIsochrones(metallicities=[0])
         with self.assertRaises(ValueError):
-            # Stars of mass 10 M_sun are longer be near the main sequence, so mass value is invalid
-            misos.stellar_params_for_mass(feh=0, log_age=9, mass=10, min_phase=0.0, max_phase=2.0)
+            # Stars of mass 10 M_sun have long left the M-S at this age, so mass value is invalid
+            misos.stellar_params_for_mass(feh=0, log_age=9, mass=10, params="R", min_phase=0., max_phase=2.)
+
+    def test_stellar_params_for_mass_select_nearest_age_block(self):
+        """ Test stellar_params_for_mass(): the age block nearest to input value chosen """
+        misos = MistIsochrones(metallicities=[0])
+        input_age = 8.123456
+        vals = misos.stellar_params_for_mass(feh=0, log_age=input_age, mass=1.,
+                                               params="log10_isochrone_age_yr", min_phase=0., max_phase=2.)
+
+        ages = misos.list_ages(0, min_phase=0., max_phase=2.)
+        exp_age = ages[np.argmin(np.abs(ages - input_age))]
+        self.assertEqual(exp_age, vals[0], 2)
+
 
 if __name__ == "__main__":
     unittest.main()
