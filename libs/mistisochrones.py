@@ -4,6 +4,7 @@ from typing import List, Iterable
 from pathlib import Path
 from inspect import getsourcefile
 import re
+from enum import Enum
 
 import numpy as np
 
@@ -17,10 +18,23 @@ COLS_FOR_PARAMS = {
     "g":    "log_g",
 }
 
+class Phase(Enum):
+    """ The various stellar evolutionary phases modelled by MIST """
+    # pylint: disable=invalid-name
+    PMS = -1
+    MS = 0
+    RGB = 2
+    CHeB = 3
+    EAGB = 4
+    TPAGB = 5
+    postAGB = 6
+    WR = 9
+
 class MistIsochrones():
     """
     This class wraps one or more MIST isochrone files and exposes functions to query them.
     """
+
     _this_dir = Path(getsourcefile(lambda:0)).parent
 
     def __init__(self, metallicities: list[float]=None) -> None:
@@ -58,7 +72,8 @@ class MistIsochrones():
         return np.array(list(self._isos.keys()))
 
 
-    def list_ages(self, feh: float, min_phase: float=0.0, max_phase: float=9.0) -> np.ndarray:
+    def list_ages(self, feh: float, min_phase: Phase=Phase.MS, max_phase: Phase=Phase.WR) \
+            -> np.ndarray:
         """
         List the distinct log10(age yr)s within the isochrones matching the passed metallicity.
         Only ages with records for stars within the min and max phases are returned.
@@ -73,8 +88,8 @@ class MistIsochrones():
         """
         # We only want age blocks which contain stars within our chosen phase criteria
         iso = self._isos[feh]
-        ages = [ab["log10_isochrone_age_yr"][0] for ab in iso.isos if ab["phase"][-1] >= min_phase
-                                                                    or ab["phase"][0] <= max_phase]
+        ages = [ab["log10_isochrone_age_yr"][0] for ab in iso.isos \
+                    if ab["phase"][-1] >= min_phase.value or ab["phase"][0] <= max_phase.value]
         return np.array(ages)
 
 
@@ -83,8 +98,8 @@ class MistIsochrones():
                                 log_age: float,
                                 mass: float,
                                 params: Iterable[str],
-                                min_phase: float=None,
-                                max_phase: float=None) -> np.ndarray:
+                                min_phase: Phase=None,
+                                max_phase: Phase=None) -> np.ndarray:
         """
         Get the requested stellar param values for the metallicity, age, mass and phase criteria.
         Will allow a log field (i.e.: log_R) to be requested as either the log value (as log_R) or
@@ -108,13 +123,13 @@ class MistIsochrones():
         # Mask out any rows which do not match any phase criteria
         if min_phase is not None or max_phase is not None:
             if min_phase == max_phase: # cannot be None, so optimize when the same
-                mask = age_block["phase"] == min_phase
+                mask = age_block["phase"] == min_phase.value
             else:
                 mask = np.array([True] * len(age_block))
                 if min_phase is not None:
-                    mask &= age_block["phase"] >= min_phase
+                    mask &= age_block["phase"] >= min_phase.value
                 if max_phase is not None:
-                    mask &= age_block["phase"] <= max_phase
+                    mask &= age_block["phase"] <= max_phase.value
             all_masses = age_block[mask]["star_mass"]
         else:
             all_masses = age_block["star_mass"]
