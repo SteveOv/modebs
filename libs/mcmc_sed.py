@@ -8,10 +8,6 @@ from deblib.vmath import exp
 
 # pylint: disable=invalid-name, too-many-arguments, too-many-positional-arguments
 
-# TODO: need a better way of handling this - static cctor?
-from libs.mistisochrones import MistIsochrones
-mist_isos = MistIsochrones(metallicities=[0])
-
 
 def norm_blackbody_model(x: np.ndarray,
                          Teff1: float,
