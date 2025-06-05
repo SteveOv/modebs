@@ -17,13 +17,12 @@ def norm_blackbody_model(x: np.ndarray,
                          Teff1: float,
                          Teff2: float,
                          logg1: float=None,
-                         logg2: float=None) \
-        -> Tuple[np.ndarray, np.ndarray]:
+                         logg2: float=None) -> np.ndarray:
     """
     Model a SED on the Planck blackbody function of two stars of the given effective temperatures.
-    The returned model is the min-max normalized sum the the two stars' fluxes.
+    The returned model is the min-max normalized sum the the two stars' fluxes at each x.
 
-    :x: the frequencies at which the SED observations are required
+    :x: the x-axis/frequencies [Hz] at which fluxes are required
     :Teff1: the effective temperature of star 1 in K
     :Teff2: the effective temperature of star 2 in K
     :logg1: the surface gravity of star 1 in log(cgs) (not used)
@@ -36,7 +35,7 @@ def norm_blackbody_model(x: np.ndarray,
         Calculate the BB spectral brightness at effective temp T and frequencies x with;
         B(x, T) = (2hx^3)/c^2 * 1/(exp(hx/kT)-1)  [W / m^2 / Hz / sr]
 
-        Params teff and x are floats in units of K and Hz, respectively
+        teff and x are floats in units of K and Hz, respectively
         """
         pt1 = (2 * h * x**3) / c**2
         pt2 = exp((h * x) / (k_B * teff)) - 1
@@ -44,61 +43,58 @@ def norm_blackbody_model(x: np.ndarray,
     return min_max_normalize(np.add(bb_spec_brightness(Teff1), bb_spec_brightness(Teff2)))
 
 
-def ln_like(x: np.ndarray,
-            y: np.ndarray,
-            y_err: np.ndarray,
-            Teff1: float,
-            Teff2: float,
-            logg1: float,
-            logg2: float,
-            model_func: Callable=norm_blackbody_model):
-    """
-    The MCMC likelihood function, which returns a comparison of the x & y (+/-y_err)
-    observations with the model produced by the model_func based on the Teffs and loggs.
-
-    Is calculated as 1/2 Σ((y - y_model)/y_err)^2
-    
-    :x: the frequencies at which the SED observations were made
-    :y: the fluxes of the SED observations
-    :y_err: the uncertainties of the flux observations
-    :Teff1: the effective temperature of star 1 in K
-    :Teff2: the effective temperature of star 2 in K
-    :logg1: the surface gravity of star 1 in log(cgs)
-    :logg2: the surface gravity of star 2 in log(cgs)
-    :returns: the calculated likelihood value
-    """
-    y_model = model_func(x, Teff1, Teff2, logg1, logg2)
-    return -0.5 * np.sum(((y - y_model) / y_err)**2)
-
-
-def ln_prob(theta: Tuple[float, float, float],
+def ln_like(theta: np.ndarray,
             x: np.ndarray,
             y: np.ndarray,
             y_err: np.ndarray,
-            ln_prior_func: Callable[[float, float, float, float], Tuple[float, Tuple[any]]],
-            model_func: Callable[[np.ndarray, float, float, float, float],
-                                 Tuple[np.ndarray]]=norm_blackbody_model):
+            model_func: Callable[[np.ndarray, any], np.ndarray]=norm_blackbody_model) -> float:
+    """
+    The MCMC log likelihood function, which returns a chi-squared based comparison of
+    the x & y (+/-y_err) observations with the model produced by the model_func.
+
+    The comparison is calculated as -1/2 Σ((y - model) / y_err)^2
+
+    This returns a negative value as emcee will seek to maximize this value.
+
+    :theta: the current walker position/parameter set to evaluate
+    :x: the x values at which the observations are made
+    :y: the y values of observations
+    :y_err: the y value uncertainties
+    :model_func: function to produce the model values to be evaluated. This should have the
+    form func(x, *theta_rev) -> np.ndarray, and defaults to norm_blackbody_model()
+    :returns: the calculated likelihood value
+    """
+    chi2 = np.square((y - model_func(x, *theta)) / y_err)
+    return -0.5 * np.sum(chi2)
+
+
+def ln_prob(theta: np.ndarray,
+            x: np.ndarray,
+            y: np.ndarray,
+            y_err: np.ndarray,
+            ln_prior_func: Callable[[any], Tuple[float, np.ndarray]],
+            model_func: Callable[[np.ndarray, any], np.ndarray]=norm_blackbody_model) \
+                -> Tuple[float, any]:
     """
     The ln_prob function to be called by emcee.EnsembleSample to fit models to a SED.
     Will create the call stack of MCMC ln_prior_func() and ln_like() functions using the
     chosen model_func to support it.
 
-    :theta: the current walker position of the (M1, M2, log_age) parameters
-    :x: the frequencies at which the SED observations were made
-    :y: the fluxes of the SED observations
-    :y_err: the uncertainties of the flux observations
-    :ln_prior_func: the mmcmc function to evaluate the priors. This should hace the form
-    func(M1, M2, age, k) -> (0 or -np.inf, (Teff1, Teff2, logg1, logg2))
-    :model_func: function to produce the model pairs of SEDs to be evaluated. This should have the
-    form func(x, Teff1, Teff2, logg1, logg2) -> (sed1+sed2) and defaults to norm_blackbody_model()
-    :returns: the log probability of this walker position and the unpacked blob returned from the
-    ln_prior_func (which emcee will repack within a numpy array for publication through get_blobs)
+    :theta: the current walker position/parameter set to evaluate
+    :x: the x values at which the observations are made
+    :y: the y values of observations
+    :y_err: the y value uncertainties
+    :ln_prior_func: function to evaluate theta against any priors and return the potentially revised
+    theta to pass to model_func. This should have the form func(*theta) -> (0 or -np.inf, theta_rev)
+    :model_func: function to produce the model values to be evaluated. This should have the
+    form func(x, *theta_rev) -> np.ndarray, and defaults to norm_blackbody_model()
+    :returns: log probability at this walker position & the theta_rev values corresponding to theta
+    as returned from ln_prior_func (emcee will repack within a numpy array & publish with get_blobs)
     """
-    # theta == M1, M2, log_age, blob = Teff1, Teff2, logg1, logg2
-    lp, blob = ln_prior_func(*theta)
+    lp, theta_rev = ln_prior_func(*theta)
     if np.isfinite(lp):
-        return lp + ln_like(x, y, y_err, *blob, model_func), *blob
-    return -np.inf, *blob
+        return lp + ln_like(theta_rev, x, y, y_err, model_func), *theta_rev
+    return -np.inf, *theta_rev
 
 
 def min_max_normalize(vals: np.ndarray, val_errs: np.ndarray=None):
