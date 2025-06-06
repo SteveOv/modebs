@@ -2,9 +2,10 @@
 Low level utility functions for light curve ingest, pre-processing, estimation and fitting.
 """
 #pylint: disable=no-member
-from typing import Tuple
-from requests.exceptions import HTTPError
+from typing import Tuple, List, Callable, Generator
+import inspect
 
+from requests.exceptions import HTTPError
 import numpy as np
 import astropy.units as u
 from astropy.coordinates import SkyCoord
@@ -14,6 +15,42 @@ from dustmaps import config, bayestar           # Bayestar dustmaps/dereddening 
 from pyvo import registry, DALServiceError      # Vergeley at al. extinction catalogue
 
 # TODO: remove the extinction funcs from pipeline and update quick_fit
+
+
+def get_extinction(target_coords: SkyCoord,
+                   funcs: List[str]=None) -> Generator[Tuple[float, dict], any, any]:
+    """
+    A convenience function which iterates through the requested extinction lookup functions,
+    published on this module, yielding the extinction value and flags returned by each.
+    The extinction value will be the E(B-V) or A_V as specific to each function.
+
+    If no funcs specified the following list will be used, in the order shown:
+    [get_gontcharov_ebv, get_bayestar_ebv, get_vergely_av]
+
+    :target_coords: the SkyCoords to get the extinction value for
+    :funcs: optional list of functions to iterate over, either by name of function object.
+    These must be callable as func(coords: SkyCoord) -> (value: float, flags: Dict)
+    """
+    if funcs is None:
+        funcs = [get_gontcharov_ebv, get_bayestar_ebv, get_vergely_av]
+    if isinstance(funcs, str) or isinstance(funcs, Callable):
+        funcs = [funcs]
+
+    for ext_func in funcs:
+        if isinstance(ext_func, str):
+            # Find the matching function in this module
+            # TODO: can this be more efficient? Also perhaps better validation of func signature
+            for name, func in inspect.getmembers(inspect.getmodule(get_extinction),
+                                                 lambda m: isinstance(m, Callable)):
+                if ext_func in name:
+                    ext_func = func
+                    break
+
+        if isinstance(ext_func, Callable):
+            val, flags = ext_func(target_coords)
+            flags["source"] = ext_func.__name__
+            yield val, flags
+
 
 def get_bayestar_ebv(target_coords: SkyCoord,
                      version: str="bayestar2019",
@@ -40,8 +77,10 @@ def get_bayestar_ebv(target_coords: SkyCoord,
 
     # Now we can use the local cache for the lookup
     query = bayestar.BayestarQuery(version=version)
-    ebv, flags =  query(target_coords, mode='median', return_flags=True)
-    return conversion_factor * ebv, { n: flags[n] for n in flags.dtype.names }
+    val, flags =  query(target_coords, mode='median', return_flags=True)
+    flags_dict = { n: flags[n] for n in flags.dtype.names }
+    flags_dict["type"] = "E(B-V)"
+    return conversion_factor * val, flags_dict
 
 
 def get_gontcharov_ebv(target_coords: SkyCoord,
@@ -70,6 +109,7 @@ def get_gontcharov_ebv(target_coords: SkyCoord,
             if len(_tbl):
                 ebv = _tbl[0]["E(J-Ks)"][0] * conversion_factor
                 flags["converged"] = dflag
+                flags["type"] = "E(B-V)"
                 break
 
     return ebv, flags
@@ -77,8 +117,8 @@ def get_gontcharov_ebv(target_coords: SkyCoord,
 
 def get_vergely_av(target_coords: SkyCoord):
     """
-    Queries the Vergely, Lallement & Cox (2022) 3-d extinction map for the Av value of the
-    target coordinates.
+    Queries the Vergely, Lallement & Cox (2022) [2022A&A...664A.174V] 3-d extinction map
+    for the Av value of the target coordinates.
 
     TODO: this needs further work
 
@@ -104,6 +144,7 @@ def get_vergely_av(target_coords: SkyCoord):
                 ext_nmag_per_pc = rec["Exti"][0] # nmag
                 av = (ext_nmag_per_pc * target_coords.distance.to(u.pc).value) / 10**9
                 flags['converged'] = True
+                flags["type"] = "Av"
                 break
     except DALServiceError as exc:
         print(f"Failed to query: {exc}")
