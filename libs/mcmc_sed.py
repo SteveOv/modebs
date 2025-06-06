@@ -3,47 +3,14 @@ from typing import Callable, Tuple
 
 import numpy as np
 
-from deblib.constants import c, h, k_B
-from deblib.vmath import exp
-
 # pylint: disable=invalid-name, too-many-arguments, too-many-positional-arguments
-
-
-def norm_blackbody_model(x: np.ndarray,
-                         Teff1: float,
-                         Teff2: float,
-                         logg1: float=None,
-                         logg2: float=None) -> np.ndarray:
-    """
-    Model a SED on the Planck blackbody function of two stars of the given effective temperatures.
-    The returned model is the min-max normalized sum the the two stars' fluxes at each x.
-
-    :x: the x-axis/frequencies [Hz] at which fluxes are required
-    :Teff1: the effective temperature of star 1 in K
-    :Teff2: the effective temperature of star 2 in K
-    :logg1: the surface gravity of star 1 in log(cgs) (not used)
-    :logg2: the surface gravity of star 2 in log(cgs) (not used)
-    :returns: the normalized summed fluxes at x for the two stars
-    """
-    # pylint: disable=unused-argument
-    def bb_spec_brightness(teff):
-        """
-        Calculate the BB spectral brightness at effective temp T and frequencies x with;
-        B(x, T) = (2hx^3)/c^2 * 1/(exp(hx/kT)-1)  [W / m^2 / Hz / sr]
-
-        teff and x are floats in units of K and Hz, respectively
-        """
-        pt1 = (2 * h * x**3) / c**2
-        pt2 = exp((h * x) / (k_B * teff)) - 1
-        return pt1 / pt2
-    return min_max_normalize(np.add(bb_spec_brightness(Teff1), bb_spec_brightness(Teff2)))
 
 
 def ln_like(theta: np.ndarray,
             x: np.ndarray,
             y: np.ndarray,
             y_err: np.ndarray,
-            model_func: Callable[[np.ndarray, any], np.ndarray]=norm_blackbody_model) -> float:
+            model_func: Callable[[np.ndarray, any], np.ndarray]) -> float:
     """
     The MCMC log likelihood function, which returns a chi-squared based comparison of
     the x & y (+/-y_err) observations with the model produced by the model_func.
@@ -56,8 +23,8 @@ def ln_like(theta: np.ndarray,
     :x: the x values at which the observations are made
     :y: the y values of observations
     :y_err: the y value uncertainties
-    :model_func: function to produce the model values to be evaluated. This should have the
-    form func(x, *theta_rev) -> np.ndarray, and defaults to norm_blackbody_model()
+    :model_func: function to produce the model values to be evaluated.
+    This should have the form func(x, *theta_rev) -> np.ndarray.
     :returns: the calculated likelihood value
     """
     chi2 = np.square((y - model_func(x, *theta)) / y_err)
@@ -69,8 +36,7 @@ def ln_prob(theta: np.ndarray,
             y: np.ndarray,
             y_err: np.ndarray,
             ln_prior_func: Callable[[any], Tuple[float, np.ndarray]],
-            model_func: Callable[[np.ndarray, any], np.ndarray]=norm_blackbody_model) \
-                -> Tuple[float, any]:
+            model_func: Callable[[np.ndarray, any], np.ndarray]) -> Tuple[float, any]:
     """
     The ln_prob function to be called by emcee.EnsembleSample to fit models to a SED.
     Will create the call stack of MCMC ln_prior_func() and ln_like() functions using the
@@ -80,10 +46,10 @@ def ln_prob(theta: np.ndarray,
     :x: the x values at which the observations are made
     :y: the y values of observations
     :y_err: the y value uncertainties
-    :ln_prior_func: function to evaluate theta against any priors and return the potentially revised
-    theta to pass to model_func. This should have the form func(*theta) -> (0 or -np.inf, theta_rev)
-    :model_func: function to produce the model values to be evaluated. This should have the
-    form func(x, *theta_rev) -> np.ndarray, and defaults to norm_blackbody_model()
+    :ln_prior_func: function to evaluate theta against any priors and to potentially revise
+    theta for the model_func. This should have the form func(*theta) -> (0 or -np.inf, theta_rev)
+    :model_func: function to produce the model values to be evaluated.
+    This should have the form func(x, *theta_rev) -> np.ndarray.
     :returns: log probability at this walker position & the theta_rev values corresponding to theta
     as returned from ln_prior_func (emcee will repack within a numpy array & publish with get_blobs)
     """
