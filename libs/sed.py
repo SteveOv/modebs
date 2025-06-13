@@ -2,6 +2,7 @@
 """
 Low level utility functions for SED ingest, pre-processing, estimation and fitting.
 """
+from typing import Union
 from pathlib import Path
 import re
 from urllib.parse import quote_plus
@@ -9,9 +10,12 @@ from urllib.parse import quote_plus
 # pylint: disable=no-member
 import astropy.units as u
 from astropy.table import Table
+from uncertainties import UFloat
 import numpy as np
+from scipy.optimize import minimize
 
-from deblib.constants import c
+from deblib.constants import c, h, k_B
+from deblib.vmath import exp
 
 def get_sed_for_target(target: str,
                        search_term: str=None,
@@ -80,3 +84,68 @@ def get_sed_for_target(target: str,
     sed["sed_evfv"] = (sed["sed_freq"].value * sed["sed_eflux"].value) \
                         * (sed["sed_freq"].unit * sed["sed_eflux"].unit)
     return sed
+
+
+def create_outliers_mask(sed: Table, teff_ratio: float=1.0) -> np.ndarray[bool]:
+    """
+    WIP
+    """
+    mask = np.zeros((len(sed)), dtype=bool)
+
+    # - perform a scipy minimize fit on target (incl scaling model to observations)
+    freq = sed["sed_freq"].to(u.Hz).value
+    flux = sed["sed_flux"].to(u.W / u.m**2 / u.Hz).value
+    flux_err = sed["sed_eflux"].to(u.W / u.m**2 / u.Hz).value
+    teff1, teff2 = 5000, 5000 * teff_ratio
+    teff1, teff2 = _minimize_fit_sed(freq, flux, flux_err, teff1, teff2, teff_ratio)
+    y_model = np.add(blackbody_flux(freq, teff1), blackbody_flux(freq, teff2))
+
+    # - calculate chi^2 of fit
+    # - while (chi^2 values exist > threshold and #remaining obs > minimum)
+    #   - mask remaining obs with highest chi^2
+
+    return mask
+
+def blackbody_flux(freq: Union[float, UFloat, np.ndarray[float], np.ndarray[UFloat]],
+                   teff: Union[float, UFloat],
+                   radius: float=1.) -> np.ndarray[float]:
+    """
+    Calculates the Blackbody / Planck function fluxes of a body of the requested temperature [K]
+    at the requested frequencies [Hz] over an area defined by the radius in arcseconds.
+
+    The fluxes are given in units of W / m^2 / Hz. Multiply them 1e26 for the equivalent in Jy.
+ 
+    :freq: the frequency/ies in Hz
+    :teff: the temperature in K
+    :radius: the area radius in arcseconds
+    :returns: the blackbody fluxes at freq, in W / m^2 / Hz
+    """
+    area = 2 * np.pi * (radius / 206265)**2 # radius in arcsec where 206265 arcsec = 1 rad
+    part1 = 2 * h * freq**3 / c**2
+    part2 = exp((h * freq) / (k_B * teff)) - 1
+    return area * part1 / part2
+
+
+def _minimize_fit_sed(x, y, y_err=None, init_teff1=5000., init_teff2=5000., teff_ratio=1.0):
+    """
+    WIP
+    """
+    # Get the x, y and y_err (that latter normalized)
+    y_min = y.min()
+    y_scale = y.max() - y_min
+    y = (y - y_min) / y_scale
+    y_err = 1 if y_err is None else y_err / y_scale
+    teff_flex = teff_ratio * 0.05
+
+    def _similarity_func(theta):
+        # Get the model fluxes and normalize them (y and y_err are already normalized)
+        (teff1, teff2) = theta
+        y_model = np.add(blackbody_flux(x, teff1), blackbody_flux(x, teff2))
+        y_min = y_model.min()
+        y_model = (y_model - y_min) / (y_model.max() - y_min)
+        if 3000 < teff1 < 30000 and np.abs((teff2 / teff1) - teff_ratio) <= teff_flex:
+            return 0.5 * np.sum(((y - y_model) / y_err)**2)
+        return np.inf
+
+    soln = minimize(_similarity_func, x0=(init_teff1, init_teff2))
+    return soln.x[0], soln.x[1]
