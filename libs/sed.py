@@ -86,19 +86,20 @@ def get_sed_for_target(target: str,
     return sed
 
 
-def create_outliers_mask(sed: Table, teff_ratio: float=1.0) -> np.ndarray[bool]:
+def create_outliers_mask(sed: Table, teffs0: Tuple=(5000, 5000)) -> np.ndarray[bool]:
     """
     WIP
     """
     mask = np.zeros((len(sed)), dtype=bool)
 
     # - perform an initial teff fit on target and get the resulting model
+    teff_ratio = np.min(teffs0) / np.max(teffs0)
     teff_flex = teff_ratio * 0.05
     def priors_func(teffs):
         return all(3000 <= t <= 30000 for t in teffs) \
-            and abs((teffs[1]/teffs[0]) - teff_ratio) <= teff_flex
+            and abs((np.min(teffs) / np.max(teffs)) - teff_ratio) <= teff_flex
     teffs, y_model = simple_teff_minimize_fit(sed["sed_freq"], sed["sed_flux"], sed["sed_eflux"],
-                                              (5000, 5000 * teff_ratio), priors_func)
+                                              teffs0, priors_func)
     print(teffs)
     print(y_model)
 
@@ -147,25 +148,24 @@ def simple_teff_minimize_fit(x: np.ndarray,
     :method: the method to use in the underlying call to scipy minimize
     :returns: the final, fitted set of teffs and the set of corresponding flux values
     """
-    # initialize & normalize the SED data
+    # pylint: disable=too-many-arguments, too-many-positional-arguments
     flux_unit = y.unit
     x = x.to(u.Hz).value
-    y_scale = y.max() - y.min()
-    y = ((y - y.min()) / y_scale).value
-    y_err = 1 if y_err is None else (y_err / y_scale).value
+    y = y.value
+    y_log = np.log10(y)                 # We scale model to sed observations within log space
+    y_err = 1 if y_err is None else (y_err.value + 1e-30) # avoid div0 errors
 
-    def _normalized_combined_bb_flux(teffs):
-        y_model = np.sum([blackbody_flux(x, teff) for teff in teffs], axis=0)
+    def _scaled_combined_bb_flux(teffs):
+        y_model_log = np.log10(np.sum([blackbody_flux(x, teff) for teff in teffs], axis=0))
         if flux_unit == u.Jy:
-            y_model /= 1e26
-        y_min = y_model.min()
-        return (y_model - y_min) / (y_model.max() - y_min)
+            y_model_log += 26
+        return 10**(y_model_log + np.median(y_log - y_model_log))
 
     def _similarity_func(teffs):
         if priors_func is None or priors_func(teffs):
-            y_model = _normalized_combined_bb_flux(teffs)
+            y_model = _scaled_combined_bb_flux(teffs)
             return 0.5 * np.sum(((y - y_model) / y_err)**2)
         return np.inf
 
     soln = minimize(_similarity_func, x0=teffs0, method=method)
-    return soln.x, _normalized_combined_bb_flux(soln.x) * flux_unit
+    return soln.x, _scaled_combined_bb_flux(soln.x) * flux_unit

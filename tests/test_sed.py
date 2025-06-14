@@ -140,7 +140,7 @@ class Testsed(unittest.TestCase):
     def test_create_outliers_mask_simple_happy_path(self):
         """ Test create_outliers_mask(sed) WIP """
         sed = get_sed_for_target(Testsed._cw_eri_test_target)
-        mask = create_outliers_mask(sed, teff_ratio=0.9)
+        mask = create_outliers_mask(sed, teffs0=(6800, 6500))
         self.assertTrue(isinstance(mask, np.ndarray))
         self.assertTrue(mask.dtype == np.dtype(bool))
         self.assertEqual(len(sed), len(mask))
