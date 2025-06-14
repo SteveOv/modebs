@@ -2,7 +2,7 @@
 """
 Low level utility functions for SED ingest, pre-processing, estimation and fitting.
 """
-from typing import Union
+from typing import Union, Tuple, Callable
 from pathlib import Path
 import re
 from urllib.parse import quote_plus
@@ -92,13 +92,15 @@ def create_outliers_mask(sed: Table, teff_ratio: float=1.0) -> np.ndarray[bool]:
     """
     mask = np.zeros((len(sed)), dtype=bool)
 
-    # - perform a scipy minimize fit on target (incl scaling model to observations)
-    freq = sed["sed_freq"].to(u.Hz).value
-    flux = sed["sed_flux"].to(u.W / u.m**2 / u.Hz).value
-    flux_err = sed["sed_eflux"].to(u.W / u.m**2 / u.Hz).value
-    teff1, teff2 = 5000, 5000 * teff_ratio
-    teff1, teff2 = _minimize_fit_sed(freq, flux, flux_err, teff1, teff2, teff_ratio)
-    y_model = np.add(blackbody_flux(freq, teff1), blackbody_flux(freq, teff2))
+    # - perform an initial teff fit on target and get the resulting model
+    teff_flex = teff_ratio * 0.05
+    def priors_func(teffs):
+        return all(3000 <= t <= 30000 for t in teffs) \
+            and abs((teffs[1]/teffs[0]) - teff_ratio) <= teff_flex
+    teffs, y_model = simple_teff_minimize_fit(sed["sed_freq"], sed["sed_flux"], sed["sed_eflux"],
+                                              (5000, 5000 * teff_ratio), priors_func)
+    print(teffs)
+    print(y_model)
 
     # - calculate chi^2 of fit
     # - while (chi^2 values exist > threshold and #remaining obs > minimum)
@@ -126,26 +128,44 @@ def blackbody_flux(freq: Union[float, UFloat, np.ndarray[float], np.ndarray[UFlo
     return area * part1 / part2
 
 
-def _minimize_fit_sed(x, y, y_err=None, init_teff1=5000., init_teff2=5000., teff_ratio=1.0):
+def simple_teff_minimize_fit(x: np.ndarray,
+                             y: np.ndarray,
+                             y_err: np.ndarray,
+                             teffs0: Tuple,
+                             priors_func: Callable[[any], bool]=None,
+                             method: str=None) -> Tuple[Tuple, np.ndarray]:
     """
-    WIP
-    """
-    # Get the x, y and y_err (that latter normalized)
-    y_min = y.min()
-    y_scale = y.max() - y_min
-    y = (y - y_min) / y_scale
-    y_err = 1 if y_err is None else y_err / y_scale
-    teff_flex = teff_ratio * 0.05
+    Perform a simple fit on the passed SED data (x, y and y_err) by minimizing a function which
+    which sums one or more sets of blackbody fluxes.
 
-    def _similarity_func(theta):
-        # Get the model fluxes and normalize them (y and y_err are already normalized)
-        (teff1, teff2) = theta
-        y_model = np.add(blackbody_flux(x, teff1), blackbody_flux(x, teff2))
+    :x: the SED frequencies
+    :y: the SED fluxes at the frequencies in x [W / m^2 / Hz or Jy]
+    :y_err: the uncertainties y in the same unit
+    :teffs0: the initial set of teffs - a blackbody spectrum will be generated for each member
+    :priors_func: function to evaluate each set of teffs against known priors - returns bool
+    indicating whether the teffs conform to the priors or not
+    :method: the method to use in the underlying call to scipy minimize
+    :returns: the final, fitted set of teffs and the set of corresponding flux values
+    """
+    # initialize & normalize the SED data
+    flux_unit = y.unit
+    x = x.to(u.Hz).value
+    y_scale = y.max() - y.min()
+    y = ((y - y.min()) / y_scale).value
+    y_err = 1 if y_err is None else (y_err / y_scale).value
+
+    def _normalized_combined_bb_flux(teffs):
+        y_model = np.sum([blackbody_flux(x, teff) for teff in teffs], axis=0)
+        if flux_unit == u.Jy:
+            y_model /= 1e26
         y_min = y_model.min()
-        y_model = (y_model - y_min) / (y_model.max() - y_min)
-        if 3000 < teff1 < 30000 and np.abs((teff2 / teff1) - teff_ratio) <= teff_flex:
+        return (y_model - y_min) / (y_model.max() - y_min)
+
+    def _similarity_func(teffs):
+        if priors_func is None or priors_func(teffs):
+            y_model = _normalized_combined_bb_flux(teffs)
             return 0.5 * np.sum(((y - y_model) / y_err)**2)
         return np.inf
 
-    soln = minimize(_similarity_func, x0=(init_teff1, init_teff2))
-    return soln.x[0], soln.x[1]
+    soln = minimize(_similarity_func, x0=teffs0, method=method)
+    return soln.x, _normalized_combined_bb_flux(soln.x) * flux_unit
