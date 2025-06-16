@@ -141,8 +141,8 @@ class Testsed(unittest.TestCase):
         """ Tests quick_blackbody_fit() with simple happy path scenarios """
         for target,                         tempA,  temp_ratio, flux_unit in [
             # CW Eri has some large outliers
-            (Testsed._cw_eri_test_target,   6861,   0.9,        u.Jy),
-            (Testsed._cw_eri_test_target,   6861,   0.9,        u.W / u.m**2 / u.Hz),
+            (Testsed._cw_eri_test_target,   6800,   0.9,        u.Jy),
+            (Testsed._cw_eri_test_target,   6800,   0.9,        u.W / u.m**2 / u.Hz),
             (Testsed._cm_dra_test_target,   3200,   0.95,       u.W / u.m**2 / u.Hz),
         ]:
             # pylint: disable=unnecessary-lambda-assignment, cell-var-from-loop
@@ -166,11 +166,23 @@ class Testsed(unittest.TestCase):
     #
     def test_create_outliers_mask_simple_happy_path(self):
         """ Test create_outliers_mask(sed) WIP """
-        sed = get_sed_for_target(Testsed._cw_eri_test_target)
-        mask = create_outliers_mask(sed, temps0=(6800, 6500))
-        self.assertTrue(isinstance(mask, np.ndarray))
-        self.assertTrue(mask.dtype == np.dtype(bool))
-        self.assertEqual(len(sed), len(mask))
+        for target,                         temps0,             min_unmasked in [
+            (Testsed._cw_eri_test_target,    (6800, 6500),      15),
+            (Testsed._cm_dra_test_target,    (3200, 3200),      15),
+            (Testsed._zz_boo_test_target,    (6700, 6700),      15),
+        ]:
+            with self.subTest():
+                sed = get_sed_for_target(target)
+                mask = create_outliers_mask(sed, temps0, min_unmasked, verbose=True)
+                self.assertTrue(isinstance(mask, np.ndarray))
+                self.assertTrue(mask.dtype == np.dtype(bool))
+                self.assertEqual(len(sed), len(mask))
+
+                if min_unmasked < 1:
+                    min_unmasked = np.floor(len(sed) * min_unmasked)
+                self.assertTrue(sum(~mask) >= min_unmasked)
+
+                print(f"{target}: Number of fluxes left: {sum(~mask)} of {len(sed)}")
 
 if __name__ == "__main__":
     unittest.main()

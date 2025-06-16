@@ -3,6 +3,7 @@
 Low level utility functions for SED ingest, pre-processing, estimation and fitting.
 """
 from typing import Union, Tuple, Callable
+import warnings
 from pathlib import Path
 import re
 from urllib.parse import quote_plus
@@ -87,30 +88,91 @@ def get_sed_for_target(target: str,
     return sed
 
 
-def create_outliers_mask(sed: Table, temps0: Tuple=(5000, 5000)) -> np.ndarray[bool]:
+def create_outliers_mask(sed: Table,
+                         temps0: Tuple=(5000, 5000),
+                         min_unmasked: float=15,
+                         min_improvement_ratio: float = 0.10,
+                         verbose: bool=False) -> np.ndarray[bool]:
     """
-    WIP
-    """
-    mask = np.zeros((len(sed)), dtype=bool)
+    Will create a mask indicating the farthest outliers.
 
-    # - perform an initial teff fit on target and get the resulting model
-    if isinstance(temps0, Number):
-        temps0 = (temps0,)
+    Carried out by iteratively evaluating test blackbody fits on the observations, and masking
+    out the farthest/worst outliers. This continues until the fits no longer improve or further
+    masking would drop the number of remaining observations below a defined threshold.
+
+    :sed: the source observations to evaluate
+    :temps0: the initial temperatures to use for the test fit
+    :min_unmasked: the minimum number of observations to leave unmasked, either as an explicit
+    count (if > 1) or as a ratio of the initial number (if within (0, 1])
+    :min_improvement_ratio: minimum ratio of test stat improvement required to add to outlier_mask
+    :verbose: whether to print progress messages or not
+    :returns: a mask indicating those observations selected as outliers
+    """
+    sed_rows = len(sed)
+    outlier_mask = np.zeros((sed_rows), dtype=bool)
+    if 0 < (min_unmasked := abs(min_unmasked)) <= 1:
+        min_unmasked = int(sed_rows * min_unmasked)
+    if sed_rows <= min_unmasked:
+        if verbose:
+            print(f"No mask attempted as SED rows already at or below minimum of {min_unmasked}")
+        return outlier_mask
+
+    # Initial temps and associated priors
+    temps0 = (temps0,) if isinstance(temps0, Number) else temps0
     temp_ratio = temps0[-1] / temps0[0]
     temp_flex = temp_ratio * 0.05
-    def priors_func(ts):
-        this_tratio = 1 if len(ts) == 1 else ts[-1] / ts[0]
-        return all(3000 <= t <= 30000 for t in ts) and abs(this_tratio - temp_ratio) <= temp_flex
-    temps, y_model = quick_blackbody_fit(sed["sed_freq"], sed["sed_flux"], sed["sed_eflux"],
-                                         temps0, priors_func)
-    print(temps)
-    print(y_model)
 
-    # - calculate chi^2 of fit
-    # - while (chi^2 values exist > threshold and #remaining obs > minimum)
-    #   - mask remaining obs with highest chi^2
+    # Iteratively fit the observations, remove the worst fitted points until fit no longer improves
+    iteration = 0
+    test_mask = outlier_mask.copy()   # for initial/baseline fit nothing is excluded
+    last_test_stat = np.inf
+    while True:
+        if sed_rows - sum(test_mask) <= min_unmasked:
+            if verbose:
+                print(f"Iteration {iteration}: stopping now, as further masking will reduce the",
+                        f"number of observations below the minimum of {min_unmasked} rows.")
+            break
 
-    return mask
+        # Perform a fit on (remaining) target fluxes and get the resulting model
+        _, y_model = quick_blackbody_fit(sed["sed_freq"][~test_mask],
+                                         sed["sed_flux"][~test_mask],
+                                         sed["sed_eflux"][~test_mask],
+                                         temps0,
+                                         lambda ts: all(3000 < t <= 30000 for t in ts) \
+                                                    and abs(ts[-1]/ts[0] - temp_ratio) <= temp_flex)
+
+        # TODO: check fitted temps and/or fit against input and warn if bad fit
+
+        # Summarize this fit on the test mask. TODO: refine test stat and weights
+        weights = np.ones_like(y_model)
+        this_resids_sq = ((sed["sed_flux"][~test_mask] - y_model) / sed["sed_eflux"][~test_mask])**2
+        this_test_stat = np.sum(this_resids_sq * weights).value / (len(this_resids_sq) - 1)
+
+        if verbose:
+            print(f"Iteration {iteration:03d}: fit = {this_test_stat:.3f}",
+                  end=" " if iteration > 0 else "\n")
+        if iteration > 0:
+            # After the first iter, which sets the baseline, we evaluate the quality of this fit
+            # against that of the previous iter. If fit is better, we update the mask and try again.
+            if last_test_stat - this_test_stat > last_test_stat * min_improvement_ratio:
+                outlier_mask = test_mask
+                if verbose:
+                    print(f"with {sum(test_mask)}/{sed_rows} outliers masked at",
+                        f"{', '.join(f'{f:.3e}' for f in np.unique(sed['sed_freq'][test_mask]))}.",
+                        f"[{sed['sed_freq'].unit}]")
+            else:
+                if verbose:
+                    print("with no significant improvement so no further outliers will be masked.")
+                break
+
+        # Create the next test mask from the current outlier mask & farthest outliers from this fit.
+        # As we iterate, each resid array shrinks to cover only items not already in outlier_mask
+        (test_mask := outlier_mask.copy())[~outlier_mask] = this_resids_sq == this_resids_sq.max()
+        last_test_stat = this_test_stat
+        iteration += 1
+
+    return outlier_mask
+
 
 def blackbody_flux(freq: Union[float, UFloat, np.ndarray[float], np.ndarray[UFloat]],
                    temp: Union[float, UFloat],
@@ -175,5 +237,7 @@ def quick_blackbody_fit(x: np.ndarray,
             return 0.5 * np.sum(((y - y_model) / y_err)**2)
         return np.inf
 
-    soln = minimize(_similarity_func, x0=temps0, method=method)
+    with warnings.catch_warnings(category=RuntimeWarning):
+        warnings.filterwarnings("ignore", message="invalid value encountered in subtract")
+        soln = minimize(_similarity_func, x0=temps0, method=method)
     return tuple(soln.x), _scaled_combined_bb_flux(soln.x) * flux_unit
