@@ -11,7 +11,7 @@ from numbers import Number
 
 # pylint: disable=no-member
 import astropy.units as u
-from astropy.table import Table
+from astropy.table import Table, Column
 from uncertainties import UFloat
 import numpy as np
 from scipy.optimize import minimize
@@ -76,16 +76,35 @@ def get_sed_for_target(target: str,
     if sed["sed_freq"].unit != freq_unit:
         sed["sed_freq"] = sed["sed_freq"].to(freq_unit)
 
-    # Add wavelength which we may use for plots
+    # Add wavelength which we may be useful downstream
     sed["sed_wl"] = np.divide(c * u.m / u.s, sed["sed_freq"]).to(wl_unit)
-
-    # Add vF(v) columns. There's an issue here; we have to explicitly set each new
-    # column's unit otherwise the unit from the first source column appears to be copied.
-    sed["sed_vfv"] = (sed["sed_freq"].value * sed["sed_flux"].value) \
-                        * (sed["sed_freq"].unit * sed["sed_flux"].unit)
-    sed["sed_evfv"] = (sed["sed_freq"].value * sed["sed_eflux"].value) \
-                        * (sed["sed_freq"].unit * sed["sed_eflux"].unit)
     return sed
+
+
+def calculate_vfv(sed: Table,
+                  freq_colname: str="sed_freq",
+                  flux_colname: str="sed_flux",
+                  flux_err_colname: str="sed_eflux") -> Tuple[Column, Column]:
+    """
+    Calculate the nu*F(nu) columns which are often plotted in place of raw flux/flux err values.
+    The columns are not added directly to the table but may be by client code, if required.
+    For example:
+    ```python
+    sed["sed_vfv"], sed["sed_evfv"] = calculate_vfv(sed)
+    ```
+
+    :sed: the table which is the source of the fluxes
+    :freq_colname: the name of the frequency column to use
+    :flux_colname: the name of the flux column to use
+    :flex_err_colname: the name of the flux uncertainty column to use
+    :returns: a tuple of new astropy Columns with values (sed_freq * sed_flux, sed_freq * sed_eflux)
+    """
+    freqs, fluxes, flux_errs = sed.columns[freq_colname, flux_colname, flux_err_colname].values()
+    vfv = freqs * fluxes
+    vfv.unit = freqs.unit * fluxes.unit    # Fix the unit otherwise it'll only use that of freq
+    evfv = freqs * flux_errs
+    evfv.unit = freqs.unit * fluxes.unit   # Fix the unit otherwise it'll only use that of freq
+    return vfv, evfv
 
 
 def create_outliers_mask(sed: Table,

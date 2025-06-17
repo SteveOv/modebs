@@ -11,8 +11,8 @@ import astropy.units as u
 from astropy.units.errors import UnitConversionError
 from astropy.table import Table
 
-from libs.sed import get_sed_for_target, create_outliers_mask
-from libs.sed import blackbody_flux, quick_blackbody_fit
+from libs.sed import get_sed_for_target, calculate_vfv
+from libs.sed import create_outliers_mask, blackbody_flux, quick_blackbody_fit
 
 class Testsed(unittest.TestCase):
     """ Unit tests for the sed module. """
@@ -58,9 +58,7 @@ class Testsed(unittest.TestCase):
         self.assertIn("sed_eflux", sed.colnames)
         self.assertIn("sed_freq", sed.colnames)
         self.assertIn("sed_filter", sed.colnames)
-        self.assertIn("sed_wl", sed.colnames)       # These added once downloaded
-        self.assertIn("sed_vfv", sed.colnames)
-        self.assertIn("sed_evfv", sed.colnames)
+        self.assertIn("sed_wl", sed.colnames)       # These apended once downloaded
 
     def test_get_sed_for_target_assert_units(self):
         """ Tests get_sed_for_target() tests requested units are reflected in resulting table """
@@ -75,8 +73,6 @@ class Testsed(unittest.TestCase):
                 self.assertEqual(sed["sed_eflux"].unit, flux_unit)
                 self.assertEqual(sed["sed_freq"].unit, freq_unit)
                 self.assertEqual(sed["sed_wl"].unit, wl_unit)
-                self.assertEqual(sed["sed_vfv"].unit, freq_unit * flux_unit)
-                self.assertEqual(sed["sed_evfv"].unit, freq_unit * flux_unit)
 
     def test_get_sed_for_target_handle_invalid_unit(self):
         """ Tests get_sed_for_target() asserts UnitConversionError when a unit is incompatible """
@@ -96,6 +92,28 @@ class Testsed(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, f"search_term={search_term}",
                                     msg=f"Expected search_term={search_term} to cause ValueError"):
             get_sed_for_target(target, search_term)
+
+    #
+    #   calculate_vfv(...):
+    #
+    def test_calculate_vfv_simple_happy_path(self):
+        """ Tests calculate_vfv() basic happy path test of calculations & units """
+        sed = get_sed_for_target(Testsed._cw_eri_test_target)
+        vfv, evfv = calculate_vfv(sed)
+
+        self.assertListEqual((sed["sed_freq"] * sed["sed_flux"]).value.tolist(), vfv.value.tolist())
+        self.assertListEqual((sed["sed_freq"] * sed["sed_eflux"]).value.tolist(), evfv.value.tolist())
+
+        self.assertEqual(sed["sed_flux"].unit * sed["sed_freq"].unit, vfv.unit)
+        self.assertEqual(sed["sed_eflux"].unit * sed["sed_freq"].unit, evfv.unit)
+
+    def test_calculate_vfv_assert_can_add_columns(self):
+        """ Tests calculate_vfv() ensure returned columns can be added to source sed Table """
+        sed = get_sed_for_target(Testsed._cw_eri_test_target)
+        sed["sed_vfv"], sed["sed_evfv"] = calculate_vfv(sed)
+
+        self.assertIn("sed_vfv", sed.colnames)
+        self.assertIn("sed_evfv", sed.colnames)
 
 
     #
