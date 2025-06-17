@@ -6,12 +6,12 @@ from shutil import copy
 import unittest
 
 import numpy as np
-from uncertainties import ufloat, UFloat
+from uncertainties import ufloat, UFloat, unumpy
 import astropy.units as u
 from astropy.units.errors import UnitConversionError
 from astropy.table import Table
 
-from libs.sed import get_sed_for_target, calculate_vfv
+from libs.sed import get_sed_for_target, calculate_vfv, group_and_average_fluxes
 from libs.sed import create_outliers_mask, blackbody_flux, quick_blackbody_fit
 
 class Testsed(unittest.TestCase):
@@ -93,8 +93,10 @@ class Testsed(unittest.TestCase):
                                     msg=f"Expected search_term={search_term} to cause ValueError"):
             get_sed_for_target(target, search_term)
 
+
     #
-    #   calculate_vfv(...):
+    #   calculate_vfv(sed: Table, freq_colname="sed_freq"
+    #                 flux_colname="sed_flux", flux_err_colname="sed_eflux") -> (Column, Column):
     #
     def test_calculate_vfv_simple_happy_path(self):
         """ Tests calculate_vfv() basic happy path test of calculations & units """
@@ -103,7 +105,6 @@ class Testsed(unittest.TestCase):
 
         self.assertListEqual((sed["sed_freq"] * sed["sed_flux"]).value.tolist(), vfv.value.tolist())
         self.assertListEqual((sed["sed_freq"] * sed["sed_eflux"]).value.tolist(), evfv.value.tolist())
-
         self.assertEqual(sed["sed_flux"].unit * sed["sed_freq"].unit, vfv.unit)
         self.assertEqual(sed["sed_eflux"].unit * sed["sed_freq"].unit, evfv.unit)
 
@@ -114,6 +115,24 @@ class Testsed(unittest.TestCase):
 
         self.assertIn("sed_vfv", sed.colnames)
         self.assertIn("sed_evfv", sed.colnames)
+
+
+    #
+    #   group_and_aggregate_sed(sed: Table):
+    #
+    def test_group_and_average_fluxes_simple_happy_path(self):
+        """ Tests group_and_average_fluxes() basic happy path test of calculations & return type """
+        sed = get_sed_for_target(Testsed._cw_eri_test_target)
+        sed_grps = group_and_average_fluxes(sed, verbose=True)
+
+        self.assertTrue(len(sed_grps) < len(sed))
+
+        # Check the grouped mean(nom, err) calculation
+        grp_mask = (sed_grps["sed_filter"] == "Gaia:G") & (sed_grps["sed_freq"] == 4.4546e14 * u.Hz)
+        sed_mask = (sed["sed_filter"] == "Gaia:G") & (sed["sed_freq"] == 4.4546e14 * u.Hz)
+        exp_mean = np.mean(unumpy.uarray(sed["sed_flux"][sed_mask], sed["sed_eflux"][sed_mask]))
+        self.assertAlmostEqual(exp_mean.n, sed_grps["sed_flux"][grp_mask].value[0], 6)
+        self.assertAlmostEqual(exp_mean.s, sed_grps["sed_eflux"][grp_mask].value[0], 6)
 
 
     #

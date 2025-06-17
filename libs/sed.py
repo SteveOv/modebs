@@ -2,7 +2,7 @@
 """
 Low level utility functions for SED ingest, pre-processing, estimation and fitting.
 """
-from typing import Union, Tuple, Callable
+from typing import Union, Tuple, Callable, List
 import warnings
 from pathlib import Path
 import re
@@ -12,7 +12,7 @@ from numbers import Number
 # pylint: disable=no-member
 import astropy.units as u
 from astropy.table import Table, Column
-from uncertainties import UFloat
+from uncertainties import UFloat, unumpy
 import numpy as np
 from scipy.optimize import minimize
 
@@ -105,6 +105,60 @@ def calculate_vfv(sed: Table,
     evfv = freqs * flux_errs
     evfv.unit = freqs.unit * fluxes.unit   # Fix the unit otherwise it'll only use that of freq
     return vfv, evfv
+
+
+def group_and_average_fluxes(sed: Table,
+                             group_by_colnames: List[str] = ["sed_filter", "sed_freq"],
+                             verbose: bool=False) -> Table:
+    """
+    Will group the passed SED table by the requested columns and will then set
+    the flux/flux_err columns of each group to the mean values. The resulting
+    aggregate rows will be returned as a new table.
+
+    :sed: the source SED table
+    :group_by_colnames: the columns to group on
+    :verbose: whether to output diagnostics messages
+    :returns: a new table of just the aggregate rows
+    """
+    # pylint: disable=dangerous-default-value
+    sed_grps = sed.group_by(group_by_colnames)
+    if verbose:
+        print(f"Grouped SED by {group_by_colnames} yielding {len(sed_grps.groups)} group(s)",
+              f"from {len(sed)} row(s).")
+
+    # Find the flux & related uncertainty columns to be aggregated
+    flux_colname_pairs = []
+    for colname in sed.colnames:
+        if colname not in group_by_colnames \
+                and not colname.startswith("_") and not colname.startswith("sed_e") \
+                and sed[colname].unit is not None and sed[colname].unit.is_equivalent(u.Jy):
+            colname_err = colname[:4] + "e" + colname[4:]
+            if colname_err in sed.colnames:
+                flux_colname_pairs += [(colname, colname_err)]
+            else:
+                flux_colname_pairs += [(colname, None)]
+
+    # Can't use the default groups.aggregate(np.mean) functionality as we need to
+    # be able to work with two columns (noms, errs) to correctly calculate the mean.
+    if verbose:
+        print(f"Calculating the group means of the {flux_colname_pairs} columns")
+    for _, grp in zip(sed_grps.groups.keys, sed_grps.groups):
+        for flux_colname, flux_err_colname in flux_colname_pairs:
+            if flux_err_colname is not None:
+                mean_flux = np.mean(unumpy.uarray(grp[flux_colname].value,
+                                                  grp[flux_err_colname].value))
+                grp[flux_colname] = mean_flux.nominal_value
+                grp[flux_err_colname] = mean_flux.std_dev
+            else:
+                mean_flux = np.mean(grp[flux_colname].values)
+                grp[flux_colname] = mean_flux
+
+        # if verbose:
+        #     group_col_vals = [key[group_by_colnames][ix] for ix in range(len(group_by_colnames))]
+        #     print(f"Aggregated {len(grp)} row(s) for group {group_col_vals}")
+
+    # Return only the grouped table rows (not the original rows)
+    return sed_grps[sed_grps.groups.indices[:-1]]
 
 
 def create_outliers_mask(sed: Table,
