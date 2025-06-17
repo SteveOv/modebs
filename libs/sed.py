@@ -23,12 +23,16 @@ def get_sed_for_target(target: str,
                        search_term: str=None,
                        radius: float=0.1,
                        missing_uncertainty_ratio: float=0.1,
+                       remove_duplicates: bool=False,
                        flux_unit=u.W / u.m**2 / u.Hz,
                        freq_unit=u.Hz,
-                       wl_unit=u.micron) -> Table:
+                       wl_unit=u.micron,
+                       verbose: bool=False) -> Table:
     """
     Gets spectral energy distribution (SED) observations for the target. These data are found and
     downloaded from the VizieR photometry tool (see http://viz-beta.u-strasbg.fr/vizier/sed/doc/).
+    
+    The VizieR photometry tool is developed by Anne-Camille Simon and Thomas Boch.
 
     The data are sorted and errorbars based on missing_uncertainty_ratio are set where none given
     (sed_eflux is either zero or NaN). The sed_flux, sed_eflux and sed_freq fields will be converted
@@ -43,18 +47,23 @@ def get_sed_for_target(target: str,
     :search_term: optional search term, or leave as None to use the target value
     :radius: the search radius in arcsec
     :missing_uncertainty_rate: uncertainty, as a ratio of the fluxes, to apply where none recorded
+    :remove_duplicates: if True, only the first row for each combination of sed_filter, sed_freq,
+    sed_flux and sed_eflux will be included in the returned table
     :flux_unit: the unit of the returned sed_flux field (must support conversion from u.Jy)
     :freq_unit: the unit of the returned sed_freq field
     :wl_unit: the unit of the returned sed_wl field
+    :verbose: whether to output diagnostics messages
     :returns: an astropy Table containing the chosen data, sorted by descending frequency
     """
-    # pylint: disable=too-many-arguments, too-many-positional-arguments
+    # pylint: disable=too-many-arguments, too-many-positional-arguments, too-many-local-variables
     sed_cache_dir = Path(".cache/.sed/")
     sed_cache_dir.mkdir(parents=True, exist_ok=True)
 
     # Read in the SED for this target via the cache (filename includes both search criteria)
     sed_fname = sed_cache_dir / (re.sub(r"[^\w\d-]", "-", target.lower()) + f"-{radius}.vot")
     if not sed_fname.exists():
+        if verbose:
+            print("Table not cached so we will query the VizieR SED service.")
         try:
             targ = quote_plus(search_term or target)
             sed = Table.read(f"https://vizier.cds.unistra.fr/viz-bin/sed?-c={targ}&-c.rs={radius}")
@@ -64,6 +73,8 @@ def get_sed_for_target(target: str,
 
     sed = Table.read(sed_fname)
     sed.sort(["sed_freq"], reverse=True)
+    if verbose:
+        print(f"Opened SED table containing {len(sed)} row(s).")
 
     # Set flux uncertainties where none given
     mask_no_err = (sed["sed_eflux"].value == 0) | np.isnan(sed["sed_eflux"])
@@ -75,6 +86,13 @@ def get_sed_for_target(target: str,
         sed["sed_eflux"] = sed["sed_eflux"].to(flux_unit)
     if sed["sed_freq"].unit != freq_unit:
         sed["sed_freq"] = sed["sed_freq"].to(freq_unit)
+
+    if remove_duplicates:
+        dup_grp = sed.group_by(["sed_filter", "sed_freq", "sed_flux", "sed_eflux"])
+        if verbose:
+            print(f"Removing {len(sed)-len(dup_grp.groups)} duplicate row(s).")
+        sed = sed[dup_grp.groups.indices[:-1]]
+        sed.sort(["sed_freq"], reverse=True)
 
     # Add wavelength which we may be useful downstream
     sed["sed_wl"] = np.divide(c * u.m / u.s, sed["sed_freq"]).to(wl_unit)

@@ -9,7 +9,7 @@ import numpy as np
 from uncertainties import ufloat, UFloat, unumpy
 import astropy.units as u
 from astropy.units.errors import UnitConversionError
-from astropy.table import Table
+from astropy.table import Table, join
 
 from libs.sed import get_sed_for_target, calculate_vfv, group_and_average_fluxes
 from libs.sed import create_outliers_mask, blackbody_flux, quick_blackbody_fit
@@ -50,7 +50,7 @@ class Testsed(unittest.TestCase):
     #
     def test_get_sed_for_target_simple_happy_path(self):
         """ Tests get_sed_for_target() basic happy path test for known sed """
-        sed = get_sed_for_target(Testsed._cw_eri_test_target)
+        sed = get_sed_for_target(Testsed._cw_eri_test_target, verbose=True)
         self.assertIsNotNone(sed)
         self.assertTrue(isinstance(sed, Table))
         self.assertTrue(len(sed) > 0)
@@ -73,6 +73,18 @@ class Testsed(unittest.TestCase):
                 self.assertEqual(sed["sed_eflux"].unit, flux_unit)
                 self.assertEqual(sed["sed_freq"].unit, freq_unit)
                 self.assertEqual(sed["sed_wl"].unit, wl_unit)
+
+    def test_get_sed_for_target_basic_happy_path_for_remove_duplicates(self):
+        """ Tests get_sed_for_target() basic test for remove_duplicates functionality """
+        sed = get_sed_for_target(Testsed._cm_dra_test_target)
+        sed_dedupe = get_sed_for_target(Testsed._cm_dra_test_target,
+                                        remove_duplicates=True, verbose=True)
+
+        print(sed_dedupe["sed_filter", "sed_wl", "sed_flux", "sed_eflux"])
+
+        self.assertIsNotNone(sed_dedupe)
+        self.assertTrue(isinstance(sed_dedupe, Table))
+        self.assertTrue(len(sed) > len(sed_dedupe))
 
     def test_get_sed_for_target_handle_invalid_unit(self):
         """ Tests get_sed_for_target() asserts UnitConversionError when a unit is incompatible """
