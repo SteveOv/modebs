@@ -159,8 +159,7 @@ def create_outliers_mask(sed: Table,
                 outlier_mask = test_mask
                 if verbose:
                     print(f"with {sum(outlier_mask)}/{sed_rows} outliers masked for",
-                        f"{', '.join(f'{f}' for f in np.unique(sed['sed_filter'][outlier_mask]))}.",
-                        f"[{sed['sed_freq'].unit}]")
+                        f"{', '.join(f'{f}' for f in np.unique(sed['sed_filter'][outlier_mask]))}.")
             else:
                 if verbose:
                     print("with no significant improvement so no further outliers will be masked.")
