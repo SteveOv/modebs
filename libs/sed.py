@@ -108,6 +108,7 @@ def create_outliers_mask(sed: Table,
     :verbose: whether to print progress messages or not
     :returns: a mask indicating those observations selected as outliers
     """
+    # pylint: disable=too-many-locals
     sed_rows = len(sed)
     outlier_mask = np.zeros((sed_rows), dtype=bool)
     if 0 < (min_unmasked := abs(min_unmasked)) <= 1:
@@ -157,8 +158,8 @@ def create_outliers_mask(sed: Table,
             if last_test_stat - this_test_stat > last_test_stat * min_improvement_ratio:
                 outlier_mask = test_mask
                 if verbose:
-                    print(f"with {sum(test_mask)}/{sed_rows} outliers masked at",
-                        f"{', '.join(f'{f:.3e}' for f in np.unique(sed['sed_freq'][test_mask]))}.",
+                    print(f"with {sum(outlier_mask)}/{sed_rows} outliers masked for",
+                        f"{', '.join(f'{f}' for f in np.unique(sed['sed_filter'][outlier_mask]))}.",
                         f"[{sed['sed_freq'].unit}]")
             else:
                 if verbose:
