@@ -55,7 +55,7 @@ def get_sed_for_target(target: str,
     :verbose: whether to output diagnostics messages
     :returns: an astropy Table containing the chosen data, sorted by descending frequency
     """
-    # pylint: disable=too-many-arguments, too-many-positional-arguments, too-many-local-variables
+    # pylint: disable=too-many-arguments, too-many-positional-arguments, too-many-locals
     sed_cache_dir = Path(".cache/.sed/")
     sed_cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -289,7 +289,7 @@ def quick_blackbody_fit(x: np.ndarray,
                         y: np.ndarray,
                         y_err: np.ndarray,
                         temps0: Tuple,
-                        priors_func: Callable[[any], bool]=None,
+                        prior_func: Callable[[any], bool]=None,
                         method: str=None) -> Tuple[Tuple, np.ndarray]:
     """
     Perform a quick fit on the passed SED data (x, y and y_err) by minimizing a function which
@@ -302,7 +302,7 @@ def quick_blackbody_fit(x: np.ndarray,
     :y_err: the uncertainties of y in the same unit
     :temps0: the initial set of temperatures [in k] from which blackbody spectra will be generated
     at the frequencies, x, and summed to produce the initial candidate model
-    :priors_func: a boolean function to evaluate each set of temperatures against known priors,
+    :prior_func: a boolean function to evaluate each set of temperatures against known priors,
     returning True or False to indicate whether they conform to known prior conditions or not
     :method: the minimizing method to use - see scipy minimize documentation for options
     :returns: final, best fit set of temperatures and resulting scaled flux values (in input units)
@@ -316,19 +316,57 @@ def quick_blackbody_fit(x: np.ndarray,
     if isinstance(temps0, Number):
         temps0 = (temps0,)
 
-    def _scaled_combined_bb_flux(temps):
+    def _scaled_combined_bb_flux(x, temps):
         y_model_log = log10(np.sum([blackbody_flux(x, temp) for temp in temps], axis=0))
         if flux_unit == u.Jy:
             y_model_log += 26
         return 10**(y_model_log + np.median(y_log - y_model_log))
 
-    def _similarity_func(temps):
-        if priors_func is None or priors_func(temps):
-            y_model = _scaled_combined_bb_flux(temps)
-            return 0.5 * np.sum(((y - y_model) / y_err)**2)
-        return np.inf
+    # The function to minimize
+    _similarity_func = create_minimize_target_func(x, y, y_err,
+                                                   model_func=_scaled_combined_bb_flux,
+                                                   prior_func=prior_func)
 
     with warnings.catch_warnings(category=RuntimeWarning):
         warnings.filterwarnings("ignore", message="invalid value encountered in subtract")
         soln = minimize(_similarity_func, x0=temps0, method=method)
-    return tuple(soln.x), _scaled_combined_bb_flux(soln.x) * flux_unit
+    return tuple(soln.x), _scaled_combined_bb_flux(x, soln.x) * flux_unit
+
+
+def create_minimize_target_func(
+        x: Tuple[Column, np.ndarray],
+        y: Tuple[Column, np.ndarray],
+        y_err: Tuple[Column, np.ndarray],
+        model_func: Callable[[np.ndarray], Union[Tuple, List]],
+        prior_func: Callable[[Union[Tuple, List]], bool]=None,
+        sim_func: Callable[[np.ndarray, np.ndarray, np.ndarray], float]=\
+                                    lambda ymodel, y, y_err: 0.5*np.sum(((y-ymodel)/y_err)**2),) \
+    -> Callable[[Union[Tuple, List]], float]:
+    """
+    Will create a simple similarity function which can be used as the target function
+    for scipy minimize optimization. The resulting similarity function accepts the
+    current set of model arguments (theta) which it first passes to a client supplied
+    boolean prior_func with arguments (theta) for evaluation against some prior criteria.
+    
+    If the prior_func returns false, the similarity_func immediately returns with value np.inf.
+
+    If the prior_func returns true, the supplied model_func is called with the arguments (x, theta)
+    from which the corresponding y_model is expected to be returned. Finally, y_model is evaluated
+    against y & y_err with sim_func(y_model, y, y_err) from which the return value is given
+    
+    :x: the SED frequencies or wavelengths of y and y_err; to be passed to model_func(x, theta)
+    :y: the SED fluxes at x; to be passed to sim_func(y_model, y, y_err)
+    :y_err: the uncertainties of y in the same unit; to be passed to sim_func(y_model, y, y_err)
+    :model_func: a function which creates and returns a candidate model y based on the current theta
+    :prior_func: a boolean function to evaluate each iteration's theta against known prior criteria,
+    returning True or False to indicate whether theta conforms to these conditions or not
+    :sim_func: the function taking arguments (y_model, y, y_err) which evaluates y_model against
+    y & y_err and returns a numeric results which is the statistic which is minimized
+    :returns: the minimize func which may be passed on to scipy minimize for optimizing
+    """
+    # pylint: disable=too-many-arguments, too-many-positional-arguments
+    def minimize_func(theta):
+        if not prior_func or prior_func(theta):
+            return sim_func(model_func(x, theta), y, y_err)
+        return np.inf
+    return minimize_func
