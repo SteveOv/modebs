@@ -199,68 +199,71 @@ def create_outliers_mask(sed: Table,
     :verbose: whether to print progress messages or not
     :returns: a mask indicating those observations selected as outliers
     """
-    # pylint: disable=too-many-locals
-    sed_rows = len(sed)
-    outlier_mask = np.zeros((sed_rows), dtype=bool)
-    if 0 < (min_unmasked := abs(min_unmasked)) <= 1:
-        min_unmasked = int(sed_rows * min_unmasked)
-    if sed_rows <= min_unmasked:
-        if verbose:
-            print(f"No mask attempted as SED rows already at or below minimum of {min_unmasked}")
+    # pylint: disable=too-many-locals, multiple-statements
+    sed_count = len(sed)
+    outlier_mask = np.zeros((sed_count), dtype=bool)
+    test_mask = outlier_mask.copy()   # for initial/baseline fit nothing is excluded
+    min_unmasked = int(sed_count * min_unmasked if 0 < min_unmasked <= 1 else max(min_unmasked, 1))
+    if sed_count <= min_unmasked:
+        if verbose: print(f"No mask created as SED rows already at or below {min_unmasked}")
         return outlier_mask
 
-    # Initial temps and associated priors
+    # Initial temps, associated priors and the prior_func
     temps0 = (temps0,) if isinstance(temps0, Number) else temps0
     temp_ratio = temps0[-1] / temps0[0]
     temp_flex = temp_ratio * 0.05
+    def prior_func(temps):
+        return all(3e3 < t < 3e4 for t in temps) and abs(temps[-1]/temps[0] -temp_ratio) < temp_flex
+
+    # Prepare the y and y_err data and the model func
+    x = sed["sed_freq"].to(u.Hz).value
+    y = sed["sed_flux"].to(u.Jy).value
+    y_err = sed["sed_eflux"].to(u.Jy).value + 1e-30 # avoid div0 errors
+    y_log = log10(y)
+    def scaled_summed_bb_model(nu, temps):
+        # We scale model to sed observations within log space as the value range is high
+        y_model_log = log10(np.sum([blackbody_flux(nu, t) for t in temps], axis=0)) + 26 # to Jy
+        return 10**(y_model_log + np.median(y_log[~test_mask] - y_model_log))
 
     # Iteratively fit the observations, remove the worst fitted points until fit no longer improves
-    iteration = 0
-    test_mask = outlier_mask.copy()   # for initial/baseline fit nothing is excluded
     last_test_stat = np.inf
-    while True:
-        if sed_rows - sum(test_mask) <= min_unmasked:
-            if verbose:
-                print(f"Iteration {iteration}: stopping now, as further masking will reduce the",
-                        f"number of observations below the minimum of {min_unmasked} rows.")
+    for _iter in range(sed_count):
+        if sed_count - sum(test_mask) < min_unmasked:
+            if verbose: print(f"[{_iter:03d}] stopped as the {'next' if _iter >1 else ''} mask",
+                        f"will reduce the number of SED rows below the minimum of {min_unmasked}.")
             break
 
-        # Perform a fit on (remaining) target fluxes and get the resulting model
-        _, y_model = quick_blackbody_fit(sed["sed_freq"][~test_mask],
-                                         sed["sed_flux"][~test_mask],
-                                         sed["sed_eflux"][~test_mask],
-                                         temps0,
-                                         lambda ts: all(3000 < t <= 30000 for t in ts) \
-                                                    and abs(ts[-1]/ts[0] - temp_ratio) <= temp_flex)
+        # Perform a fit on the unmasked target fluxes and get the resulting model
+        target_func = create_minimize_target_func(x[~test_mask], y[~test_mask], y_err[~test_mask],
+                                                  scaled_summed_bb_model, prior_func)
+        with warnings.catch_warnings(category=RuntimeWarning):
+            warnings.filterwarnings("ignore", message="invalid value encountered in subtract")
+            soln = minimize(target_func, x0=temps0)
 
         # TODO: check fitted temps and/or fit against input and warn if bad fit
+        this_temps = soln.x
+        this_y_model = scaled_summed_bb_model(x[~test_mask], this_temps)
 
-        # Summarize this fit on the test mask. TODO: refine test stat and weights
-        weights = np.ones_like(y_model)
-        this_resids_sq = ((sed["sed_flux"][~test_mask] - y_model) / sed["sed_eflux"][~test_mask])**2
-        this_test_stat = np.sum(this_resids_sq * weights).value / (len(this_resids_sq) - 1)
+        # Calculate a comperable summary stat on this fit. TODO: refine test stat & weights
+        weights = np.ones_like(this_y_model)
+        this_resids_sq = ((y[~test_mask] - this_y_model) / y_err[~test_mask])**2
+        this_test_stat = np.sum(this_resids_sq * weights) / (len(this_resids_sq) - 1)
 
-        if verbose:
-            print(f"Iteration {iteration:03d}: fit = {this_test_stat:.3f}",
-                  end=" " if iteration > 0 else "\n")
-        if iteration > 0:
-            # After the first iter, which sets the baseline, we evaluate the quality of this fit
-            # against that of the previous iter. If fit is better, we update the mask and try again.
+        # After the first iter, which sets the unmasked baseline, evaluate this fit (with mask) vs
+        # that of the previous iter. If it's significantly better, we adopt the mask and try again.
+        if verbose: print(f"[{_iter:03d}] stat = {this_test_stat:.3e}", end="; " if _iter else "\n")
+        if _iter > 0:
             if last_test_stat - this_test_stat > last_test_stat * min_improvement_ratio:
                 outlier_mask = test_mask
-                if verbose:
-                    print(f"with {sum(outlier_mask)}/{sed_rows} outliers masked for",
-                        f"{', '.join(f'{f}' for f in np.unique(sed['sed_filter'][outlier_mask]))}.")
+                if verbose: print(f"{sum(test_mask)}/{sed_count} outliers masked for",
+                            f"{', '.join(f'{f}' for f in np.unique(sed['sed_filter'][test_mask]))}")
             else:
-                if verbose:
-                    print("with no significant improvement so no further outliers will be masked.")
+                if verbose: print("no significant improvement so stopped further masking")
                 break
 
         # Create the next test mask from the current outlier mask & farthest outliers from this fit.
-        # As we iterate, each resid array shrinks to cover only items not already in outlier_mask
         (test_mask := outlier_mask.copy())[~outlier_mask] = this_resids_sq == this_resids_sq.max()
         last_test_stat = this_test_stat
-        iteration += 1
 
     return outlier_mask
 
@@ -285,54 +288,6 @@ def blackbody_flux(freq: Union[float, UFloat, np.ndarray[float], np.ndarray[UFlo
     return area * part1 / part2
 
 
-def quick_blackbody_fit(x: np.ndarray,
-                        y: np.ndarray,
-                        y_err: np.ndarray,
-                        temps0: Tuple,
-                        prior_func: Callable[[any], bool]=None,
-                        method: str=None) -> Tuple[Tuple, np.ndarray]:
-    """
-    Perform a quick fit on the passed SED data (x, y and y_err) by minimizing a function which
-    which sums one or more sets of blackbody fluxes, as defined by one or more temperatures.
-    During fitting, the model fluxes are scaled to the same magnitude as the those of the input.
-    The temperatures and scaled combined fluxes of the best fitting model are returned.
-
-    :x: the SED frequencies
-    :y: the SED fluxes at the frequencies of x [in units of W / m^2 / Hz or Jy]
-    :y_err: the uncertainties of y in the same unit
-    :temps0: the initial set of temperatures [in k] from which blackbody spectra will be generated
-    at the frequencies, x, and summed to produce the initial candidate model
-    :prior_func: a boolean function to evaluate each set of temperatures against known priors,
-    returning True or False to indicate whether they conform to known prior conditions or not
-    :method: the minimizing method to use - see scipy minimize documentation for options
-    :returns: final, best fit set of temperatures and resulting scaled flux values (in input units)
-    """
-    # pylint: disable=too-many-arguments, too-many-positional-arguments
-    flux_unit = y.unit
-    x = x.to(u.Hz).value
-    y = y.value
-    y_log = log10(y)                 # We scale model to sed observations within log space
-    y_err = 1 if y_err is None else (y_err.value + 1e-30) # avoid div0 errors
-    if isinstance(temps0, Number):
-        temps0 = (temps0,)
-
-    def _scaled_combined_bb_flux(x, temps):
-        y_model_log = log10(np.sum([blackbody_flux(x, temp) for temp in temps], axis=0))
-        if flux_unit == u.Jy:
-            y_model_log += 26
-        return 10**(y_model_log + np.median(y_log - y_model_log))
-
-    # The function to minimize
-    _similarity_func = create_minimize_target_func(x, y, y_err,
-                                                   model_func=_scaled_combined_bb_flux,
-                                                   prior_func=prior_func)
-
-    with warnings.catch_warnings(category=RuntimeWarning):
-        warnings.filterwarnings("ignore", message="invalid value encountered in subtract")
-        soln = minimize(_similarity_func, x0=temps0, method=method)
-    return tuple(soln.x), _scaled_combined_bb_flux(x, soln.x) * flux_unit
-
-
 def create_minimize_target_func(
         x: Tuple[Column, np.ndarray],
         y: Tuple[Column, np.ndarray],
@@ -343,16 +298,16 @@ def create_minimize_target_func(
                                     lambda ymodel, y, y_err: 0.5*np.sum(((y-ymodel)/y_err)**2),) \
     -> Callable[[Union[Tuple, List]], float]:
     """
-    Will create a simple similarity function which can be used as the target function
-    for scipy minimize optimization. The resulting similarity function accepts the
-    current set of model arguments (theta) which it first passes to a client supplied
-    boolean prior_func with arguments (theta) for evaluation against some prior criteria.
+    Will create and return a simple similarity function which can be used as the target
+    function for scipy's minimize optimization. The resulting similarity function accepts the
+    each iterations's set of model arguments (theta) which it first passes to a client supplied
+    boolean prior_func, with arguments (theta), for evaluation against some prior criteria.
     
     If the prior_func returns false, the similarity_func immediately returns with value np.inf.
 
     If the prior_func returns true, the supplied model_func is called with the arguments (x, theta)
     from which the corresponding y_model is expected to be returned. Finally, y_model is evaluated
-    against y & y_err with sim_func(y_model, y, y_err) from which the return value is given
+    against y & y_err with the sim_func(y_model, y, y_err) from which the return value is taken.
     
     :x: the SED frequencies or wavelengths of y and y_err; to be passed to model_func(x, theta)
     :y: the SED fluxes at x; to be passed to sim_func(y_model, y, y_err)

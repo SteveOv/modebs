@@ -14,7 +14,7 @@ from astropy.units.errors import UnitConversionError
 from astropy.table import Table, join
 
 from libs.sed import get_sed_for_target, calculate_vfv, group_and_average_fluxes
-from libs.sed import create_outliers_mask, blackbody_flux, quick_blackbody_fit
+from libs.sed import create_outliers_mask, blackbody_flux
 from libs.sed import create_minimize_target_func
 
 class Testsed(unittest.TestCase):
@@ -185,45 +185,19 @@ class Testsed(unittest.TestCase):
                 flux = blackbody_flux(freq, teff, radius)
                 self.assertAlmostEqual(flux, exp_flux, places)
 
-    #
-    #   quick_blackbody_fit(x: array, y: array, y_err: array, temps0: Tuple[float],
-    #                       priors_func: Callable[[any], bool], method: str)
-    #
-    def test_quick_blackbody_fit_simple_happy_path(self):
-        """ Tests quick_blackbody_fit() with simple happy path scenarios """
-        for target,                         tempA,  temp_ratio, flux_unit in [
-            # CW Eri has some large outliers
-            (Testsed._cw_eri_test_target,   6800,   0.9,        u.Jy),
-            (Testsed._cw_eri_test_target,   6800,   0.9,        u.W / u.m**2 / u.Hz),
-            (Testsed._cm_dra_test_target,   3200,   0.95,       u.W / u.m**2 / u.Hz),
-        ]:
-            # pylint: disable=unnecessary-lambda-assignment, cell-var-from-loop
-            with self.subTest():
-                sed = get_sed_for_target(target)
-                x = sed["sed_freq"]
-                y, y_err = sed["sed_flux"].to(flux_unit), sed["sed_eflux"].to(flux_unit)
-                temps0 = [tempA, tempA*temp_ratio]
-                priors_func = lambda ts: all(3000 <= t <= 12000 for t in ts) \
-                                            and abs(ts[-1]/ts[0] - temp_ratio) <= temp_ratio * 0.05
-
-                temps, y_model = quick_blackbody_fit(x, y, y_err, temps0, priors_func, "SLSQP")
-
-                print(f"\n{target} fitted temps: {temps} (c/w {temps0})")
-                print(f"{target} max model flux: {y_model.max():.3e} (c/w {y.max():.3e})")
-
-                self.assertAlmostEqual(temps[1]/temps[0], temp_ratio, 1)
 
     #
     #   create_outliers_mask(sed: Table) -> np.ndarray[bool]
     #
     def test_create_outliers_mask_simple_happy_path(self):
         """ Test create_outliers_mask(sed) WIP """
-        for target,                         temps0,             min_unmasked in [
-            (Testsed._cw_eri_test_target,    (6800, 6500),      15),
-            (Testsed._cm_dra_test_target,    (3200, 3200),      15),
-            (Testsed._zz_boo_test_target,    (6700, 6700),      15),
+        for target,                         temps0,     min_unmasked,   msg in [
+            (Testsed._cw_eri_test_target,   (6800, 6500),   15,     "test stops at no improvement"),
+            (Testsed._zz_boo_test_target,   (6700, 6700),   125,    "test stops at min"),
+            (Testsed._cm_dra_test_target,   (3200, 3200),   50,     "test stops as already at min"),
+            (Testsed._cm_dra_test_target,   (3200, 3200),   0.99,   "test fractional min"),
         ]:
-            with self.subTest():
+            with self.subTest(msg=msg):
                 sed = get_sed_for_target(target)
                 mask = create_outliers_mask(sed, temps0, min_unmasked, verbose=True)
                 self.assertTrue(isinstance(mask, np.ndarray))
@@ -232,7 +206,10 @@ class Testsed(unittest.TestCase):
 
                 if min_unmasked < 1:
                     min_unmasked = np.floor(len(sed) * min_unmasked)
-                self.assertTrue(sum(~mask) >= min_unmasked)
+                if min_unmasked < len(sed):
+                    self.assertTrue(sum(~mask) >= min_unmasked)
+                else:
+                    self.assertEqual(sum(~mask), len(sed))
 
                 print(f"{target}: Number of fluxes left: {sum(~mask)} of {len(sed)}")
 
