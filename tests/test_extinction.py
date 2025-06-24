@@ -5,17 +5,17 @@ import unittest
 import astropy.units as u
 from astropy.coordinates import SkyCoord
 
-from libs.extinction import get_extinction, get_bayestar_ebv
+from libs.extinction import get_ebv, get_bayestar_ebv
 
 class Testextinction(unittest.TestCase):
     """ Unit tests for the extinction module. """
 
 
-    def test_get_extinction_happy_path(self):
+    def test_get_ebv_happy_path(self):
         """ Tests get_extinction() - basic happy path test """
         # CM Dra
         coords = SkyCoord("16h34m20.3302660573", "+57d09m44.368918696", 14.844 * u.pc, frame="icrs")
-        for val, flags in get_extinction(coords, ["gontcharov_ebv", get_bayestar_ebv]):
+        for val, flags in get_ebv   (coords, ["gontcharov_ebv", get_bayestar_ebv]):
             print(f"val={val}, flags={flags}")
 
             self.assertIn("converged", flags)

@@ -17,8 +17,9 @@ from pyvo import registry, DALServiceError      # Vergeley at al. extinction cat
 # TODO: remove the extinction funcs from pipeline and update quick_fit
 
 
-def get_extinction(target_coords: SkyCoord,
-                   funcs: List[str]=None) -> Generator[Tuple[float, dict], any, any]:
+def get_ebv(target_coords: SkyCoord,
+            funcs: List[str]=None,
+            rv: float=3.1) -> Generator[Tuple[float, dict], any, any]:
     """
     A convenience function which iterates through the requested extinction lookup functions,
     published on this module, yielding the extinction value and flags returned by each.
@@ -30,17 +31,18 @@ def get_extinction(target_coords: SkyCoord,
     :target_coords: the SkyCoords to get the extinction value for
     :funcs: optional list of functions to iterate over, either by name of function object.
     These must be callable as func(coords: SkyCoord) -> (value: float, flags: Dict)
+    :rv: the R_V value to use if it is necessary to convert Av values to E(B-V)
     """
     if funcs is None:
         funcs = [get_gontcharov_ebv, get_bayestar_ebv, get_vergely_av]
-    if isinstance(funcs, str) or isinstance(funcs, Callable):
+    if isinstance(funcs, str | Callable):
         funcs = [funcs]
 
     for ext_func in funcs:
         if isinstance(ext_func, str):
             # Find the matching function in this module
             # TODO: can this be more efficient? Also perhaps better validation of func signature
-            for name, func in inspect.getmembers(inspect.getmodule(get_extinction),
+            for name, func in inspect.getmembers(inspect.getmodule(get_ebv),
                                                  lambda m: isinstance(m, Callable)):
                 if ext_func in name:
                     ext_func = func
@@ -48,6 +50,8 @@ def get_extinction(target_coords: SkyCoord,
 
         if isinstance(ext_func, Callable):
             val, flags = ext_func(target_coords)
+            if flags.get("type", "").lower() == "av" or ext_func.__name__.lower().endswith("_av"):
+                val /= rv
             flags["source"] = ext_func.__name__
             yield val, flags
 
