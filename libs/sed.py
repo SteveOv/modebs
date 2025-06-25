@@ -235,7 +235,8 @@ def create_outliers_mask(sed: Table,
 
         # Perform a fit on the unmasked target fluxes and get the resulting model
         target_func = create_objective_func(x[~test_mask], y[~test_mask], y_err[~test_mask],
-                                            scaled_summed_bb_model, prior_func)
+                                            model_func=scaled_summed_bb_model,
+                                            prior_func=prior_func)
         with warnings.catch_warnings(category=RuntimeWarning):
             warnings.filterwarnings("ignore", message="invalid value encountered in subtract")
             soln = minimize(target_func, x0=temps0)
@@ -293,35 +294,51 @@ def create_objective_func(
         y: Tuple[Column, np.ndarray],
         y_err: Tuple[Column, np.ndarray],
         model_func: Callable[[np.ndarray, Union[Tuple, List]], np.ndarray],
-        prior_func: Callable[[Union[Tuple, List]], bool]=None,
+        map_func: Callable[[Union[Tuple, List]], Union[Tuple, List]]=None,
+        prior_func: Callable[[Union[Tuple, List]], float]=None,
         sim_func: Callable[[np.ndarray, np.ndarray, np.ndarray], float]=\
                                     lambda ymodel, y, y_err: 0.5*np.sum(((y - ymodel) / y_err)**2) \
     ) -> Callable[[Union[Tuple, List]], float]:
     """
-    Will create and return a simple objective function which can be used as the target
-    function for scipy's minimize optimization. The resulting function accepts each iterations's
-    set of model arguments (theta) which it first passes to a client supplied boolean prior_func,
-    with arguments (theta), for evaluation against some prior criteria.
+    This creates and return a simple objective function which can be used as the target function
+    for scipy's minimize optimization. 
     
-    If the prior_func returns false, the objective function immediately returns with value np.inf.
+    The objective function accepts each iterations's set of model arguments (theta) which it first
+    passes to the optional map_func. The map_func is an opportunity for client code to inspect
+    and/or modify theta (for example we could be fitting for mass and stellar age with a map_func
+    which maps theta to equivalent teff/logg values via model lookup which are returned to be
+    passed to the subsequent prior_func and model_func).
+    
+    If theta is not None (a map_func which couldn't map a specific theta may return None), the next
+    step is to call the prior_func to evaluate theta against the client's prior criteria. This is
+    expected to return the value of the evaluation if it passes else np.inf.
+    
+    If the prior_func returns np.inf, the objective function immediately returns with value np.inf.
 
-    If the prior_func returns true, the supplied model_func is called with the arguments (x, theta)
+    If the prior_func returns !np.inf, the model_func is called with the arguments (x, theta)
     from which the corresponding y_model is expected to be returned. Finally, y_model is evaluated
-    against y & y_err with the sim_func(y_model, y, y_err) from which the return value is taken.
+    against y & y_err with the sim_func(y_model, y, y_err) from which the return value is taken
+    and added to that from the prior_func.
     
     :x: the SED frequencies or wavelengths of y and y_err; to be passed to model_func(x, theta)
     :y: the SED fluxes at x; to be passed to sim_func(y_model, y, y_err)
     :y_err: the uncertainties of y in the same unit; to be passed to sim_func(y_model, y, y_err)
     :model_func: a function which creates and returns a candidate model y based on the current theta
-    :prior_func: a boolean function to evaluate each iteration's theta against known prior criteria,
-    returning True or False to indicate whether theta conforms to these conditions or not
-    :sim_func: the function taking arguments (y_model, y, y_err) which evaluates y_model against
+    :map_func: optional function, called before prior_func, to modify theta values or to map them\
+    onto different params (i.e. masses/age to teffs/loggs via MIST)
+    :prior_func: optional function to evaluate each iteration's theta against known prior criteria,\
+    returning 0 or np.inf to indicate whether theta conforms to these conditions or not
+    :sim_func: the function taking arguments (y_model, y, y_err) which evaluates y_model against\
     y & y_err and returns a numeric similarity score which is the statistic to be minimized
     :returns: the objective func for minimizing
     """
     # pylint: disable=too-many-arguments, too-many-positional-arguments
     def objective_func(theta: Union[Tuple, List]) -> float:
-        if not prior_func or prior_func(theta):
-            return sim_func(model_func(x, theta), y, y_err)
+        if map_func:
+            theta = map_func(theta)
+        if theta is not None:
+            priors = 0 if not prior_func else prior_func(theta)
+            if np.isfinite(priors):
+                return priors + sim_func(model_func(x, theta), y, y_err)
         return np.inf
     return objective_func
