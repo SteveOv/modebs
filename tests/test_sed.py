@@ -15,7 +15,7 @@ from astropy.table import Table, join
 
 from libs.sed import get_sed_for_target, calculate_vfv, group_and_average_fluxes
 from libs.sed import create_outliers_mask, blackbody_flux
-from libs.sed import create_likelihood_func
+from libs.sed import create_objective_func
 
 class Testsed(unittest.TestCase):
     """ Unit tests for the sed module. """
@@ -214,13 +214,13 @@ class Testsed(unittest.TestCase):
                 print(f"{target}: Number of fluxes left: {sum(~mask)} of {len(sed)}")
 
     #
-    #   create_likelihood_func(x: array, y: array, y_err: array,
-    #                          model_func: Callable,
-    #                          prior_func: Callable=null,
-    #                          sim_func: 1/2 sum ((y_model-y)/y_err)**2)) -> func(theta) -> float:
+    #   create_objective_func(x: array, y: array, y_err: array,
+    #                         model_func: Callable,
+    #                         prior_func: Callable=null,
+    #                         sim_func: 1/2 sum ((y_model-y)/y_err)**2)) -> func(theta) -> float:
     #
-    def test_create_likelihood_func_simple_happy_path(self):
-        """ Test create_likelihood_func(...) happy path > does it work & is it minimizable """
+    def test_create_objective_func_simple_happy_path(self):
+        """ Test create_objective_func(...) happy path > does it work & is it minimizable """
         sed = get_sed_for_target(Testsed._cw_eri_test_target)
 
         x = sed["sed_freq"].to(u.Hz).value
@@ -235,13 +235,16 @@ class Testsed(unittest.TestCase):
         def prior_func(teffs):
             return all(6000 <= t <= 7000 for t in teffs) and abs(teffs[1]/teffs[0] - 0.9) <= 0.1
 
-        # Create the target func - leave sim_func() to the default implementation
-        target_func = create_likelihood_func(x, y, y_err, model_func, prior_func)
+        # Create the func - leave sim_func() to the default implementation
+        objective_func = create_objective_func(x, y, y_err, model_func, prior_func)
 
         # Minimize it
         with warnings.catch_warnings(category=RuntimeWarning):
             warnings.filterwarnings("ignore", message="invalid value encountered in subtract")
-            soln = scipy_minimize(target_func, (6800, 6500))
+            soln = scipy_minimize(objective_func, (6800, 6500), method="SLSQP")
+
+        print(f"\nSoln message = {soln.message}")
+        self.assertTrue(soln.success)
 
         print(f"Final teffs = {soln.x}")
         self.assertTrue(6000 <= soln.x[0] <= 7000)

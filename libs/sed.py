@@ -234,8 +234,8 @@ def create_outliers_mask(sed: Table,
             break
 
         # Perform a fit on the unmasked target fluxes and get the resulting model
-        target_func = create_likelihood_func(x[~test_mask], y[~test_mask], y_err[~test_mask],
-                                             scaled_summed_bb_model, prior_func)
+        target_func = create_objective_func(x[~test_mask], y[~test_mask], y_err[~test_mask],
+                                            scaled_summed_bb_model, prior_func)
         with warnings.catch_warnings(category=RuntimeWarning):
             warnings.filterwarnings("ignore", message="invalid value encountered in subtract")
             soln = minimize(target_func, x0=temps0)
@@ -288,22 +288,22 @@ def blackbody_flux(freq: Union[float, UFloat, np.ndarray[float], np.ndarray[UFlo
     return area * part1 / part2
 
 
-def create_likelihood_func(
+def create_objective_func(
         x: Tuple[Column, np.ndarray],
         y: Tuple[Column, np.ndarray],
         y_err: Tuple[Column, np.ndarray],
-        model_func: Callable[[np.ndarray], Union[Tuple, List]],
+        model_func: Callable[[np.ndarray, Union[Tuple, List]], np.ndarray],
         prior_func: Callable[[Union[Tuple, List]], bool]=None,
         sim_func: Callable[[np.ndarray, np.ndarray, np.ndarray], float]=\
-                                    lambda ymodel, y, y_err: 0.5*np.sum(((y-ymodel)/y_err)**2),) \
-    -> Callable[[Union[Tuple, List]], float]:
+                                    lambda ymodel, y, y_err: 0.5*np.sum(((y - ymodel) / y_err)**2) \
+    ) -> Callable[[Union[Tuple, List]], float]:
     """
-    Will create and return a simple likelihood function which can be used as the target
+    Will create and return a simple objective function which can be used as the target
     function for scipy's minimize optimization. The resulting function accepts each iterations's
     set of model arguments (theta) which it first passes to a client supplied boolean prior_func,
     with arguments (theta), for evaluation against some prior criteria.
     
-    If the prior_func returns false, the likelihood function immediately returns with value np.inf.
+    If the prior_func returns false, the objective function immediately returns with value np.inf.
 
     If the prior_func returns true, the supplied model_func is called with the arguments (x, theta)
     from which the corresponding y_model is expected to be returned. Finally, y_model is evaluated
@@ -316,12 +316,12 @@ def create_likelihood_func(
     :prior_func: a boolean function to evaluate each iteration's theta against known prior criteria,
     returning True or False to indicate whether theta conforms to these conditions or not
     :sim_func: the function taking arguments (y_model, y, y_err) which evaluates y_model against
-    y & y_err and returns a numeric results which is the statistic which is minimized
-    :returns: the likelihood func for minimizing
+    y & y_err and returns a numeric similarity score which is the statistic to be minimized
+    :returns: the objective func for minimizing
     """
     # pylint: disable=too-many-arguments, too-many-positional-arguments
-    def minimize_func(theta):
+    def objective_func(theta: Union[Tuple, List]) -> float:
         if not prior_func or prior_func(theta):
             return sim_func(model_func(x, theta), y, y_err)
         return np.inf
-    return minimize_func
+    return objective_func
