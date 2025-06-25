@@ -15,7 +15,7 @@ from astropy.table import Table, join
 
 from libs.sed import get_sed_for_target, calculate_vfv, group_and_average_fluxes
 from libs.sed import create_outliers_mask, blackbody_flux
-from libs.sed import create_minimize_target_func
+from libs.sed import create_likelihood_func
 
 class Testsed(unittest.TestCase):
     """ Unit tests for the sed module. """
@@ -214,13 +214,13 @@ class Testsed(unittest.TestCase):
                 print(f"{target}: Number of fluxes left: {sum(~mask)} of {len(sed)}")
 
     #
-    #   create_minimize_target_func(x: array, y: array, y_err: array,
-    #                               model_func: Callable,
-    #                               prior_func: Callable=null,
-    #                               sim_func: 1/2 sum ((y_model-y)/y_err)**2)) -> func(theta) -> float:
+    #   create_likelihood_func(x: array, y: array, y_err: array,
+    #                          model_func: Callable,
+    #                          prior_func: Callable=null,
+    #                          sim_func: 1/2 sum ((y_model-y)/y_err)**2)) -> func(theta) -> float:
     #
-    def test_create_minimize_target_func_simple_happy_path(self):
-        """ Test create_minimize_target_func(...) happy path > does it work & is it minimizable """
+    def test_create_likelihood_func_simple_happy_path(self):
+        """ Test create_likelihood_func(...) happy path > does it work & is it minimizable """
         sed = get_sed_for_target(Testsed._cw_eri_test_target)
 
         x = sed["sed_freq"].to(u.Hz).value
@@ -236,7 +236,7 @@ class Testsed(unittest.TestCase):
             return all(6000 <= t <= 7000 for t in teffs) and abs(teffs[1]/teffs[0] - 0.9) <= 0.1
 
         # Create the target func - leave sim_func() to the default implementation
-        target_func = create_minimize_target_func(x, y, y_err, model_func, prior_func)
+        target_func = create_likelihood_func(x, y, y_err, model_func, prior_func)
 
         # Minimize it
         with warnings.catch_warnings(category=RuntimeWarning):

@@ -234,8 +234,8 @@ def create_outliers_mask(sed: Table,
             break
 
         # Perform a fit on the unmasked target fluxes and get the resulting model
-        target_func = create_minimize_target_func(x[~test_mask], y[~test_mask], y_err[~test_mask],
-                                                  scaled_summed_bb_model, prior_func)
+        target_func = create_likelihood_func(x[~test_mask], y[~test_mask], y_err[~test_mask],
+                                             scaled_summed_bb_model, prior_func)
         with warnings.catch_warnings(category=RuntimeWarning):
             warnings.filterwarnings("ignore", message="invalid value encountered in subtract")
             soln = minimize(target_func, x0=temps0)
@@ -288,7 +288,7 @@ def blackbody_flux(freq: Union[float, UFloat, np.ndarray[float], np.ndarray[UFlo
     return area * part1 / part2
 
 
-def create_minimize_target_func(
+def create_likelihood_func(
         x: Tuple[Column, np.ndarray],
         y: Tuple[Column, np.ndarray],
         y_err: Tuple[Column, np.ndarray],
@@ -298,12 +298,12 @@ def create_minimize_target_func(
                                     lambda ymodel, y, y_err: 0.5*np.sum(((y-ymodel)/y_err)**2),) \
     -> Callable[[Union[Tuple, List]], float]:
     """
-    Will create and return a simple similarity function which can be used as the target
-    function for scipy's minimize optimization. The resulting similarity function accepts the
-    each iterations's set of model arguments (theta) which it first passes to a client supplied
-    boolean prior_func, with arguments (theta), for evaluation against some prior criteria.
+    Will create and return a simple likelihood function which can be used as the target
+    function for scipy's minimize optimization. The resulting function accepts each iterations's
+    set of model arguments (theta) which it first passes to a client supplied boolean prior_func,
+    with arguments (theta), for evaluation against some prior criteria.
     
-    If the prior_func returns false, the similarity_func immediately returns with value np.inf.
+    If the prior_func returns false, the likelihood function immediately returns with value np.inf.
 
     If the prior_func returns true, the supplied model_func is called with the arguments (x, theta)
     from which the corresponding y_model is expected to be returned. Finally, y_model is evaluated
@@ -317,7 +317,7 @@ def create_minimize_target_func(
     returning True or False to indicate whether theta conforms to these conditions or not
     :sim_func: the function taking arguments (y_model, y, y_err) which evaluates y_model against
     y & y_err and returns a numeric results which is the statistic which is minimized
-    :returns: the minimize func which may be passed on to scipy minimize for optimizing
+    :returns: the likelihood func for minimizing
     """
     # pylint: disable=too-many-arguments, too-many-positional-arguments
     def minimize_func(theta):
