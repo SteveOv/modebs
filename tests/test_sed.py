@@ -231,7 +231,7 @@ class Testsed(unittest.TestCase):
         y_err = sed["sed_eflux"].to(u.Jy).value
 
         y_log = np.log10(y)
-        def model_func(x, teffs): # sums blackbody spectra and scales them to y in log10 space
+        def model_func(teffs, x): # sums blackbody spectra and scales them to y in log10 space
             y_mdl_log = np.log10(np.sum([blackbody_flux(x, t) for t in teffs], axis=0)) + 26 # to Jy
             return 10**(y_mdl_log + np.median(y_log - y_mdl_log))
 

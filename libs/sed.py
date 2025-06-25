@@ -220,7 +220,7 @@ def create_outliers_mask(sed: Table,
     y = sed["sed_flux"].to(u.Jy).value
     y_err = sed["sed_eflux"].to(u.Jy).value + 1e-30 # avoid div0 errors
     y_log = log10(y)
-    def scaled_summed_bb_model(nu, temps):
+    def scaled_summed_bb_model(temps, nu):
         # We scale model to sed observations within log space as the value range is high
         y_model_log = log10(np.sum([blackbody_flux(nu, t) for t in temps], axis=0)) + 26 # to Jy
         return 10**(y_model_log + np.median(y_log[~test_mask] - y_model_log))
@@ -243,7 +243,7 @@ def create_outliers_mask(sed: Table,
 
         # TODO: check fitted temps and/or fit against input and warn if bad fit
         this_temps = soln.x
-        this_y_model = scaled_summed_bb_model(x[~test_mask], this_temps)
+        this_y_model = scaled_summed_bb_model(this_temps, x[~test_mask])
 
         # Calculate a comperable summary stat on this fit. TODO: refine test stat & weights
         weights = np.ones_like(this_y_model)
@@ -289,16 +289,29 @@ def blackbody_flux(freq: Union[float, UFloat, np.ndarray[float], np.ndarray[UFlo
     return area * part1 / part2
 
 
+def simple_like_func(y_model: np.ndarray, y: np.ndarray, y_err: np.ndarray) -> float:
+    """
+    A very simple like function which compares y_model with y +/- y_err with
+
+    like = 0.5 * Σ ((y - y_model) / y_err)^2
+
+    :y_model: the model y data points
+    :y: the equivalent observation y data points
+    :y_err: the equivalent uncertatinties in y
+    :returns: the likeness of the model to the data
+    """
+    return 0.5 * np.sum(((y - y_model) / y_err)**2)
+
+
 def create_objective_func(
         x: Tuple[Column, np.ndarray],
         y: Tuple[Column, np.ndarray],
         y_err: Tuple[Column, np.ndarray],
-        model_func: Callable[[np.ndarray, Union[Tuple, List]], np.ndarray],
+        model_func: Callable[[Union[Tuple, List], np.ndarray], np.ndarray],
         map_func: Callable[[Union[Tuple, List]], Union[Tuple, List]]=None,
         prior_func: Callable[[Union[Tuple, List]], float]=None,
-        sim_func: Callable[[np.ndarray, np.ndarray, np.ndarray], float]=\
-                                    lambda ymodel, y, y_err: 0.5*np.sum(((y - ymodel) / y_err)**2) \
-    ) -> Callable[[Union[Tuple, List]], float]:
+        like_func: Callable[[np.ndarray, np.ndarray, np.ndarray], float]=simple_like_func) \
+            -> Callable[[Union[Tuple, List]], float]:
     """
     This creates and return a simple objective function which can be used as the target function
     for scipy's minimize optimization. 
@@ -317,7 +330,7 @@ def create_objective_func(
 
     If the prior_func returns !np.inf, the model_func is called with the arguments (x, theta)
     from which the corresponding y_model is expected to be returned. Finally, y_model is evaluated
-    against y & y_err with the sim_func(y_model, y, y_err) from which the return value is taken
+    against y & y_err with the like_func(y_model, y, y_err) from which the return value is taken
     and added to that from the prior_func.
     
     :x: the SED frequencies or wavelengths of y and y_err; to be passed to model_func(x, theta)
@@ -328,7 +341,7 @@ def create_objective_func(
     onto different params (i.e. masses/age to teffs/loggs via MIST)
     :prior_func: optional function to evaluate each iteration's theta against known prior criteria,\
     returning 0 or np.inf to indicate whether theta conforms to these conditions or not
-    :sim_func: the function taking arguments (y_model, y, y_err) which evaluates y_model against\
+    :like_func: the function taking arguments (y_model, y, y_err) which evaluates y_model against\
     y & y_err and returns a numeric similarity score which is the statistic to be minimized
     :returns: the objective func for minimizing
     """
@@ -339,6 +352,6 @@ def create_objective_func(
         if theta is not None:
             priors = 0 if not prior_func else prior_func(theta)
             if np.isfinite(priors):
-                return priors + sim_func(model_func(x, theta), y, y_err)
+                return priors + like_func(model_func(theta, x), y, y_err)
         return np.inf
     return objective_func
