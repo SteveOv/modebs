@@ -85,7 +85,7 @@
         "period": 1.744,        "period_err": null
     },
     "psi Cen": {
-        "search_term": "V* psi Cen",
+        "search_term": "psi Cen",
         "source": "DEBCat and Bruntt et al. (2006) Table 2 based on WIRE photometry and JKTEBOP. We have access to TESS sectors 38 & 65 120 s SAP photometry (38 has incomplete eclipses).",
         "reference": "BrunttSouthworth+06aa",
         "exclude": true,
