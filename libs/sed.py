@@ -2,7 +2,7 @@
 """
 Low level utility functions for SED ingest, pre-processing, estimation and fitting.
 """
-from typing import Union, Tuple, Callable, List
+from typing import Union, Tuple, List
 import warnings
 from pathlib import Path
 import re
@@ -202,30 +202,35 @@ def create_outliers_mask(sed: Table,
     # pylint: disable=too-many-locals, multiple-statements
     sed_count = len(sed)
     outlier_mask = np.zeros((sed_count), dtype=bool)
-    test_mask = outlier_mask.copy()   # for initial/baseline fit nothing is excluded
     min_unmasked = int(sed_count * min_unmasked if 0 < min_unmasked <= 1 else max(min_unmasked, 1))
     if sed_count <= min_unmasked:
         if verbose: print(f"No mask created as SED rows already at or below {min_unmasked}")
         return outlier_mask
 
-    # Initial temps, associated priors and the prior_func
+    # Initial temps & associated priors
     temps0 = (temps0,) if isinstance(temps0, Number) else temps0
     temp_ratio = temps0[-1] / temps0[0]
     temp_flex = temp_ratio * 0.05
-    def prior_func(temps):
-        return all(3e3 < t < 3e4 for t in temps) and abs(temps[-1]/temps[0] -temp_ratio) < temp_flex
 
-    # Prepare the y and y_err data and the model func
+    # Prepare the x, y & y_err data for the model & objective funcs which access these data directly
     x = sed["sed_freq"].to(u.Hz).value
     y = sed["sed_flux"].to(u.Jy).value
-    y_err = sed["sed_eflux"].to(u.Jy).value + 1e-30 # avoid div0 errors
+    y_err = sed["sed_eflux"].to(u.Jy).value
     y_log = log10(y)
-    def scaled_summed_bb_model(temps, nu):
-        # We scale model to sed observations within log space as the value range is high
-        y_model_log = log10(np.sum([blackbody_flux(nu, t) for t in temps], axis=0)) + 26 # to Jy
-        return 10**(y_model_log + np.median(y_log[~test_mask] - y_model_log))
+
+    # The model func scaling is in log space, as the range is large, but it returns linear fluxes.
+    def scaled_bb_model(temps, mask):
+        y_model_log = log10(np.sum([blackbody_flux(x[~mask], t) for t in temps], 0)) + 26 # to Jy
+        return 10**(y_model_log + np.median(y_log[~mask] - y_model_log))
+
+    # The minimize target func; checks temps against priors, calls the model func and evaluates like
+    def objective_func(temps, mask) -> float:
+        if all(2e3 < t < 3e4 for t in temps) and abs(temps[-1] / temps[0] - temp_ratio) < temp_flex:
+            return simple_like_func(scaled_bb_model(temps, mask), y[~mask], y_err[~mask])
+        return np.inf
 
     # Iteratively fit the observations, remove the worst fitted points until fit no longer improves
+    test_mask = outlier_mask.copy()   # for initial/baseline fit nothing is excluded
     last_test_stat = np.inf
     for _iter in range(sed_count):
         if sed_count - sum(test_mask) < min_unmasked:
@@ -233,17 +238,14 @@ def create_outliers_mask(sed: Table,
                         f"will reduce the number of SED rows below the minimum of {min_unmasked}.")
             break
 
-        # Perform a fit on the unmasked target fluxes and get the resulting model
-        target_func = create_objective_func(x[~test_mask], y[~test_mask], y_err[~test_mask],
-                                            model_func=scaled_summed_bb_model,
-                                            prior_func=prior_func)
+        # Perform a fit on the target fluxes which are still unmasked
         with warnings.catch_warnings(category=RuntimeWarning):
             warnings.filterwarnings("ignore", message="invalid value encountered in subtract")
-            soln = minimize(target_func, x0=temps0)
+            soln = minimize(objective_func, x0=temps0, args=test_mask)
 
         # TODO: check fitted temps and/or fit against input and warn if bad fit
         this_temps = soln.x
-        this_y_model = scaled_summed_bb_model(this_temps, x[~test_mask])
+        this_y_model = scaled_bb_model(this_temps, test_mask)
 
         # Calculate a comperable summary stat on this fit. TODO: refine test stat & weights
         weights = np.ones_like(this_y_model)
@@ -293,65 +295,13 @@ def simple_like_func(y_model: np.ndarray, y: np.ndarray, y_err: np.ndarray) -> f
     """
     A very simple like function which compares y_model with y +/- y_err with
 
-    like = 0.5 * Σ ((y - y_model) / y_err)^2
+    like = 1/2 * Σ((y - y_model) / (y_err + 10^-30))^2
+
+    where the addition of 10^-30 to y_err is to prevent division by zero errors
 
     :y_model: the model y data points
     :y: the equivalent observation y data points
     :y_err: the equivalent uncertatinties in y
     :returns: the likeness of the model to the data
     """
-    return 0.5 * np.sum(((y - y_model) / y_err)**2)
-
-
-def create_objective_func(
-        x: Tuple[Column, np.ndarray],
-        y: Tuple[Column, np.ndarray],
-        y_err: Tuple[Column, np.ndarray],
-        model_func: Callable[[Union[Tuple, List], np.ndarray], np.ndarray],
-        map_func: Callable[[Union[Tuple, List]], Union[Tuple, List]]=None,
-        prior_func: Callable[[Union[Tuple, List]], float]=None,
-        like_func: Callable[[np.ndarray, np.ndarray, np.ndarray], float]=simple_like_func) \
-            -> Callable[[Union[Tuple, List]], float]:
-    """
-    This creates and return a simple objective function which can be used as the target function
-    for scipy's minimize optimization. 
-    
-    The objective function accepts each iterations's set of model arguments (theta) which it first
-    passes to the optional map_func. The map_func is an opportunity for client code to inspect
-    and/or modify theta (for example we could be fitting for mass and stellar age with a map_func
-    which maps theta to equivalent teff/logg values via model lookup which are returned to be
-    passed to the subsequent prior_func and model_func).
-    
-    If theta is not None (a map_func which couldn't map a specific theta may return None), the next
-    step is to call the prior_func to evaluate theta against the client's prior criteria. This is
-    expected to return the value of the evaluation if it passes else np.inf.
-    
-    If the prior_func returns np.inf, the objective function immediately returns with value np.inf.
-
-    If the prior_func returns !np.inf, the model_func is called with the arguments (x, theta)
-    from which the corresponding y_model is expected to be returned. Finally, y_model is evaluated
-    against y & y_err with the like_func(y_model, y, y_err) from which the return value is taken
-    and added to that from the prior_func.
-    
-    :x: the SED frequencies or wavelengths of y and y_err; to be passed to model_func(x, theta)
-    :y: the SED fluxes at x; to be passed to sim_func(y_model, y, y_err)
-    :y_err: the uncertainties of y in the same unit; to be passed to sim_func(y_model, y, y_err)
-    :model_func: a function which creates and returns a candidate model y based on the current theta
-    :map_func: optional function, called before prior_func, to modify theta values or to map them\
-    onto different params (i.e. masses/age to teffs/loggs via MIST)
-    :prior_func: optional function to evaluate each iteration's theta against known prior criteria,\
-    returning 0 or np.inf to indicate whether theta conforms to these conditions or not
-    :like_func: the function taking arguments (y_model, y, y_err) which evaluates y_model against\
-    y & y_err and returns a numeric similarity score which is the statistic to be minimized
-    :returns: the objective func for minimizing
-    """
-    # pylint: disable=too-many-arguments, too-many-positional-arguments
-    def objective_func(theta: Union[Tuple, List]) -> float:
-        if map_func:
-            theta = map_func(theta)
-        if theta is not None:
-            priors = 0 if not prior_func else prior_func(theta)
-            if np.isfinite(priors):
-                return priors + like_func(model_func(theta, x), y, y_err)
-        return np.inf
-    return objective_func
+    return 0.5 * np.sum(((y - y_model) / (y_err + 1e-30))**2)

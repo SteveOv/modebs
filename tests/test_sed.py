@@ -6,6 +6,7 @@ from pathlib import Path
 from shutil import copy
 import unittest
 
+# pylint: disable=wrong-import-position
 warnings.filterwarnings("ignore", "Using UFloat objects with std_dev==0 may give unexpected results.", category=UserWarning)
 from uncertainties import ufloat, UFloat, unumpy
 import numpy as np
@@ -16,7 +17,7 @@ from astropy.table import Table, join
 
 from libs.sed import get_sed_for_target, calculate_vfv, group_and_average_fluxes
 from libs.sed import create_outliers_mask, blackbody_flux
-from libs.sed import create_objective_func
+
 
 class Testsed(unittest.TestCase):
     """ Unit tests for the sed module. """
@@ -213,55 +214,6 @@ class Testsed(unittest.TestCase):
                     self.assertEqual(sum(~mask), len(sed))
 
                 print(f"{target}: Number of fluxes left: {sum(~mask)} of {len(sed)}")
-
-    #
-    #   create_objective_func(x: array, y: array, y_err: array,
-    #                         model_func: Callable,
-    #                         map_func: Callable=None,
-    #                         prior_func: Callable=None,
-    #                         sim_func: 1/2 sum ((y_model-y)/y_err)**2)
-    #   ) -> func(theta)->float:
-    #
-    def test_create_objective_func_simple_happy_path(self):
-        """ Test create_objective_func(...) happy path > does it work & is it minimizable """
-        sed = get_sed_for_target(Testsed._cw_eri_test_target)
-
-        x = sed["sed_freq"].to(u.Hz).value
-        y = sed["sed_flux"].to(u.Jy).value
-        y_err = sed["sed_eflux"].to(u.Jy).value
-
-        y_log = np.log10(y)
-        def model_func(teffs, x): # sums blackbody spectra and scales them to y in log10 space
-            y_mdl_log = np.log10(np.sum([blackbody_flux(x, t) for t in teffs], axis=0)) + 26 # to Jy
-            return 10**(y_mdl_log + np.median(y_log - y_mdl_log))
-
-        max_map_teff = 6950
-        def map_func(teffs):
-            # This tests that objective_func correctly handles map_func returning None (indicating
-            # theta is not mappable). Expected to prevent teffs > this despite prior_func allowing
-            if max(teffs) > max_map_teff:
-                teffs = None
-            return teffs
-
-        def prior_func(teffs):
-            if all(6000 <= t <= 7000 for t in teffs) and abs(teffs[1]/teffs[0] - 0.94) <= 0.05:
-                return 0
-            return np.inf
-
-        # Create the func - leave sim_func() to the default implementation
-        objective_func = create_objective_func(x, y, y_err, model_func, map_func, prior_func)
-
-        # Minimize it
-        with warnings.catch_warnings(category=RuntimeWarning):
-            warnings.filterwarnings("ignore", message="invalid value encountered in subtract")
-            soln = scipy_minimize(objective_func, (6800, 6600), method="SLSQP", options={"maxiter": 1000})
-
-        print(f"\nSoln message = {soln.message}")
-        self.assertTrue(soln.success)
-
-        print(f"Final teffs = {soln.x}")
-        self.assertTrue(6000 <= soln.x[0] <= max_map_teff)
-        self.assertTrue(6000 <= soln.x[1] <= max_map_teff)
 
 
 if __name__ == "__main__":
