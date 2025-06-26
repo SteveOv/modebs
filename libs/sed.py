@@ -175,9 +175,9 @@ def group_and_average_fluxes(sed: Table,
 
 
 def create_outliers_mask(sed: Table,
-                         temps0: Tuple=(5000, 5000),
+                         temps0: Union[Tuple[float], List[float]]=(5000., 5000.),
                          min_unmasked: float=15,
-                         min_improvement_ratio: float = 0.10,
+                         min_improvement_ratio: float=0.10,
                          verbose: bool=False) -> np.ndarray[bool]:
     """
     Will create a mask indicating the farthest outliers.
@@ -194,7 +194,7 @@ def create_outliers_mask(sed: Table,
     :verbose: whether to print progress messages or not
     :returns: a mask indicating those observations selected as outliers
     """
-    # pylint: disable=too-many-locals
+    # pylint: disable=too-many-locals, too-many-branches, too-many-statements
     sed_count = len(sed)
     outlier_mask = np.zeros((sed_count), dtype=bool)
     min_unmasked = int(sed_count * min_unmasked if 0 < min_unmasked <= 1 else max(min_unmasked, 1))
@@ -203,9 +203,10 @@ def create_outliers_mask(sed: Table,
         return outlier_mask
 
     # Initial temps & associated priors
-    temps0 = (temps0,) if isinstance(temps0, Number) else temps0
+    temps0 = [temps0] if isinstance(temps0, Number) else temps0
     temp_ratio = temps0[-1] / temps0[0]
     temp_flex = temp_ratio * 0.05
+    temps0_median = np.median(temps0)
 
     # Prepare the x, y & y_err data for the model & objective funcs which access these data directly
     x = sed["sed_freq"].to(u.Hz).value
@@ -236,13 +237,20 @@ def create_outliers_mask(sed: Table,
         # Perform a fit on the target fluxes which are still unmasked
         with warnings.catch_warnings(category=RuntimeWarning):
             warnings.filterwarnings("ignore", message="invalid value encountered in subtract")
-            soln = minimize(objective_func, x0=temps0, args=test_mask)
+            soln = minimize(objective_func, x0=temps0, args=test_mask, method="SLSQP")
 
-        # TODO: check fitted temps and/or fit against input and warn if bad fit
+        if not soln.success:
+            if verbose: print(f"[{_iter:03d}] stopped as this fit failed with '{soln.message}'")
+            break
+
         this_temps = soln.x
-        this_y_model = scaled_bb_model(this_temps, test_mask)
+        if abs(np.median(this_temps) - temps0_median) > temps0_median * 0.25:
+            if verbose: print(f"[{_iter:03d}] stopped as this fit yielded unlikely temps",
+                              f"of {this_temps} against input temps of {temps0}")
+            break
 
         # Calculate a comperable summary stat on this fit. TODO: refine test stat & weights
+        this_y_model = scaled_bb_model(this_temps, test_mask)
         weights = np.ones_like(this_y_model)
         this_resids_sq = ((y[~test_mask] - this_y_model) / y_err[~test_mask])**2
         this_test_stat = np.sum(this_resids_sq * weights) / (len(this_resids_sq) - 1)

@@ -192,15 +192,21 @@ class Testsed(unittest.TestCase):
     #   create_outliers_mask(sed: Table) -> np.ndarray[bool]
     #
     def test_create_outliers_mask_simple_happy_path(self):
-        """ Test create_outliers_mask(sed) WIP """
-        for target,                         temps0,     min_unmasked,   msg in [
-            (Testsed._cw_eri_test_target,   (6800, 6500),   15,     "test stops at no improvement"),
-            (Testsed._zz_boo_test_target,   (6700, 6700),   125,    "test stops at min"),
-            (Testsed._cm_dra_test_target,   (3200, 3200),   50,     "test stops as already at min"),
-            (Testsed._cm_dra_test_target,   (3200, 3200),   0.99,   "test fractional min"),
+        """ Test create_outliers_mask(sed) various scenarios - check verbose output against msg """
+        for target,                         temps0,         min_unmasked,   msg in [
+            (Testsed._cw_eri_test_target,   [6800, 6500],       15,     "test stops at no improvement"),
+            (Testsed._zz_boo_test_target,   [6700, 6700],       70,     "test stops at explicit (>=1) min"),
+            (Testsed._zz_boo_test_target,   [6700, 6700],       0.95,   "test stops at fractional (<1) min"),
+            (Testsed._cm_dra_test_target,   [3100, 3100],       50,     "test stops as already at min"),
+            (Testsed._cm_dra_test_target,   [4200, 4200],       10,     "test stop for fitted temp unlikely"),
+            (Testsed._cm_dra_test_target,   [1200, 2900],       10,     "test stop, minimize failed (iter limit)"),
+            (Testsed._cm_dra_test_target,   4200,               10,     "test supports single value in temps0"),
+            (Testsed._cm_dra_test_target,   [3100, 3100, 2200], 10,     "test supports triple value in temps0"),
         ]:
             with self.subTest(msg=msg):
-                sed = get_sed_for_target(target)
+                sed = get_sed_for_target(target, remove_duplicates= True)
+                print(f"\n{target} / '{msg}': Number of fluxes to start: {len(sed)}")
+
                 mask = create_outliers_mask(sed, temps0, min_unmasked, verbose=True)
                 self.assertTrue(isinstance(mask, np.ndarray))
                 self.assertTrue(mask.dtype == np.dtype(bool))
@@ -213,7 +219,7 @@ class Testsed(unittest.TestCase):
                 else:
                     self.assertEqual(sum(~mask), len(sed))
 
-                print(f"{target}: Number of fluxes left: {sum(~mask)} of {len(sed)}")
+                print(f"{target} / '{msg}': Number of fluxes left: {sum(~mask)} of {len(sed)}")
 
 
 if __name__ == "__main__":
