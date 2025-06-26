@@ -2,6 +2,7 @@
 """
 Low level utility functions for SED ingest, pre-processing, estimation and fitting.
 """
+# pylint: disable=no-member, multiple-statements
 from typing import Union, Tuple, List
 import warnings
 from pathlib import Path
@@ -9,7 +10,6 @@ import re
 from urllib.parse import quote_plus
 from numbers import Number
 
-# pylint: disable=no-member
 import astropy.units as u
 from astropy.table import Table, Column
 from uncertainties import UFloat, unumpy
@@ -62,8 +62,7 @@ def get_sed_for_target(target: str,
     # Read in the SED for this target via the cache (filename includes both search criteria)
     sed_fname = sed_cache_dir / (re.sub(r"[^\w\d-]", "-", target.lower()) + f"-{radius}.vot")
     if not sed_fname.exists():
-        if verbose:
-            print("Table not cached so we will query the VizieR SED service.")
+        if verbose: print(f"Table {sed_fname.name} not cached so will query the VizieR SED service")
         try:
             targ = quote_plus(search_term or target)
             sed = Table.read(f"https://vizier.cds.unistra.fr/viz-bin/sed?-c={targ}&-c.rs={radius}")
@@ -73,8 +72,7 @@ def get_sed_for_target(target: str,
 
     sed = Table.read(sed_fname)
     sed.sort(["sed_freq"], reverse=True)
-    if verbose:
-        print(f"Opened SED table containing {len(sed)} row(s).")
+    if verbose: print(f"Opened SED table {sed_fname.name} containing {len(sed)} row(s).")
 
     # Set flux uncertainties where none given
     mask_no_err = (sed["sed_eflux"].value == 0) | np.isnan(sed["sed_eflux"])
@@ -89,8 +87,7 @@ def get_sed_for_target(target: str,
 
     if remove_duplicates:
         dup_grp = sed.group_by(["sed_filter", "sed_freq", "sed_flux", "sed_eflux"])
-        if verbose:
-            print(f"Removing {len(sed)-len(dup_grp.groups)} duplicate row(s).")
+        if verbose: print(f"Removing {len(sed)-len(dup_grp.groups)} duplicate row(s).")
         sed = sed[dup_grp.groups.indices[:-1]]
         sed.sort(["sed_freq"], reverse=True)
 
@@ -140,9 +137,8 @@ def group_and_average_fluxes(sed: Table,
     """
     # pylint: disable=dangerous-default-value
     sed_grps = sed.group_by(group_by_colnames)
-    if verbose:
-        print(f"Grouped SED by {group_by_colnames} yielding {len(sed_grps.groups)} group(s)",
-              f"from {len(sed)} row(s).")
+    if verbose: print(f"Grouped SED by {group_by_colnames} yielding",
+                      f"{len(sed_grps.groups)} group(s) from {len(sed)} row(s).")
 
     # Find the flux & related uncertainty columns to be aggregated
     flux_colname_pairs = []
@@ -158,8 +154,7 @@ def group_and_average_fluxes(sed: Table,
 
     # Can't use the default groups.aggregate(np.mean) functionality as we need to
     # be able to work with two columns (noms, errs) to correctly calculate the mean.
-    if verbose:
-        print(f"Calculating the group means of the {flux_colname_pairs} columns")
+    if verbose: print(f"Calculating the group means of the {flux_colname_pairs} columns")
     for _, grp in zip(sed_grps.groups.keys, sed_grps.groups):
         for flux_colname, flux_err_colname in flux_colname_pairs:
             if flux_err_colname is not None:
@@ -199,7 +194,7 @@ def create_outliers_mask(sed: Table,
     :verbose: whether to print progress messages or not
     :returns: a mask indicating those observations selected as outliers
     """
-    # pylint: disable=too-many-locals, multiple-statements
+    # pylint: disable=too-many-locals
     sed_count = len(sed)
     outlier_mask = np.zeros((sed_count), dtype=bool)
     min_unmasked = int(sed_count * min_unmasked if 0 < min_unmasked <= 1 else max(min_unmasked, 1))
@@ -234,7 +229,7 @@ def create_outliers_mask(sed: Table,
     last_test_stat = np.inf
     for _iter in range(sed_count):
         if sed_count - sum(test_mask) < min_unmasked:
-            if verbose: print(f"[{_iter:03d}] stopped as the {'next' if _iter >1 else ''} mask",
+            if verbose: print(f"[{_iter:03d}] stopped as the {'next' if _iter > 1 else ''} mask",
                         f"will reduce the number of SED rows below the minimum of {min_unmasked}.")
             break
 
