@@ -33,35 +33,40 @@ _regex_pattern_val_and_err = r"^[\s]*(?:{0})[\w\d\s]*[\s]+" \
                              r"[\s]*(?:\+\/\-)?[\s]*"\
                              r"(?P<err>[0-9]+[\.]?[0-9]*)?"
 
+# These should be "escaped" here as they're placed in the 1st non-capturing group in the above regex
 _param_file_line_beginswith = {
-    "J":                "1  Surf. bright. ratio",
-    "rA_plus_rB":       "2  Sum of frac radii",
-    "k":                "3  Ratio of the radii",
-    "LDA1":             "4  Limb darkening A1",
-    "LDB1":             "5  Limb darkening B1",
-    "inc":              "6  Orbit",
-    "ecosw":            "7  ecc * cos(omega)",
-    "esinw":            "8  ecc * sin(omega)",
-    "gravA":            "9  Grav darkening A",
-    "gravB":            "10  Grav darkening B",
-    "reflA":            "11  Reflected light A",
-    "reflB":            "12  Reflected light B",
-    "qphot":            "13  Phot mass ratio",
-    "L3":               "15  Third light (L_3)",
-    "period":           "19  Orbital period (P)",
-    "primary_epoch":    "20  Ephemeris",
-    "pe":               "20  Ephemeris",
-    "LDA2":             "21  Limb darkening A2",
-    "LDB2":             "24  Limb darkening B2",
-    "rA":               "Fractional primary radius:",
-    "rB":               "Fractional secondary radius:",
-    "ecc":              "Orbital eccentricity e:",
-    "omega":            "Periastron longitude omega (degree):",
-    "bP":               "Impact parameter (primary eclipse):",
-    "bS":               "Impact paramtr (secondary eclipse):",
-    "phiS":             "Phase of secondary eclipse:",
-    "LA":               "Primary contribut'n to system light:",
-    "LB":               "Secondary contrib'n to system light:",
+    "J":                r"1  Surf. bright. ratio",
+    "rA_plus_rB":       r"2  Sum of frac radii",
+    "k":                r"3  Ratio of the radii",
+    "LDA1":             r"4  Limb darkening A1",
+    "LDB1":             r"5  Limb darkening B1",
+    "inc":              r"6  Orbit",
+    "ecosw":            r"7  ecc \* cos\(omega\)",
+    "esinw":            r"8  ecc \* sin\(omega\)",
+    "gravA":            r"9  Grav darkening A",
+    "gravB":            r"10  Grav darkening B",
+    "reflA":            r"11  Reflected light A",
+    "reflB":            r"12  Reflected light B",
+    "qphot":            r"13  Phot mass ratio",
+    "L3":               r"15  Third light \(L_3\)",
+    "period":           r"19  Orbital period \(P\)",
+    "primary_epoch":    r"20  Ephemeris",
+    "pe":               r"20  Ephemeris",
+    "LDA2":             r"21  Limb darkening A2",
+    "LDB2":             r"24  Limb darkening B2",
+    "rA":               r"Fractional primary radius:",
+    "rB":               r"Fractional secondary radius:",
+    "ecc":              r"Orbital eccentricity e:",
+    "omega":            r"Periastron longitude omega \(degree\):",
+    "bP":               r"Impact parameter \(primary eclipse\):",
+    "bS":               r"Impact paramtr \(secondary eclipse\):",
+    "phiS":             r"Phase of secondary eclipse:",
+    "LA":               r"Primary contribut'n to system light:",
+    "LB":               r"Secondary contrib'n to system light:",
+    "light_ratio":      r"Stellar light ratio \(phase [\d.]+\):",
+    "chisq":            r"Total chisq of the fit:",
+    "red_chisq":        r"Reduced chisq of the fit:",
+    "rms_resids":       r"rms of the LC residuals \(mmag\):",
 }
 
 # Defines the "columns" of the structured array returned by generate_model_light_curve()
@@ -373,7 +378,7 @@ def read_fitted_params_from_par_lines(par_lines: Iterable[str],
     results = {}
     lines = list(par_lines)  # Get them out of a generator as we need to go through more than once
     for param in params:
-        beginswith = re.escape(_param_file_line_beginswith.get(param, ""))
+        beginswith = _param_file_line_beginswith.get(param, "") # don't escape; may contain tokens
         if beginswith:
             pattern = re.compile(_regex_pattern_val_and_err.format(beginswith), re.IGNORECASE)
             for line in lines:
