@@ -77,7 +77,7 @@ class ModelSed():
     @property
     def logg_range(self) -> u.Quantity:
         """ Gets the range of logg covered by this model """
-        return self._model_teff_range
+        return self._model_logg_range
 
     @property
     def flux_unit(self) -> u.Unit:
