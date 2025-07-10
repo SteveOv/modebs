@@ -24,14 +24,13 @@ class ModelSed():
         this_dir = _Path(_getsourcefile(lambda:0)).parent
         if data_file is None:
             data_file = this_dir / "data/pyssed/model-bt-settl-recast.dat"
+        self._data_file = data_file
         self._flux_unit = u.Jy
 
         # Read the pre-built model file. The delete chars is to handle some of the
         # column/filter names which contain spaces and grammar chars.
-        model_grid = np.genfromtxt(data_file, names=True, delimiter=" ",
+        model_grid = np.genfromtxt(self._data_file, names=True, delimiter=" ",
                                    deletechars=r" ~!@#$%^&*()=+~\|]}[{';: ?>,<")
-
-        # For now we're only interested in the solar metallicity model fluxes
         model_grid = model_grid[model_grid["alpha"] == 0]
 
         # Should already be in this order, but just in case as we depend on this order below
@@ -63,9 +62,19 @@ class ModelSed():
         self._model_logg_range = (min(loggs), max(loggs)) << u.dex
         self._model_metal_range = (min(metals), max(metals)) << u.dimensionless_unscaled
 
-        # Lookup for translating the SED service filter names into those used here
+        # Lookup for translating the SED service filter names into those used here & within the dat
         with open(this_dir / "data/pyssed/sed-filter-translation.json", "r", encoding="utf8") as j:
             self._sed_filter_name_map = _json_load(j)
+
+    @property
+    def data_file(self) -> _Path:
+        """ Gets the Path of the data file being used. """
+        return self._data_file
+
+    @property
+    def num_interpolators(self) -> int:
+        """ Gets the number of interpolators covering this model """
+        return self._model_interps.shape[0]
 
     @property
     def wavelength_range(self) -> u.Quantity["length"]:
@@ -94,6 +103,8 @@ class ModelSed():
 
     def map_filter_name(self, name: str) -> str:
         """ Get the name of the equivalent filter within this model """        
+        if name in self._model_interps["filter"]:
+            return name
         # We want an index error if the mapping does not exist
         return self._sed_filter_name_map[name]
 
@@ -101,83 +112,51 @@ class ModelSed():
         """ Gets whether this model knows of the requested filter """
         return name in self._sed_filter_name_map or name in self._sed_filter_name_map.values()
 
-    def get_filter_interpolators_and_mappings(self,
-                                              filter_names: Iterable[str]) \
-            -> Tuple[Iterable[_RegularGridInterpolator], Iterable[int]]:
+    def get_filter_indices(self, filter_names: Iterable[str]) -> np.ndarray[int]:
         """
-        This is a rather dangerous convenience/optimization which is coupled to
-        get_model_fluxes_from_mappings(). Hopefully I can drop this!
+        Get the indices of the given filters. Useful in optimizing filter access when iterating
+        as the indices can be used in place of the names. Handles mapping filter names.
 
-        It takes the passed list of filters and returns a list of interpolators, one for each unique
-        filter listed, and a second list of indices which map these back to the original list.
+        Will raise a KeyError if a filter is unknown.
 
-        This allows us to avoid repeating this lookup/mapping within a MCMC run.
-
-        :filter_names: a list of filters to locate and map
-        :returns: (array of interpolators, array the mappings from interpolators to the input list)
+        :filter_names: a list of filters for which we want the indices
+        :returns: an array of the equivalent indices
         """
-        # Here np.unique return 2 arrays; one of unique filter names & another of indices mapping
-        # them onto input. We use the first to locate & list the interp corresponding to each unique
-        # filter and the second to map these onto the >=1 locations within the input they're used.
-        unique_names, input_map = np.unique(filter_names, return_inverse=True)
-        interps = np.empty(len(unique_names), dtype=object)
-        for filter_ix, name in enumerate(unique_names):
-            if name not in self._model_interps["filter"]:
-                # Will raise IndexError if a filter is unknown
-                name = self.map_filter_name(name)
-
-            # TODO: what about if the mapped name is not in the model?
-            interp = self._model_interps[self._model_interps["filter"] == name]["interp"][0]
-            interps[filter_ix] = interp
-        return interps, input_map
-
-    def get_fluxes_from_mappings(self,
-                                 filter_interps: Iterable[_RegularGridInterpolator],
-                                 flux_mappings: Iterable[int],
-                                 teff: float,
-                                 logg: float,
-                                 metal: float=0.) -> u.Quantity:
-        """
-        Will return a ndarray of flux values calculated by the filters corresponding to the
-        interpolators. The filter_interps and flux_mappings are effectively the return values
-        from the get_filter_interpolators_and_mappings() function. This is separated out to avoid
-        repeating the same lookup for every attempted fit.
-
-        It's not obvious in the data file, but the scale of the values implies the fluxes are in Jy
-
-        :filter_interps: unique list of interpolators to use to generate flux values
-        :flux_mappings: mapping indices from the interpolators onto the output
-        :teff: the effective temperature for the fluxes
-        :logg: the logg for the fluxes
-        :metal: the metallicity for the fluxes
-        :returns: the resulting flux values (in the units of the underlying data file)
-        """
-        # pylint: disable=too-many-arguments, too-many-positional-arguments
-        xi = (teff, logg, metal)
-        fluxes_by_filter = np.empty((len(filter_interps)), dtype=float)
-        for filter_flux_ix, filter_interp in enumerate(filter_interps):
-            fluxes_by_filter[filter_flux_ix] = filter_interp(xi=xi)
-
-        # Copy the fluxes to the output via the mappings
-        return_fluxes = np.empty((len(flux_mappings)), dtype=float)
-        for flux_ix, flux_mapping in enumerate(flux_mappings):
-            return_fluxes[flux_ix] = fluxes_by_filter[flux_mapping]
-        return return_fluxes * self.flux_unit
+        if isinstance(filter_names, str):
+            filter_names = [filter_names]
+        ixs = [np.where(self._model_interps['filter'] == self.map_filter_name(f))[0]
+                for f in filter_names]
+        return np.array(ixs, dtype=int).squeeze(axis=1)
 
     def get_fluxes(self,
-                   filter_names: Iterable[str],
+                   filters: Union[np.ndarray[str], np.ndarray[int]],
                    teff: float,
                    logg: float,
                    metal: float=0.) -> u.Quantity:
         """
         Will return a ndarray of flux values calculated for requested filter names at
-        the chosen effective temperature and logg values.
+        the chosen effective temperature, logg and metallicity values.
 
-        :filter_names: a list of filters for which we are generating fluxes
+        Will raise a KeyError if a named filter is unknown.
+        Will raise IndexError if an indexed filter is out of range.
+
+        :filters: a list of filter names or indices for which we are generating fluxes
         :teff: the effective temperature for the fluxes
         :logg: the logg for the fluxes
         :metal: the metallicity for the fluxes
         :returns: the resulting flux values (in the units of the underlying data file)
         """
-        filter_iterps, mappings = self.get_filter_interpolators_and_mappings(filter_names)
-        return self.get_fluxes_from_mappings(filter_iterps, mappings, teff, logg, metal)
+        # Find the unique filters and the map onto the request/response (a filter can appear > once)
+        if isinstance(filters, (str|int)):
+            unique_filters, flux_mappings = np.array([filters]), np.array([0])
+        else:
+            unique_filters, flux_mappings = np.unique(filters, return_inverse=True)
+
+        # Get the fluxes once for each of the unique filters
+        if unique_filters.dtype not in (np.int64, np.int32):
+            unique_filters = self.get_filter_indices(unique_filters)
+        xi = (teff, logg, metal)
+        fluxes = [self._model_interps[filter]["interp"](xi=xi) for filter in unique_filters]
+
+        # Map these fluxes onto the response, where a filter/flux may appear >1 times
+        return np.array([fluxes[m] for m in flux_mappings], dtype=float) << self.flux_unit
