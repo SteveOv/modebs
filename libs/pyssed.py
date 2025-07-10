@@ -32,15 +32,16 @@ class ModelSed():
                                    deletechars=r" ~!@#$%^&*()=+~\|]}[{';: ?>,<")
 
         # For now we're only interested in the solar metallicity model fluxes
-        model_grid = model_grid[(model_grid["metal"] == 0) & (model_grid["alpha"] == 0)]
+        model_grid = model_grid[model_grid["alpha"] == 0]
 
         # Should already be in this order, but just in case as we depend on this order below
-        model_grid.sort(order=["teff", "logg"])
+        model_grid.sort(order=["teff", "logg", "metal"])
 
         # The cols 0 to 4 are expected to be teff, logg, metal, alpha and lum.
         # The rest of the cols are the filters and corresponding fluxes.
         teffs, teff_ixs = np.unique(model_grid["teff"], return_inverse=True)
         loggs, logg_ixs = np.unique(model_grid["logg"], return_inverse=True)
+        metals, metal_ixs = np.unique(model_grid["metal"], return_inverse=True)
         filter_names = list(model_grid.dtype.names)[5:]
 
         # Set up a table of interpolators, one per filter. Each interpolator is based on
@@ -48,36 +49,43 @@ class ModelSed():
         self._model_interps = np.empty(shape=(len(filter_names), ),
                                        dtype=[("filter", object), ("interp", object)])
         for filter_ix, filter_name in enumerate(filter_names):
-            # Writing tl_pivot this way only works if model_grid[filter_name] has teffs*loggs #items
-            tl_pivot = np.zeros((len(teffs), len(loggs)), dtype=model_grid[filter_name].dtype)
-            tl_pivot[teff_ixs, logg_ixs] = model_grid[filter_name]
+            # Need model_grid[filter_name] as teffs*loggs*metals items to write tl_pivot this way
+            tl_pivot = np.zeros((teffs.shape[0], loggs.shape[0], metals.shape[0]),
+                                dtype=model_grid[filter_name].dtype)
+            tl_pivot[teff_ixs, logg_ixs, metal_ixs] = model_grid[filter_name]
 
-            interp = _RegularGridInterpolator((teffs, loggs), tl_pivot, "linear")
+            interp = _RegularGridInterpolator((teffs, loggs, metals), tl_pivot, "linear")
             self._model_interps[filter_ix] = (filter_name, interp)
         del model_grid
 
-        self._wavelength_range = (0.3, 22) * u.micron
-        self._model_teff_range = (min(teffs), max(teffs)) * u.K
-        self._model_logg_range = (min(loggs), max(loggs)) * u.dex
+        self._wavelength_range = (0.3, 22) << u.micron
+        self._model_teff_range = (min(teffs), max(teffs)) << u.K
+        self._model_logg_range = (min(loggs), max(loggs)) << u.dex
+        self._model_metal_range = (min(metals), max(metals)) << u.dimensionless_unscaled
 
         # Lookup for translating the SED service filter names into those used here
         with open(this_dir / "data/pyssed/sed-filter-translation.json", "r", encoding="utf8") as j:
             self._sed_filter_name_map = _json_load(j)
 
     @property
-    def wavelength_range(self) -> u.Quantity:
+    def wavelength_range(self) -> u.Quantity["length"]:
         """ Gets the range of wavelength covered by this model """
         return self._wavelength_range
 
     @property
-    def teff_range(self) -> u.Quantity:
+    def teff_range(self) -> u.Quantity["temperature"]:
         """ Gets the range of effective temperatures covered by this model """
         return self._model_teff_range
 
     @property
-    def logg_range(self) -> u.Quantity:
+    def logg_range(self) -> u.Dex:
         """ Gets the range of logg covered by this model """
         return self._model_logg_range
+
+    @property
+    def metal_range(self) -> u.Quantity:
+        """ Gets the range of metallicities covered by this model """
+        return self._model_metal_range
 
     @property
     def flux_unit(self) -> u.Unit:
@@ -127,7 +135,8 @@ class ModelSed():
                                  filter_interps: Iterable[_RegularGridInterpolator],
                                  flux_mappings: Iterable[int],
                                  teff: float,
-                                 logg: float) -> u.Quantity:
+                                 logg: float,
+                                 metal: float=0.) -> u.Quantity:
         """
         Will return a ndarray of flux values calculated by the filters corresponding to the
         interpolators. The filter_interps and flux_mappings are effectively the return values
@@ -140,10 +149,11 @@ class ModelSed():
         :flux_mappings: mapping indices from the interpolators onto the output
         :teff: the effective temperature for the fluxes
         :logg: the logg for the fluxes
+        :metal: the metallicity for the fluxes
         :returns: the resulting flux values (in the units of the underlying data file)
         """
-        # Generate each unique flux value
-        xi = (teff, logg)
+        # pylint: disable=too-many-arguments, too-many-positional-arguments
+        xi = (teff, logg, metal)
         fluxes_by_filter = np.empty((len(filter_interps)), dtype=float)
         for filter_flux_ix, filter_interp in enumerate(filter_interps):
             fluxes_by_filter[filter_flux_ix] = filter_interp(xi=xi)
@@ -157,7 +167,8 @@ class ModelSed():
     def get_fluxes(self,
                    filter_names: Iterable[str],
                    teff: float,
-                   logg: float) -> u.Quantity:
+                   logg: float,
+                   metal: float=0.) -> u.Quantity:
         """
         Will return a ndarray of flux values calculated for requested filter names at
         the chosen effective temperature and logg values.
@@ -165,7 +176,8 @@ class ModelSed():
         :filter_names: a list of filters for which we are generating fluxes
         :teff: the effective temperature for the fluxes
         :logg: the logg for the fluxes
+        :metal: the metallicity for the fluxes
         :returns: the resulting flux values (in the units of the underlying data file)
         """
         filter_iterps, mappings = self.get_filter_interpolators_and_mappings(filter_names)
-        return self.get_fluxes_from_mappings(filter_iterps, mappings, teff, logg)
+        return self.get_fluxes_from_mappings(filter_iterps, mappings, teff, logg, metal)
