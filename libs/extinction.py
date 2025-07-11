@@ -26,7 +26,7 @@ def get_ebv(target_coords: SkyCoord,
     The extinction value will be the E(B-V) or A_V as specific to each function.
 
     If no funcs specified the following list will be used, in the order shown:
-    [get_gontcharov_ebv, get_bayestar_ebv, get_vergely_av]
+    [get_bayestar_ebv, get_vergely_av, get_gontcharov_ebv]
 
     :target_coords: the SkyCoords to get the extinction value for
     :funcs: optional list of functions to iterate over, either by name of function object.
@@ -34,7 +34,7 @@ def get_ebv(target_coords: SkyCoord,
     :rv: the R_V value to use if it is necessary to convert Av values to E(B-V)
     """
     if funcs is None:
-        funcs = [get_gontcharov_ebv, get_bayestar_ebv, get_vergely_av]
+        funcs = [get_bayestar_ebv, get_vergely_av, get_gontcharov_ebv]
     if isinstance(funcs, str | Callable):
         funcs = [funcs]
 
