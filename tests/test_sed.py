@@ -70,6 +70,7 @@ class Testsed(unittest.TestCase):
         for flux_unit, freq_unit, wl_unit in [
             (u.Jy, u.GHz, u.Angstrom),          # Jy & GHz are the default units as downloaded
             (u.W/u.m**2/u.Hz, u.Hz, u.micron),  # Default units expected (requires conversion)
+            (u.W/u.nm**2/u.THz, u.THz, u.nm),   # Unusual, but equivalent (requires conversion)
         ]:
             with self.subTest():
                 sed = get_sed_for_target(Testsed._cw_eri_test_target,
@@ -139,17 +140,23 @@ class Testsed(unittest.TestCase):
     #
     def test_group_and_average_fluxes_simple_happy_path(self):
         """ Tests group_and_average_fluxes() basic happy path test of calculations & return type """
-        sed = get_sed_for_target(Testsed._cw_eri_test_target)
-        sed_grps = group_and_average_fluxes(sed, verbose=True)
+        for flux_unit, freq_unit in [
+            (u.W / u.m**2 / u.Hz, u.Hz),
+            (u.Jy, u.GHz),
+        ]:
+            sed = get_sed_for_target(Testsed._cw_eri_test_target,
+                                     flux_unit=flux_unit, freq_unit=freq_unit)
+            sed_grps = group_and_average_fluxes(sed, verbose=True)
 
-        self.assertTrue(len(sed_grps) < len(sed))
+            self.assertTrue(len(sed_grps) < len(sed))
 
-        # Check the grouped mean(nom, err) calculation
-        grp_mask = (sed_grps["sed_filter"] == "Gaia:G") & (sed_grps["sed_freq"] == 4.4546e14 * u.Hz)
-        sed_mask = (sed["sed_filter"] == "Gaia:G") & (sed["sed_freq"] == 4.4546e14 * u.Hz)
-        exp_mean = np.mean(unumpy.uarray(sed["sed_flux"][sed_mask], sed["sed_eflux"][sed_mask]))
-        self.assertAlmostEqual(exp_mean.n, sed_grps["sed_flux"][grp_mask].value[0], 6)
-        self.assertAlmostEqual(exp_mean.s, sed_grps["sed_eflux"][grp_mask].value[0], 6)
+            # Check the grouped mean(nom, err) calculation
+            grp_mask = (sed_grps["sed_filter"] == "Gaia:G") & (sed_grps["sed_freq"].to(u.Hz) == 4.4546e14 * u.Hz)
+            sed_mask = (sed["sed_filter"] == "Gaia:G") & (sed["sed_freq"].to(u.Hz) == 4.4546e14 * u.Hz)
+            grp_fluxes = unumpy.uarray(sed["sed_flux"][sed_mask].value, sed["sed_eflux"][sed_mask].value)
+            exp_mean = grp_fluxes.sum() / len(grp_fluxes)
+            self.assertAlmostEqual(exp_mean.n, sed_grps["sed_flux"][grp_mask].value[0], 6)
+            self.assertAlmostEqual(exp_mean.s, sed_grps["sed_eflux"][grp_mask].value[0], 6)
 
 
     #

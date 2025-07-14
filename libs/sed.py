@@ -92,7 +92,7 @@ def get_sed_for_target(target: str,
         sed.sort(["sed_freq"], reverse=True)
 
     # Add wavelength which we may be useful downstream
-    sed["sed_wl"] = np.divide(c * u.m / u.s, sed["sed_freq"]).to(wl_unit)
+    sed["sed_wl"] = np.divide(c * u.m / u.s, sed["sed_freq"].to(u.Hz)).to(wl_unit)
     return sed
 
 
@@ -156,15 +156,14 @@ def group_and_average_fluxes(sed: Table,
     # be able to work with two columns (noms, errs) to correctly calculate the mean.
     if verbose: print(f"Calculating the group means of the {flux_colname_pairs} columns")
     for _, grp in zip(sed_grps.groups.keys, sed_grps.groups):
-        for flux_colname, flux_err_colname in flux_colname_pairs:
-            if flux_err_colname is not None:
-                mean_flux = np.mean(unumpy.uarray(grp[flux_colname].value,
-                                                  grp[flux_err_colname].value))
-                grp[flux_colname] = mean_flux.nominal_value
-                grp[flux_err_colname] = mean_flux.std_dev
+        for flux_colname, err_colname in flux_colname_pairs:
+            if err_colname is not None:
+                # avoid mean() or np.mean() as they may trigger uncertainties' FutureWarning
+                mf = unumpy.uarray(grp[flux_colname].value, grp[err_colname].value).sum() / len(grp)
+                grp[flux_colname] = mf.nominal_value
+                grp[err_colname] = mf.std_dev
             else:
-                mean_flux = np.mean(grp[flux_colname].values)
-                grp[flux_colname] = mean_flux
+                grp[flux_colname] = np.mean(grp[flux_colname].values)
 
         # if verbose:
         #     group_col_vals = [key[group_by_colnames][ix] for ix in range(len(group_by_colnames))]
