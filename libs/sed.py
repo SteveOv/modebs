@@ -102,7 +102,8 @@ def get_sed_for_target(target: str,
 def calculate_vfv(sed: Table,
                   freq_colname: str="sed_freq",
                   flux_colname: str="sed_flux",
-                  flux_err_colname: str="sed_eflux") -> Tuple[Column, Column]:
+                  flux_err_colname: str="sed_eflux",
+                  unit=None) -> Tuple[Column, Column]:
     """
     Calculate the nu*F(nu) columns which are often plotted in place of raw flux/flux err values.
     The columns are not added directly to the table but may be by client code, if required.
@@ -115,6 +116,7 @@ def calculate_vfv(sed: Table,
     :freq_colname: the name of the frequency column to use
     :flux_colname: the name of the flux column to use
     :flex_err_colname: the name of the flux uncertainty column to use
+    :unit: optional unit to transform the result to - must be equivalent to the natural unit
     :returns: a tuple of new astropy Columns with values (sed_freq * sed_flux, sed_freq * sed_eflux)
     """
     freqs, fluxes, flux_errs = sed.columns[freq_colname, flux_colname, flux_err_colname].values()
@@ -122,6 +124,8 @@ def calculate_vfv(sed: Table,
     vfv.unit = freqs.unit * fluxes.unit    # Fix the unit otherwise it'll only use that of freq
     evfv = freqs * flux_errs
     evfv.unit = freqs.unit * fluxes.unit   # Fix the unit otherwise it'll only use that of freq
+    if unit is not None:
+        return vfv.to(unit), evfv.to(unit)
     return vfv, evfv
 
 

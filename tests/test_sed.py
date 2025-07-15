@@ -137,6 +137,23 @@ class Testsed(unittest.TestCase):
         self.assertEqual(sed["sed_flux"].unit * sed["sed_freq"].unit, vfv.unit)
         self.assertEqual(sed["sed_eflux"].unit * sed["sed_freq"].unit, evfv.unit)
 
+    def test_calculate_vfv_cast_units(self):
+        """ Tests calculate_vfv() basic test of custom units """
+        for freq_unit,  flux_unit,              vfv_unit in [
+            (u.Hz,      u.W / u.m**2 / u.Hz,    None),
+            (u.Hz,      u.W / u.m**2 / u.Hz,    u.W / u.m**2),
+            (u.GHz,     u.W / u.m**2 / u.Hz,    u.W / u.m**2),
+            (u.THz,     u.Jy,                   u.W / u.m**2),
+        ]:
+            sed = get_sed_for_target(Testsed._cw_eri_test_target, freq_unit=freq_unit, flux_unit=flux_unit)
+            vfv, evfv = calculate_vfv(sed, unit=vfv_unit)
+
+            if vfv_unit is None:
+                vfv_unit = freq_unit * flux_unit
+                print(f"\nvfv_unit == None, so assert it defaults to {vfv_unit:unicode} from the freq & flux")
+            self.assertEqual(vfv_unit, vfv.unit)
+            self.assertEqual(vfv_unit, evfv.unit)
+
     def test_calculate_vfv_assert_can_add_columns(self):
         """ Tests calculate_vfv() ensure returned columns can be added to source sed Table """
         sed = get_sed_for_target(Testsed._cw_eri_test_target)
