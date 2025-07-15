@@ -11,7 +11,7 @@ from urllib.parse import quote_plus
 from numbers import Number
 
 import astropy.units as u
-from astropy.table import Table, Column, unique
+from astropy.table import Table, unique
 from astropy.io.votable import parse_single_table
 from uncertainties import UFloat, unumpy
 import numpy as np
@@ -83,10 +83,10 @@ def get_sed_for_target(target: str,
 
     # Get the data into desired units
     if sed["sed_flux"].unit != flux_unit:
-        sed["sed_flux"] = sed["sed_flux"].to(flux_unit)
-        sed["sed_eflux"] = sed["sed_eflux"].to(flux_unit)
+        sed["sed_flux"].convert_unit_to(flux_unit)
+        sed["sed_eflux"].convert_unit_to(flux_unit)
     if sed["sed_freq"].unit != freq_unit:
-        sed["sed_freq"] = sed["sed_freq"].to(freq_unit)
+        sed["sed_freq"].convert_unit_to(freq_unit)
 
     if remove_duplicates:
         sed = unique(sed, keys=["sed_filter", "sed_freq", "sed_flux", "sed_eflux"], keep="first")
@@ -103,27 +103,25 @@ def calculate_vfv(sed: Table,
                   freq_colname: str="sed_freq",
                   flux_colname: str="sed_flux",
                   flux_err_colname: str="sed_eflux",
-                  unit=None) -> Tuple[Column, Column]:
+                  unit=None) -> Tuple[u.Quantity, u.Quantity]:
     """
-    Calculate the nu*F(nu) columns which are often plotted in place of raw flux/flux err values.
-    The columns are not added directly to the table but may be by client code, if required.
-    For example:
+    Calculate the nu*F(nu) values from the passed SED Table. These are often plotted in place of
+    raw flux/flux err values. New columns are not added directly to the table but may be added
+    by client code, if required. For example:
     ```python
     sed["sed_vfv"], sed["sed_evfv"] = calculate_vfv(sed)
     ```
 
-    :sed: the table which is the source of the fluxes
+    :sed: the SED table which is the source of the fluxes
     :freq_colname: the name of the frequency column to use
     :flux_colname: the name of the flux column to use
     :flex_err_colname: the name of the flux uncertainty column to use
     :unit: optional unit to transform the result to - must be equivalent to the natural unit
-    :returns: a tuple of new astropy Columns with values (sed_freq * sed_flux, sed_freq * sed_eflux)
+    :returns: a tuple of astropy Quanities with values (sed_freq * sed_flux, sed_freq * sed_eflux)
     """
     freqs, fluxes, flux_errs = sed.columns[freq_colname, flux_colname, flux_err_colname].values()
-    vfv = freqs * fluxes
-    vfv.unit = freqs.unit * fluxes.unit    # Fix the unit otherwise it'll only use that of freq
-    evfv = freqs * flux_errs
-    evfv.unit = freqs.unit * fluxes.unit   # Fix the unit otherwise it'll only use that of freq
+    vfv = freqs.quantity * fluxes.quantity
+    evfv = freqs.quantity * flux_errs.quantity
     if unit is not None:
         return vfv.to(unit), evfv.to(unit)
     return vfv, evfv
