@@ -67,14 +67,15 @@ class Testsed(unittest.TestCase):
 
     def test_get_sed_for_target_assert_units(self):
         """ Tests get_sed_for_target() tests requested units are reflected in resulting table """
-        for flux_unit, freq_unit, wl_unit in [
-            (u.Jy, u.GHz, u.Angstrom),          # Jy & GHz are the default units as downloaded
-            (u.W/u.m**2/u.Hz, u.Hz, u.micron),  # Default units expected (requires conversion)
-            (u.W/u.nm**2/u.THz, u.THz, u.nm),   # Unusual, but equivalent (requires conversion)
+        for flux_unit,          freq_unit,  wl_unit,    msg in [
+            (u.Jy,              u.GHz,      u.Angstrom, "default units in dat file"),
+            (u.W/u.m**2/u.Hz,   u.Hz,       u.micron,   "SI units requiring conversion"),
+            (u.W/u.nm**2/u.THz, u.THz,      u.nm,       "alt equiv units requiring conversion"),
         ]:
-            with self.subTest():
+            with self.subTest(msg=msg):
                 sed = get_sed_for_target(Testsed._cw_eri_test_target,
                                          flux_unit=flux_unit, freq_unit=freq_unit, wl_unit=wl_unit)
+                self.assertIsInstance(sed, Table)
                 self.assertEqual(sed["sed_flux"].unit, flux_unit)
                 self.assertEqual(sed["sed_eflux"].unit, flux_unit)
                 self.assertEqual(sed["sed_freq"].unit, freq_unit)
@@ -82,15 +83,25 @@ class Testsed(unittest.TestCase):
 
     def test_get_sed_for_target_basic_happy_path_for_remove_duplicates(self):
         """ Tests get_sed_for_target() basic test for remove_duplicates functionality """
-        sed = get_sed_for_target(Testsed._cm_dra_test_target)
-        sed_dedupe = get_sed_for_target(Testsed._cm_dra_test_target,
-                                        remove_duplicates=True, verbose=True)
+        for flux_unit,          freq_unit,  wl_unit,    msg in [
+            (u.Jy,              u.GHz,      u.Angstrom, "default units in dat file"),
+            (u.W/u.m**2/u.Hz,   u.Hz,       u.micron,   "SI units requiring conversion"),
+            (u.W/u.nm**2/u.THz, u.THz,      u.nm,       "alt equiv units requiring conversion"),
+        ]:
+            with self.subTest(msg=msg):
+                sed = get_sed_for_target(Testsed._cm_dra_test_target, flux_unit=flux_unit,
+                                                freq_unit=freq_unit, wl_unit=wl_unit)
+                sed_dedupe = get_sed_for_target(Testsed._cm_dra_test_target, flux_unit=flux_unit,
+                                                freq_unit=freq_unit, wl_unit=wl_unit,
+                                                remove_duplicates=True, verbose=True)
 
-        print(sed_dedupe["sed_filter", "sed_wl", "sed_flux", "sed_eflux"])
+                # report_fields = ["sed_freq", "sed_wl", "sed_flux", "sed_eflux"]
+                # print(sed[report_fields][sed["sed_filter"]=="Gaia:G"])
+                # print(sed_dedupe[report_fields][sed_dedupe["sed_filter"]=="Gaia:G"])
 
-        self.assertIsNotNone(sed_dedupe)
-        self.assertTrue(isinstance(sed_dedupe, Table))
-        self.assertTrue(len(sed) > len(sed_dedupe))
+                self.assertIsNotNone(sed_dedupe)
+                self.assertIsInstance(sed_dedupe, Table)
+                self.assertTrue(len(sed) > len(sed_dedupe))
 
     def test_get_sed_for_target_handle_invalid_unit(self):
         """ Tests get_sed_for_target() asserts UnitConversionError when a unit is incompatible """

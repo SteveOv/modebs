@@ -11,7 +11,8 @@ from urllib.parse import quote_plus
 from numbers import Number
 
 import astropy.units as u
-from astropy.table import Table, Column
+from astropy.table import Table, Column, unique
+from astropy.io.votable import parse_single_table
 from uncertainties import UFloat, unumpy
 import numpy as np
 from scipy.optimize import minimize
@@ -70,9 +71,11 @@ def get_sed_for_target(target: str,
         except ValueError as err:
             raise ValueError(f"No SED for target={target} and search_term={search_term}") from err
 
-    sed = Table.read(sed_fname)
+    # Read first/only table in votable & parse into a stock astropy Table (more consistent to use)
+    sed = parse_single_table(sed_fname).to_table()
     sed.sort(["sed_freq"], reverse=True)
-    if verbose: print(f"Opened SED table {sed_fname.name} containing {len(sed)} row(s).")
+    rcount = len(sed)
+    if verbose: print(f"Opened SED table {sed_fname.name} containing {rcount} row(s).")
 
     # Set flux uncertainties where none given
     mask_no_err = (sed["sed_eflux"].value == 0) | np.isnan(sed["sed_eflux"])
@@ -86,9 +89,9 @@ def get_sed_for_target(target: str,
         sed["sed_freq"] = sed["sed_freq"].to(freq_unit)
 
     if remove_duplicates:
-        dup_grp = sed.group_by(["sed_filter", "sed_freq", "sed_flux", "sed_eflux"])
-        if verbose: print(f"Removing {len(sed)-len(dup_grp.groups)} duplicate row(s).")
-        sed = sed[dup_grp.groups.indices[:-1]]
+        sed = unique(sed, keys=["sed_filter", "sed_freq", "sed_flux", "sed_eflux"], keep="first")
+        ucount = len(sed)
+        if verbose: print(f"Dropped {rcount-ucount} duplicate(s) leaving {ucount} unique row(s).")
         sed.sort(["sed_freq"], reverse=True)
 
     # Add wavelength which we may be useful downstream
