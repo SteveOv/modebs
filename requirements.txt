@@ -10,13 +10,15 @@ scikit-learn>=1.0
 uncertainties
 emcee
 corner
+h5py
 
-# Astropy affiliated lib for interacting with virtual observatory protocols 
+# Astropy affiliated lib for interacting with virtual observatory protocols
 pyvo
 
-# Astropy affiliated libs for extinction maps and filters
-dust_extinction
-dustmaps
+# Libs for extinction maps and filters
+dustmaps            # Green18joss - easy to use extinction maps (esp Bayestar)
+dust_extinction     # Gordon24joss - more extinction curves than dustapprox (specifically G23)
+dustapprox          # Fouesneau+2022:dustapprox - extinction curves+more & support for literature conversion coefficients 
 
 # For jupyter notebook support
 ipykernel
@@ -34,7 +36,6 @@ pandas
 mocpy
 
 # For NewEra stellar grids
-h5py
 f90nml
 
 # dEB characterisation support library
