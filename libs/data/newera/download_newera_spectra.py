@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """ Script to download the full Z=0 spectra files from the NewEra archive. """
+from inspect import getsourcefile
 from pathlib import Path
 import re
 from hashlib import md5
 import pandas as pd
 import requests
 
-list_file = Path("libs/data/newera/list_of_available_NewEra_models.txt")
-save_dir = Path(".cache/.newera_spectra/")
+this_dir = Path(getsourcefile(lambda:0)).parent
+
+list_file = this_dir / "list_of_available_NewEra_models.txt"
+save_dir = this_dir / "../../../.cache/.newera_spectra/"
 
 # Don't use the header row in the file as the names have spaces
 flist = pd.read_csv(list_file, header=0, skiprows=1, sep=r"\s+",
