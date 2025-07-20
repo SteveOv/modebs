@@ -1,0 +1,52 @@
+{
+    "source_vizier_table": "J/ApJS/258/16",
+    "morphology_filter": [0, 0.5],
+    "period_filter": [2.0, 28.0],
+    "target_configs": {
+        "0001220444": {
+            "notes": "single sector (5); tess-ebs period 7.162 d; prim eclipse depths of ~4% & very shallow secondary; SAP - lots of variability between eclipses; PDCSAP - similar to SAP;",
+            "exclude": true,
+            "exclude_reason": "shallow eclipses"
+        },
+        "0001449640": {
+            "notes": "two sectors (5 & 32); tess-ebs period 3.5 d; prim eclipse depths of ~2%; either negligible secondary eclipse or period is wrong; SAP - instrumental effects skew s32; PDCSAP - fixes skew -> better",
+            "exclude": true,
+            "exclude_reason": "shallow eclipses"
+        },
+        "0007695666": {
+            "notes": "two sectors @ 120 s (4 & 5); tess-ebs period ~17.5 d; clear & deep eclipses with secondary nr phase 0.17; PDCSAP flatter than SAP;",
+            "flux_column": "pdcsap_flux",
+            "exclude": false,
+            "combine_sectors": true,
+            "quality_masks": [[1420.0, 1424.0], [1451.0, 1465.0]],
+            "phiS": 0.17
+        },
+        "0013021029": {
+            "notes": "two sectors @ 120 s (5 & 32); tess-ebs period ~3.85 d; shallow eclipses of <2%; PDCSAP flatter than SAP;",
+            "exclude": true,
+            "exclude_reason": "shallow eclipses"
+        },
+        "0013957444": {
+            "notes": "two sectors @ 120 s (5 & 32); tess-ebs period ~3.74 d; clear eclipses - primary ~8% & secondary ~1.5%; secondary shallower than ideal but quick-fit indicates may be usable;",
+            "exclude": false
+        },
+
+
+
+        "0031273263": {
+            "notes": "20+ sectors; tess-ebs period ~22.5 d although it's likely double this; deep eclipses of ~20% but no sectors have more than 1; SAP - variability between eclipses; PDCSAP - discontinuities -> worse;",
+            "exclude": true,
+            "exclude_reason": "needs further investigation - may be able to get this to work by combining limited set of contiguous sectors"
+        },
+        "0300560295": {
+            "notes": "20+ sectors; tess-ebs period ~20 d; eclipse depths of 2-4%; SAP - lots of stochastic variability between eclipses; PDCSAP - similar to SAP;",
+            "exclude": true,
+            "exclude_reason": "shallow eclipses with inconsistent depths; hints of extra eclipses in later sectors;"
+        },
+        "0150101472": {
+            "notes": "20+ sectors; tess-ebs period ~3.3 d; SAP - no sectors with clear eclipses plus lots of instrumental effects; PDCSAP - improves on SAP with shallow eclipses visible",
+            "exclude": true,
+            "exclude_reason": "shallow eclipses < 1%"
+        }
+    }
+}
