@@ -3,50 +3,182 @@
     "morphology_filter": [0, 0.5],
     "period_filter": [2.0, 28.0],
     "target_configs": {
-        "0001220444": {
-            "notes": "single sector (5); tess-ebs period 7.162 d; prim eclipse depths of ~4% & very shallow secondary; SAP - lots of variability between eclipses; PDCSAP - similar to SAP;",
+        "0031273263": {
+            "notes": "20+ sectors; tess-ebs period ~22.5 d & morph 0.081; SpT F5; deep eclipses of ~20% but no sectors have more than 1; period may be double tess-ebs; SAP - variability between eclipses; PDCSAP - discontinuities -> worse;",
             "exclude": true,
-            "exclude_reason": "shallow eclipses"
+            "exclude_reason": "needs further investigation - may be able to get this to work by combining limited set of contiguous sectors"
+        },
+        "0032050581": {
+            "notes": "11 sectors @ 120 s; tess-ebs period ~3.1 d morph 0.224; t0 may refer to secondary; shallow primary ~3% and secondary ~2%; likely too shallow for good fit but we could try; lots of instrumental effects in SAP resolved with PDCSAP; further investigation;",
+            "flux_column": "pdcsap_flux",
+            "t0~": 1561.5,
+            "quality_masks": [[3147.0, 3152.0]],
+            "exclude": true,
+            "exclude_reason": "needs further investigation"
+        },
+        "0038678931": {
+            "notes": "14 sectors @ 120 s; tess-ebs period ~6.3 d morph 0.133; clear eclipses of ~10% and ~2%; lots of variability; will need flattening/detrending;",
+            "exclude": true,
+            "exclude_reason": "needs further investigation"
+        },
+        "0052276229": {
+            "notes": "2 sector @ 120 s (6 & 7); tess-ebs period ~2.5 d morph 0.243; eclipses of >20% but high level of noise (faint target); either negligible secondary or period is wrong; PDCSAP better than SAP;",
+            "flux_column": "pdcsap_flux",
+            "exclude": true,
+            "exclude_reason": "faint & noisy - needs further investigation"
+        },
+
+
+        "0001220444": {
+            "notes": "1 sector (5); tess-ebs period 7.162 d morph 0.173; SpT G0; prim eclipse depths of ~4% & very shallow secondary ~0.5%; SAP - lots of variability between eclipses; PDCSAP & SAP much the same;",
+            "exclude": true,
+            "exclude_reason": "very shallow secondary"
         },
         "0001449640": {
-            "notes": "two sectors (5 & 32); tess-ebs period 3.5 d; prim eclipse depths of ~2%; either negligible secondary eclipse or period is wrong; SAP - instrumental effects skew s32; PDCSAP - fixes skew -> better",
+            "notes": "2 sectors (5 & 32); tess-ebs period 3.5 d; prim eclipse depths of ~2%; either negligible secondary eclipse or period is wrong; SAP - instrumental effects skew s32; PDCSAP - fixes skew -> better",
+            "flux_column": "pdcsap_flux",
             "exclude": true,
-            "exclude_reason": "shallow eclipses"
+            "exclude_reason": "either negligible secondary or period is wrong"
         },
         "0007695666": {
-            "notes": "two sectors @ 120 s (4 & 5); tess-ebs period ~17.5 d; clear & deep eclipses with secondary nr phase 0.17; PDCSAP flatter than SAP;",
+            "notes": "2 sectors @ 120 s (4 & 5); tess-ebs period ~17.5 d & morph 0.093; clear & deep eclipses with secondary nr phase 0.17 (high ecc); PDCSAP flatter than SAP;",
             "flux_column": "pdcsap_flux",
-            "exclude": false,
             "combine_sectors": true,
             "quality_masks": [[1420.0, 1424.0], [1451.0, 1465.0]],
             "phiS": 0.17
         },
         "0013021029": {
-            "notes": "two sectors @ 120 s (5 & 32); tess-ebs period ~3.85 d; shallow eclipses of <2%; PDCSAP flatter than SAP;",
+            "notes": "2 sectors @ 120 s (5 & 32); tess-ebs period ~3.85 d & morph 0.323; SpT F7; shallow eclipses of <2%; either negligible secondary or period is wrong; PDCSAP flatter than SAP;",
+            "exclude": true,
+            "exclude_reason": "either negligible secondary or period is wrong"
+        },
+        "0013957444": {
+            "notes": "2 sectors @ 120 s (5 & 32); tess-ebs period ~3.74 d & morph 0.257; SpT F6V; clear eclipses - primary ~8% & secondary ~1.5%; secondary shallower than ideal but quick-fit indicates may be usable;"
+        },
+        "0014081980": {
+            "notes": "2 sectors @ 120 s (5 & 6); tess-ebs period ~2.92 d & morph 0.326; shallow eclipses - primary ~1.5% & secondary ~0.5%; PDCSAP flux flattens variability seen in SAP;",
+            "flux_column": "pdcsap_flux",
+            "exclude": true,
+            "exclude_reason": "very shallow eclipses"
+        },
+        "0022538139": {
+            "notes": "2 sectors @ 120 s (8 & 61); tess-ebs period ~4.6 d morph 0.321; SpT A2Vs; clear deep primary (>10%) and shallow secondary (<1%) transit; well detached & dissimilar components; SAP flux generally better; despite shallow secondary may be worth trying",
+            "quality_masks": [[1533.0, 1537.0]]
+        },
+        "0024397947": {
+            "notes": "4 sectors @ 120 s (5, 6, 32 & 33); tess-ebs period ~10.2 d & morph 0.260; primary ~3% and very shallow secondary <0.5%; SAP flux generally better;",
+            "exclude": true,
+            "exclude_reason": "very shallow secondary"
+        },
+        "0024400247": {
+            "notes": "3 sectors @ 120 s (5, 6 & 32); tess-ebs period ~7.2 d & morhp 0.235; SpT G1V; extremely shallow eclipses < 0.1%; PDCSAP flux better than SAP;",
+            "flux_column": "pdcsap_flux",
+            "exclude": true,
+            "exclude_reason": "very shallow eclipses"
+        },
+        "0024433067": {
+            "notes": "1 sectors @ 120 s (5); tess-ebs period ~6.2 d & morph 0.466; SpT K0V+K2V; clear deep eclipses (>50% & 40%); SAP & PDCSAP similar; may need flattening/detrending;",
+            "quality_masks": [[1437.0, 1440.0]]
+        },
+        "0025155310": {
+            "notes": "20+ sectors @ 120 s; tess-ebs period ~3.3 d & morph 0.349; SpT G2; very shallow eclipses at <1%; either negligible secondary or period is wrong; PDCSAP much better than SAP;",
+            "flux_column": "pdcsap_flux",
             "exclude": true,
             "exclude_reason": "shallow eclipses"
         },
-        "0013957444": {
-            "notes": "two sectors @ 120 s (5 & 32); tess-ebs period ~3.74 d; clear eclipses - primary ~8% & secondary ~1.5%; secondary shallower than ideal but quick-fit indicates may be usable;",
-            "exclude": false
+        "0029983149": {
+            "notes": "13 sectors @ 120 s; tess-ebs period ~3.85 d & morph 0.316; very shallow eclipses at <1%; PDCSAP much better than SAP;",
+            "flux_column": "pdcsap_flux",
+            "exclude": true,
+            "exclude_reason": "very shallow eclipses"
+        },
+        "0030313682": {
+            "notes": "~20 sectors @ 120 s; tess-ebs period ~5.7 d morph 0.422; clear eclipses at <15% and 10%; lots of variability; SAP & PDCSAP similar; may need flattening/detrending;",
+            "quality_masks": [[1337.0, 1339.0], [1366.5, 1367.5], [1449.5, 1450.5], [1420.0, 1424.0], [1581.0, 1582.0], [1667.0, 1668.0], [3165.0, 3170.0], [3689.0, 3691.0], [3703.0, 3706.0]]
+        },
+        "0031810287": {
+            "notes": "6 sectors @ 120 s (8, 9, 35, 36, 62 & 63); tess-ebs period ~4.8 d morph 0.233; deep primary ~25% and shallower secondary ~5%; lots of variability; SAP & PDCSAP similar; may need flattening/detrending;",
+            "quality_masks": [[1535.0, 1538.0], [2266.0, 2268.0]]
+        },
+        "0032759110": {
+            "notes": "1 sector @ 120 s (6); tess-ebs period ~4.1 d morph 0.128; SpT M4.5Ve; clear eclipses at <14% and 12%; some of variability; SAP & PDCSAP similar; may need flattening/detrending; very interesting!;"
+        },
+        "0037606218": {
+            "notes": "2 sectors @ 120 s (6 & 87); tess-ebs period ~7.8 d morph 0.210; clear eclipses at 10% and ~1%; PDCSAP fixes discontinuity in SAP on S87; secondary shallower than ideal but quick-fit indicates may be usable;",
+            "flux_column": "pdcsap_flux",
+            "quality_masks": [[3676.5, 3685.0]],
+            "detrend_poly_degree": 2,
+            "phiS": 0.55
+        },
+        "0038846515": {
+            "notes": ">30 sectors @ 120 s; tess-ebs period ~2.85 d morph 0.446; SpT F2; clear eclipses of ~1%; either negligible secondary or period is wrong; some instrumental effects in SAP handled by PDCSAP;",
+            "flux_column": "pdcsap_flux",
+            "exclude": true,
+            "exclude_reason": "shallow eclipses"
+        },
+        "0047911178": {
+            "notes": "2 sectors @ 120 s (6 & 33); tess-ebs period ~3.6 d morph 0.254; SpT F6; clear eclipses of 1.5%; either negligible secondary or period is wrong; some of variability; SAP & PDCSAP similar;",
+            "exclude": true,
+            "exclude_reason": "shallow eclipses"
+        },
+        "0048658291": {
+            "notes": "1 sector @ 120 s (6); tess-ebs period ~3.2 d morph 0.400; clear eclipses of ~9% & 8%; some of variability between eclipses (& potentially ellipsoidal effect); SAP & PDCSAP similar;",
+            "quality_masks": [[1476.5, 1477.5]]
+        },
+        "0048880872": {
+            "notes": "2 sectors @ 120 s (6 & 7); tess-ebs period ~2.2 d morph 0.463; very shallow eclipses and lots of noise; PDCSAP better than SAP;",
+            "exclude": true,
+            "exclude_reason": "very shallow eclipses"
+        },
+        "0049671442": {
+            "notes": "1 sector @ 120 s (6); tess-ebs period ~4.2 d morph 0.300; very shallow eclipses and lots of noise; PDCSAP better than SAP;",
+            "exclude": true,
+            "exclude_reason": "very shallow eclipses"
+        },
+        "0049701947": {
+            "notes": "3 sectors @ 120 s (6, 33 & 87); tess-ebs period ~5.8 d morph 0.176; clear eclipses of ~3%; either negligible secondary or period is wrong; variability between eclipses; SAP & PDCSAP similar;",
+            "exclude": true,
+            "exclude_reason": "shallow eclipses"
+        },
+        "0052449797": {
+            "notes": "2 sectors @ 120 s (6 & 7); tess-ebs period ~2.45 d morph 0.357; shallow eclipses and high levels of noise; either negligible secondary or period is wrong; PDCSAP better;",
+            "flux_column": "pdcsap_flux",
+            "exclude": true,
+            "exclude_reason": "shallow eclipses and noise"
+        },
+        "0053059882": {
+            "notes": "6 sectors @ 120 s; tess-ebs period ~8.96 d morph 0.223; SpT Am+M; clear primary of ~3% and very shallow secondary only visible when folded;SAP detrends better;",
+            "exclude": true,
+            "exclude_reason": "very shallow secondary"
+        },
+        "0053122807": {
+            "notes": "7 sectors @ 120 s; tess-ebs period ~17.85 d morph 0.181; SpT F0V; primary of ~1% and secondary of <1% (<0.4 phase); pulsations visible;  SAP & PDCSAP similar;",
+            "exclude": true,
+            "exclude_reason": "shallow eclipses"
+        },
+        "0055404385": {
+            "notes": ">30 sectors @ 120 s; tess-ebs period ~2.95 d morph 0.324; SpT F5V; clear primary & secondary of ~10% & ~4%; some variability between eclipses beyound ellipsoidal effect;SAP & PDCSAP similar; potentially use a subset of quiet sectors (s2?)",
+            "quality_masks": [[1410.0, 1411.5], [1420.0, 1424.0], [1528.5, 1529.5], [1628.0, 1630.0], [2266.0, 2268.0], [2976.5, 2977.5]]
         },
 
 
 
-        "0031273263": {
-            "notes": "20+ sectors; tess-ebs period ~22.5 d although it's likely double this; deep eclipses of ~20% but no sectors have more than 1; SAP - variability between eclipses; PDCSAP - discontinuities -> worse;",
+        "0055497281": {
+            "notes": ">30 sectors @ 120 s; tess-ebs period ~14.9 d morph 0.070; SpT F8V; very clear primary & secondary of ~35% & ~30%; little variability between eclipses; SAP & PDCSAP similar; usually 2 to 3 eclipses per sector so maybe combine",
+            "quality_masks": [[1337.0, 1342.0], [1366.0, 1372.0], [1420.0, 1423.0], [1449.0, 1451.0], [2094.5, 2100.0], [2291.0, 2297.0]]
+        },
+
+
+
+        "0150101472": {
+            "notes": "20+ sectors; tess-ebs period ~3.3 d; SAP - no sectors with clear eclipses plus lots of instrumental effects; PDCSAP - improves on SAP with shallow eclipses visible",
             "exclude": true,
-            "exclude_reason": "needs further investigation - may be able to get this to work by combining limited set of contiguous sectors"
+            "exclude_reason": "shallow eclipses < 1%"
         },
         "0300560295": {
             "notes": "20+ sectors; tess-ebs period ~20 d; eclipse depths of 2-4%; SAP - lots of stochastic variability between eclipses; PDCSAP - similar to SAP;",
             "exclude": true,
             "exclude_reason": "shallow eclipses with inconsistent depths; hints of extra eclipses in later sectors;"
-        },
-        "0150101472": {
-            "notes": "20+ sectors; tess-ebs period ~3.3 d; SAP - no sectors with clear eclipses plus lots of instrumental effects; PDCSAP - improves on SAP with shallow eclipses visible",
-            "exclude": true,
-            "exclude_reason": "shallow eclipses < 1%"
         }
     }
 }
