@@ -2,6 +2,7 @@
     "source_vizier_table": "J/ApJS/258/16",
     "morphology_filter": [0, 0.5],
     "period_filter": [2.0, 28.0],
+    "exclude_default": false,
     "target_configs": {
         "0031273263": {
             "notes": "20+ sectors; tess-ebs period ~22.5 d & morph 0.081; SpT F5; deep eclipses of ~20% but no sectors have more than 1; period may be double tess-ebs; SAP - variability between eclipses; PDCSAP - discontinuities -> worse;",
