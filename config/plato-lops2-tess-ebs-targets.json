@@ -2,6 +2,7 @@
     "source_vizier_table": "J/ApJS/258/16",
     "morphology_filter": [0, 0.5],
     "period_filter": [2.0, 28.0],
+    "exclude_unlisted": false,
     "exclude_default": false,
     "target_configs": {
         "0031273263": {
@@ -335,6 +336,8 @@
             "notes": "22 sectors @ 120 s (4 ... 89); tess-ebs period ~7.8 d morph 0.220; clear eclipses of ~25% & ~6%; PDCSAP introduces distortions so stick with SAP and clip;",
             "quality_masks": [[1420.0, 1423.0], [1594.0, 1596.0], [1534.0, 1536.0], [3702.5, 3705.0], [3717.0, 3720.0], [3760.5, 3761.5]]
         },
+
+
 
 
 
