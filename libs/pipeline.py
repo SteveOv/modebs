@@ -73,9 +73,10 @@ def get_teff_from_spt(target_spt):
     teff = None
 
     # Also add the whole spt in case it's just a single char (i.e.: V889 Aql is set to "A")
-    if (spts := re.findall(r"([A-Z][0-9])", target_spt) + [target_spt.upper()]) is not None:
+    if target_spt is not None \
+            and (spts := re.findall(r"([A-Z][0-9])", target_spt) + [target_spt.upper()]):
         for spt in spts:
-            if (tp := spt.strip()[0]) in _spt_to_teff_map \
+            if spt and len(spt) and (tp := spt.strip()[0]) in _spt_to_teff_map \
                 and _spt_to_teff_map[tp].n > (teff.n if teff is not None else 0):
                 teff = _spt_to_teff_map[tp]
     return teff
