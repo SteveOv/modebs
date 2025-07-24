@@ -9,7 +9,9 @@ import argparse
 
 import numpy as np
 import astropy.units as u
-from astropy.table import QTable, MaskedColumn
+from astropy.table import QTable
+from astropy.io.votable import parse_single_table
+from astropy.utils.diff import report_diff_values
 
 from astroquery.vizier import Vizier
 from astroquery.simbad import Simbad
@@ -46,12 +48,12 @@ if __name__ == "__main__":
     gaia_tbosb_catalog = Vizier(catalog="I/357/tbosb2", row_limit=1)
 
     target_dtype = [
-        ("target", object),
-        ("search_term", object),
-        ("main_id", object),
-        ("tics", object),
+        ("target", "<U14"),
+        ("search_term", "<U20"),
+        ("main_id", "<U20"),
+        ("tics", "<U40"),
         ("gaia_dr3_id", int),
-        ("spt", object),
+        ("spt", "<U20"),
         ("ra", float),
         ("dec", float),
         ("parallax", float),
@@ -84,13 +86,16 @@ if __name__ == "__main__":
         "period_err": u.d,
         "teff_sys": u.K,
         "teff_sys_err": u.K,
-        "logg_sys": u.dex, #(u.cm / u.s**2),
-        "logg_sys_err": u.dex, #(u.cm / u.s**2),
     }
 
     # Start with the data in a structured array: helpful as we don't need to use units
     # at this point and we can also use Data Wrangler on it for diagnostics.
     target_data = np.empty(shape=(len(target_configs), ), dtype=target_dtype)
+
+    # Where possible, set the initial numerical values to nan to indicate missing data. Any
+    # int fields will be masked later, once we have a QTable, as we can only assign nan to floats.
+    for col_name in [n for n in target_data.dtype.names if target_data[n].dtype in [float]]:
+        target_data[col_name] = np.nan
 
     # Basic information
     for ix, (target, target_config) in enumerate(target_configs.items()):
@@ -104,10 +109,10 @@ if __name__ == "__main__":
         _id_pattern = re.compile(r"(Gaia DR3|V\*|TIC|HD|HIP|2MASS)\s+(.+?(?=\||$))", re.IGNORECASE)
         for _trow, _srow in zip(target_data, _tbl):
             ids = np.array(_id_pattern.findall(_srow["ids"]), [("type", "O"), ("id", "O")])
-            _trow["tics"] = ids[ids["type"]=="TIC"]["id"] or []
+            _trow["tics"] = "|".join(f"{i}" for i in ids[ids["type"]=="TIC"]["id"])
             if "Gaia DR3" in ids["type"]:
                 _trow["gaia_dr3_id"] = int(ids[ids["type"]=="Gaia DR3"][0]["id"])
-            _trow["main_id"] = _srow["main_id"] or _trow["tic"][0]
+            _trow["main_id"] = _srow["main_id"]
 
             for (_tfield, _sfield) in [
                 ("ra", "ra"), ("dec", "dec"), ("parallax", "plx_value"),
@@ -146,31 +151,33 @@ if __name__ == "__main__":
             # Get published system effective temperature/logg. start with an estimate based on SpT
             _teff_sys = pipeline.get_teff_from_spt(_trow["spt"]) or ufloat(1e4, 7e3)
             _trow["teff_sys"], _trow["teff_sys_err"] = _teff_sys.n, _teff_sys.s
-            _trow["logg_sys"], _trow["logg_sys_err"] = 4.0, 0
+            _trow["logg_sys"], _trow["logg_sys_err"] = 4.0, np.nan
             if _tbl := tic_catalog.query_object(_trow["search_term"], radius=0.1 * u.arcsec):
-                if _srow := _tbl[0][_tbl[0]["TIC"] in _trow["tics"]]:
-                    # Teff may not be reliable - only use it if it's consistent with the SpT
-                    if _teff_sys.n - _teff_sys.s < (_srow["Teff"] or 0) < _teff_sys.n + _teff_sys.s:
+                if _srow := _tbl[0][f"{_tbl[0]['TIC']}" in _trow["tics"]]:
+                    if not np.ma.is_masked(_srow["Teff"]) \
+                        and _teff_sys.n - _teff_sys.s < _srow["Teff"] < _teff_sys.n + _teff_sys.s:
                         _trow["teff_sys"] = _srow["Teff"]
                         _trow["teff_sys_err"] = _srow["s_Teff"]
-                    if (_trow["logg_sys"] or 0) > 0:
+                    if not np.ma.is_masked(_srow["logg"]):
                         _trow["logg_sys"] = _srow["logg"]
                         _trow["logg_sys_err"] = _srow["s_logg"]
 
     # Finally we convert to an astropy Masked QTable
     targets = QTable(target_data, dtype=target_data.dtype, masked=True, units=target_units)
 
-    # Rather fiddly making sure we mask out invalid/unset values (float & int are not nullable)
-    targets["spt"] = MaskedColumn(targets["spt"], mask=[v is None for v in targets["spt"]])
-    targets["gaia_dr3_id"] = np.ma.masked_values(np.ma.masked_invalid(targets["gaia_dr3_id"]), 0)
-    targets["ra"] = np.ma.masked_values(np.ma.masked_invalid(targets["ra"]), 0)
-    targets["dec"] = np.ma.masked_values(np.ma.masked_invalid(targets["ra"]), 0)
-    targets["pe"] = np.ma.masked_values(np.ma.masked_invalid(targets["pe"]), 0)
-    targets["pe_err"] = np.ma.masked_values(np.ma.masked_invalid(targets["pe_err"]), 0)
-    targets["period"] = np.ma.masked_values(np.ma.masked_invalid(targets["period"]), 0)
-    targets["period_err"] = np.ma.masked_values(np.ma.masked_invalid(targets["period_err"]), 0)
-    targets["teff_sys"] = np.ma.masked_invalid(targets["teff_sys"])
-    targets["teff_sys_err"] = np.ma.masked_invalid(targets["teff_sys_err"])
-    targets["logg_sys"] = np.ma.masked_invalid(targets["logg_sys"])
-    targets["logg_sys_err"] = np.ma.masked_invalid(targets["logg_sys_err"])
+    # Have to mask values <=0 for gaia_dr3_id as I cannot assign np.nan (for no data/null) to an int
+    targets["gaia_dr3_id"] = np.ma.masked_where(targets["gaia_dr3_id"] <= 0, targets["gaia_dr3_id"])
+    for col_name in [n for n in targets.columns if targets[n].dtype in [int, float]]:
+        targets[col_name] = np.ma.masked_invalid(targets[col_name])
+
     print(targets)
+
+    save_file = Path(f"./drop/{args.targets_file.stem}.vot")
+    targets.write(save_file, format="votable", overwrite=True)
+
+    # Verify the save by reloading
+    targets2 = parse_single_table(save_file).to_table()
+    with open(save_file.parent / f"{save_file.stem}.diff", mode="w", encoding="utf8") as df:
+        if not report_diff_values(targets, targets2, df):
+            # We should only see differences around empty/null/nan representation
+            print(f"Save verfication indicated differences. Check the diff file: {df.name}")

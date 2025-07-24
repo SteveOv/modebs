@@ -187,3 +187,6 @@ cython_debug/
 libs/data/mist/*.txz
 libs/data/mist/MIST*/*.iso
 libs/data/newera/PHOENIX*.*
+
+# Output and "in flight" files
+drop/
