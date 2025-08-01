@@ -224,51 +224,54 @@ def to_lc_time(value: Union[Time, np.double, Tuple[np.double], List[np.double,]]
     return Time(value, format="jd", scale=lc.time.scale)
 
 
-def get_sampled_phase_mags_data(flc: FoldedLightCurve,
-                                num_bins: int = 1024,
-                                phase_pivot: Union[u.Quantity, float]=0.75,
-                                flc_rollover: int = 200,
-                                interp_kind: str="linear") \
-                                    -> Tuple[u.Quantity, u.Quantity]:
+def get_binned_phase_mags_data(flc: FoldedLightCurve,
+                               num_bins: int = 1024,
+                               phase_pivot: Union[u.Quantity, float]=0.75,
+                               flc_rollover: int = 200) \
+                                    -> Tuple[np.ndarray, np.ndarray]:
     """
-    A data reduction function which gets a reduced set of phase and delta magnitude data in
-    the requested number of equal size bins. 
-    
-    The data is sourced by sampling the passed FoldedLightCurve.  In case this does not extend over
-    a complete phase, rows are copied over from opposite ends of the phase space data to extend the
-    coverage.  The number of rows copied is controlled by the flc_rollover argument.
+    Get a binned copy of the passed FoldedLightCurve. In case FoldedLightCurve does not cover
+    a complete phase, rows are copied over from opposite ends of the phase space to extend
+    the coverage.  The number of rows copied is controlled by the flc_rollover argument.
 
     :flc: the source FoldedLightCurve
-    :num_bins: the number of equally spaced rows to return
+    :num_bins: the number of equally spaced bins to return
     :phase_pivot: the pivot point about which the fold phase was wrapped to < 0.
     :flc_rollover: the number of row to extend the ends of the source phases by
-    :interp_kind: the 1d interpolation algorithm to use when reducing the fold
     :returns: a tuple with requested number or phases and delta magnitudes
     """
     source_phases = np.concatenate([
         flc.phase[-flc_rollover:] -1.,
         flc.phase,
         flc.phase[:flc_rollover] +1.
-    ])
+    ]).value
 
     source_delta_mags = np.concatenate([
         flc["delta_mag"][-flc_rollover:],
         flc["delta_mag"],
         flc["delta_mag"][:flc_rollover]
-    ])
+    ]).value
 
     # If there is a phase wrap then phases above the pivot will have been
     # wrapped around to <0. Work out what the expected minimum phase should be.
-    # Also, ensure we don't try to interpolate beyond the start of the data!
-    min_phase = u.Quantity(0)
     if phase_pivot is not None:
-        if isinstance(phase_pivot, u.Quantity) and phase_pivot.value:
-            min_phase = phase_pivot.value - 1
-        elif phase_pivot:
-            min_phase = u.Quantity(phase_pivot - 1)
+        min_phase = (phase_pivot.value if isinstance(phase_pivot, u.Quantity) else phase_pivot) - 1
+    else:
+        min_phase = 0
     min_phase = max(min_phase, source_phases.min())
 
-    interp = interpolate.interp1d(source_phases, source_delta_mags, kind=interp_kind)
-    reduced_phases = np.linspace(min_phase, min_phase + 1., num_bins + 1)[:-1]
-    reduced_mags = interp(reduced_phases)
-    return (reduced_phases, reduced_mags)
+    # Can't use lightkurve's bin() on a FoldedLightCurve (unhappy with "phase" Quantity in time col)
+    bin_phase = np.linspace(min_phase, min_phase + 1., num_bins + 1)[:-1]
+    b_ix = np.digitize(x=source_phases, bins=bin_phase)
+
+    # Derive fluxes from delta_mags, which are already be detrended & rectified to 0, then bin them.
+    flux = 10**np.array(list(source_delta_mags[~source_delta_mags.mask].data))
+    bin_flux = np.array([flux[b_ix==i].mean() if any(b_ix==i) else np.nan for i in range(num_bins)])
+
+    # Fill any gaps; there will be a np.nan where there were no source fluxes within a bin
+    if any(missing := np.isnan(bin_flux)):
+        def equiv_ix(ix):
+            return ix.nonzero()[0]
+        bin_flux[missing] = np.interp(equiv_ix(missing), equiv_ix(~missing), bin_flux[~missing])
+
+    return (bin_phase, np.log10(bin_flux)) # Back to delta_mags
