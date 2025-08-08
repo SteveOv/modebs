@@ -1,8 +1,13 @@
 """ Unit tests for the pipeline module. """
 from pathlib import Path
+import warnings
 import re
 import unittest
 
+# pylint: disable=no-member, wrong-import-position, line-too-long
+warnings.filterwarnings("ignore", "Using UFloat objects with std_dev==0 may give unexpected results.", category=UserWarning)
+import numpy as np
+import astropy.units as u
 import lightkurve as lk
 
 from libs import lightcurves
@@ -31,6 +36,72 @@ class Testlightcurves(unittest.TestCase):
         # Fits files should be cached under ~/.lightkurve/cache
         lcs = lightcurves.load_lightcurves(results, "hardest", "sap_flux")
         self.assertEqual(len(lcs), 2)
+
+
+    #
+    #   get_binned_phase_mags_data(flc, num_bins, phase_pivot) -> (phases, mags)
+    #
+    def test_get_binned_phase_mags_data_happy_path(self):
+        """ Simple happy path test of get_binned_phase_mags_data() for binning """
+        results = lk.search_lightcurve("CW Eri", sector=[31], exptime="short",
+                                       mission="TESS", author="SPOC")
+        lc = lightcurves.load_lightcurves(results, "hardest", "sap_flux")[0]
+        lightcurves.append_magnitude_columns(lc)
+
+        t0 = lightcurves.to_lc_time(1496.454695, lc)
+        period = 5.5828949 * u.d
+        wrap_phase = u.Quantity(0.75)
+        flc = lc.fold(period, t0, wrap_phase=wrap_phase, normalize_phase=True)
+
+        exp_bins = 1024
+        phases, mags = lightcurves.get_binned_phase_mags_data(flc, exp_bins, wrap_phase)
+
+        self.assertEqual(exp_bins, len(phases))
+        self.assertEqual(wrap_phase.value, phases.max())
+        self.assertTrue(wrap_phase.value - 1 <= phases.min())
+        self.assertFalse(any(np.isnan(mags)))
+        self.assertAlmostEqual(flc["delta_mag"].min().unmasked.value, mags.min(), 1)
+
+    def test_get_binned_phase_mags_data_wrap_phase(self):
+        """ Test of get_binned_phase_mags_data() to assert handling of wrapped phase """
+        results = lk.search_lightcurve("CW Eri", sector=[31], exptime="short",
+                                       mission="TESS", author="SPOC")
+        lc = lightcurves.load_lightcurves(results, "hardest", "sap_flux")[0]
+        lightcurves.append_magnitude_columns(lc)
+
+        t0, period = lightcurves.to_lc_time(1496.454695, lc), 5.5828949 * u.d
+
+        for fold_wrap, bin_wrap, msg in [
+            (u.Quantity(0.75), u.Quantity(0.75),    "Both equivalent Quantities"),
+            (u.Quantity(0.75), 0.75,                "Equivalent Quantity and float"),
+            (None, 0.5,                             "No fold, so defaults to 0.5"),
+            (u.Quantity(0.75), None,                "Is 0.75 but not supplied so inferred"),
+            (u.Quantity(0.90), None,                "Is 0.90 but not supplied so inferred"),
+        ]:
+            with self.subTest(msg=msg):
+                flc = lc.fold(period, t0, wrap_phase=fold_wrap, normalize_phase=True)
+                phases, _ = lightcurves.get_binned_phase_mags_data(flc, 2048, bin_wrap)
+                self.assertAlmostEqual(flc.phase.max().value, phases.max(), 3)
+
+    def test_get_binned_phase_mags_data_fill_gaps(self):
+        """ Test of get_binned_phase_mags_data() to assert handling of gaps in source data """
+        results = lk.search_lightcurve("CW Eri", sector=[31], exptime="short",
+                                       mission="TESS", author="SPOC")
+        lc = lightcurves.load_lightcurves(results, "hardest", "sap_flux")[0]
+        lightcurves.append_magnitude_columns(lc)
+
+        t0, period = lightcurves.to_lc_time(1496.454695, lc), 5.5828949 * u.d
+        wrap_phase = u.Quantity(0.5)
+        flc = lc.fold(period, t0, wrap_phase=wrap_phase, normalize_phase=True)
+
+        for mask, msg in [
+            (flc.phase > u.Quantity(-0.49),                             "missing section at start"),
+            (flc.phase < u.Quantity(0.49),                              "missing section at end"),
+            ((flc.phase < u.Quantity(0.0)) | (flc.phase > u.Quantity(0.05)), "missing section"),
+        ]:
+            with self.subTest(msg=msg):
+                _, mags = lightcurves.get_binned_phase_mags_data(flc[mask], 2048, wrap_phase)
+                self.assertFalse(any(np.isnan(mags)))
 
 if __name__ == "__main__":
     unittest.main()

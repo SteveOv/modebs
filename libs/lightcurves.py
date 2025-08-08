@@ -226,47 +226,47 @@ def to_lc_time(value: Union[Time, np.double, Tuple[np.double], List[np.double,]]
 
 def get_binned_phase_mags_data(flc: FoldedLightCurve,
                                num_bins: int = 1024,
-                               phase_pivot: Union[u.Quantity, float]=0.75,
-                               rollover: int = 200) \
+                               phase_pivot: Union[u.Quantity, float]=None) \
                                     -> Tuple[np.ndarray, np.ndarray]:
     """
     Get a binned copy of the phase and delta_mags (nominal values) from the passed FoldedLightCurve.
-    
-    In case the FoldedLightCurve does not cover a complete phase, prior to binning rows are copied
-    over from opposite ends of the phase space to extend the coverage.  The number of rows copied
-    is controlled by the rollover argument.
 
     :flc: the source FoldedLightCurve
     :num_bins: the number of equally spaced bins to return
-    :phase_pivot: the pivot point about which the fold phase was wrapped to < 0.
-    :rollover: the number of row to extend the ends of the source phases by
-    :returns: a tuple with requested number or phases and delta magnitudes
+    :phase_pivot: the pivot point about which the fold phase was wrapped to < 0; inferred if omitted
+    :returns: a tuple with requested number of binned phases and delta magnitudes
     """
-    # Careful with the FoldedLightCurve! The phase column is a Quantity but the flc "delta_mag" and
-    # "delta_mag_err" columns are a MaskedQuantity which will need unmasking to get to the np.array.
-    src_phase = np.concatenate([flc.phase[-rollover:]-1., flc.phase, flc.phase[:rollover]+1.]).value
-    src_mags = unumpy.uarray(
-        # pylint: disable=line-too-long
-        np.concatenate([flc["delta_mag"][-rollover:], flc["delta_mag"], flc["delta_mag"][:rollover]]).value,
-        np.concatenate([flc["delta_mag_err"][-rollover:], flc["delta_mag_err"], flc["delta_mag_err"][:rollover]]).value
-    ).unmasked
+    # Can't use lightkurve's bin() on a FoldedLightCurve: unhappy with phase Quantity as time col.
+    # By using unumpy/ufloats we're aware of the mags' errors in the mean calculation for each bin.
+    src_phase = flc.phase.value
+    src_mags = unumpy.uarray(flc["delta_mag"].value, flc["delta_mag_err"].value).unmasked
 
     # If there is a phase wrap then phases above the pivot will have been
     # wrapped around to <0. Work out what the expected minimum phase should be.
     if phase_pivot is not None:
-        min_phase = (phase_pivot.value if isinstance(phase_pivot, u.Quantity) else phase_pivot) - 1
+        max_phase = phase_pivot.value if isinstance(phase_pivot, u.Quantity) else phase_pivot
     else:
-        min_phase = 0
-    min_phase = max(min_phase, src_phase.min())
+        max_phase = src_phase.max()
+    max_phase = max(max_phase, src_phase.max())
+    min_phase = min(max_phase - 1, src_phase.min())
 
-    # Can't use lightkurve's bin() on a FoldedLightCurve: unhappy with phase Quantity as time col.
-    # By using unumpy/ufloats we're aware of the mags' errors in the mean calculation for each bin.
-    bin_phase = np.linspace(min_phase, min_phase + 1., num_bins + 1)[:-1]
-    bin_ix = np.digitize(x=src_phase, bins=bin_phase)
-    bin_mags = np.array(
-       [src_mags[bin_ix == ix].mean().n if any(bin_ix == ix) else np.nan for ix in range(num_bins)])
+    # Because we will likely know the exact max phase but the min will be infered we make sure the
+    # phases end at the pivot/max_phase but start just "above" the expected min phase (logically
+    # equiv to startpoint=False). Working with the searchsorted side="left" arg, which allocates
+    # indices where bin_phase[i-1] < src_phase <= bin_phase[i], we map all source data to a bin.
+    bin_phase = np.flip(np.linspace(max_phase, min_phase, num_bins, endpoint=False))
+    phase_bin_ix = np.searchsorted(bin_phase, src_phase, "left")
 
-    # Fill any gaps; there will be a np.nan where there were no source mags within a bin
+    # Perform the "mean" binning
+    bin_mags = np.empty_like(bin_phase, dtype=float)
+    for bin_ix in range(num_bins):
+        phase_ix = np.where(phase_bin_ix == bin_ix)[0] # np.where() indices are quicker than masking
+        if len(phase_ix) > 0:
+            bin_mags[bin_ix] = src_mags[phase_ix].mean().n
+        else:
+            bin_mags[bin_ix] = np.nan
+
+    # Fill any gaps by interpolation; we have a np.nan where there were no source data within a bin
     if any(missing := np.isnan(bin_mags)):
         def equiv_ix(ix):
             return ix.nonzero()[0]
