@@ -15,6 +15,9 @@ h5py
 # Astropy affiliated lib for interacting with virtual observatory protocols
 pyvo
 
+# Single/Binary SED fitting library
+git+https://github.com/mkounkel/SEDFit.git@0.7
+
 # Libs for extinction maps and filters
 dustmaps            # Green18joss - easy to use extinction maps (esp Bayestar)
 dust_extinction     # Gordon24joss - more extinction curves than dustapprox (specifically G23)
