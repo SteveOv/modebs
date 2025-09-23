@@ -15,7 +15,7 @@ from astropy.table import Table, unique
 from astropy.io.votable import parse_single_table
 from uncertainties import UFloat, unumpy
 import numpy as np
-from scipy.optimize import minimize
+from scipy.optimize import minimize, OptimizeWarning
 
 from deblib.constants import c, h, k_B
 from deblib.vmath import exp, log10
@@ -203,29 +203,31 @@ def create_outliers_mask(sed: Table,
     outlier_mask = np.zeros((sed_count), dtype=bool)
     min_unmasked = int(sed_count * min_unmasked if 0 < min_unmasked <= 1 else max(min_unmasked, 1))
     if sed_count <= min_unmasked:
-        if verbose: print(f"No mask created as SED rows already at or below {min_unmasked}")
+        if verbose: print(f"No outliers masked as already {min_unmasked} or fewer SED rows")
         return outlier_mask
+    if verbose: print(f"Looking for outliers with BB fits initialized at Teff(s) {temps0}")
 
     # Initial temps & associated priors
     temps0 = [temps0] if isinstance(temps0, Number) else temps0
     temp_ratio = temps0[-1] / temps0[0]
-    temp_flex = temp_ratio * 0.05
-    temps0_median = np.median(temps0)
+    temp_ratio_flex = temp_ratio * 0.05
+    temp_limits = (min(temps0) * 0.75, max(temps0) * 1.25)
 
     # Prepare the x, y & y_err data for the model & objective funcs which access these data directly
     x = sed["sed_freq"].to(u.Hz).value
     y = sed["sed_flux"].to(u.Jy).value
     y_err = sed["sed_eflux"].to(u.Jy).value
-    y_log = log10(y)
 
     # The model func scaling is in log space, as the range is large, but it returns linear fluxes.
+    y_log = log10(y)
     def scaled_bb_model(temps, mask):
         y_model_log = log10(np.sum([blackbody_flux(x[~mask], t) for t in temps], 0)) + 26 # to Jy
         return 10**(y_model_log + np.median(y_log[~mask] - y_model_log))
 
-    # The minimize target func; checks temps against priors, calls the model func and evaluates like
+    # The minimize target func; checks temps against priors, calls the model func and evals the fit
     def objective_func(temps, mask) -> float:
-        if all(2e3 < t < 3e4 for t in temps) and abs(temps[-1] / temps[0] - temp_ratio) < temp_flex:
+        if all(temp_limits[0] < t < temp_limits[1] for t in temps) \
+                and abs(temps[-1] / temps[0] - temp_ratio) < temp_ratio_flex:
             return simple_like_func(scaled_bb_model(temps, mask), y[~mask], y_err[~mask])
         return np.inf
 
@@ -238,22 +240,24 @@ def create_outliers_mask(sed: Table,
                         f"will reduce the number of SED rows below the minimum of {min_unmasked}.")
             break
 
-        # Perform a fit on the target fluxes which are still unmasked
-        with warnings.catch_warnings(category=RuntimeWarning):
+        # Perform fits on the target fluxes which are still unmasked, retaining the best fit
+        soln = None
+        with warnings.catch_warnings(category=RuntimeWarning|OptimizeWarning):
             warnings.filterwarnings("ignore", message="invalid value encountered in subtract")
-            soln = minimize(objective_func, x0=temps0, args=test_mask, method="SLSQP")
+            warnings.filterwarnings("ignore", message="Unknown solver options")
+            for method in ["Nelder-Mead", "SLSQP"]:
+                this_soln = minimize(objective_func, x0=temps0, args=test_mask,
+                                     method=method, options={ "maxiter": 5000, "maxfev": 5000 })
+                if soln is None \
+                        or (not soln.success and this_soln.success) or (soln.fun > this_soln.fun):
+                    soln = this_soln
 
-        if not soln.success:
-            if verbose: print(f"[{_iter:03d}] stopped as this fit failed with '{soln.message}'")
-            break
-
-        this_temps = soln.x
-        if abs(np.median(this_temps) - temps0_median) > temps0_median * 0.25:
-            if verbose: print(f"[{_iter:03d}] stopped as this fit yielded unlikely temps",
-                              f"of {this_temps} against input temps of {temps0}")
+        if soln is None or not soln.success:
+            if verbose: print(f"[{_iter:03d}] stopped as unable to get a good fit")
             break
 
         # Calculate a comperable summary stat on this fit. TODO: refine test stat & weights
+        this_temps = soln.x
         this_y_model = scaled_bb_model(this_temps, test_mask)
         weights = np.ones_like(this_y_model)
         this_resids_sq = ((y[~test_mask] - this_y_model) / y_err[~test_mask])**2
