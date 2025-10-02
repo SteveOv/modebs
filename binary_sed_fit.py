@@ -132,77 +132,74 @@ if __name__ == "__main__":
     EBV = 0.000515
     sed["sed_der_flux"] = sed["sed_flux"] / ext_model.extinguish(sed["sed_wl"].to(u.um), Ebv=EBV)
 
+    dist = target_data["skycoords"].distance.to(u.m).value
+    radius = 0.3
 
-    # SET UP THE GLOBALS
-
-    # If you set teffs, radii, loggs or dist on class creation they're assumed to be
-    # fixed. If you set them in calls to fit_*() then they're assumed to be fitted.
     NUM_STARS = 2
-    fixed_theta = fit_sed.create_theta(loggs=[target_data["logg_sys"].n] * 2,
-                                    dist=target_data["skycoords"].distance.to(u.m).value,
-                                    nstars=NUM_STARS,
-                                    verbose=True)
+    fit_mask = np.array([True] * NUM_STARS      # Teff
+                        + [True] * NUM_STARS    # radius
+                        + [False] * NUM_STARS   # logg
+                        + [False])              # dist
 
+    # Set up the initial fit position. The fit mask indicates we're only fitting teffs & radii
     theta0 = fit_sed.create_theta(teffs=target_data["teffs0"],
-                                radii=[1.0, 1.0],
-                                build_delta=True,
-                                fixed_theta=fixed_theta,
-                                verbose=True)
+                                  radii=[radius] * NUM_STARS,
+                                  loggs=[target_data["logg_sys"].n] * NUM_STARS,
+                                  dist=dist,
+                                  nstars=NUM_STARS,
+                                  verbose=True)
 
     priors = fit_sed.create_prior_criteria(
-            teff_limits=(2000, 100000),
+            teff_limits=tuple(model_sed.teff_range.value),
             radius_limits=(0.1, 100),
-            logg_limits=(-0.5, 0.6),
-            dist_limits=(100 * u.Mpc).to(u.m).value,
+            logg_limits=tuple(model_sed.logg_range.value),
+            dist_limits=(dist * 0.99, dist * 1.01),
             teff_ratios=target_data["teff_ratio"].n,
             radius_ratios=target_data["k"].n,
-            logg_ratios=None,
+            logg_ratios=1.0,
             teff_ratio_sigmas=max(target_data["teff_ratio"].n * 0.05, target_data["teff_ratio"].s),
             radius_ratio_sigmas=max(target_data["k"].n * 0.05, target_data["k"].s),
+            logg_ratio_sigmas=0.05,
+            nstars=NUM_STARS,
             verbose=True)
 
     # Quick initial minimize fit
     print()
-    soln = fit_sed.minimize_fit(x=model_sed.get_filter_indices(sed["sed_filter"]),
-                                y=sed["sed_der_flux"].quantity.to(u.Jy).value,
-                                y_err=sed["sed_eflux"].quantity.to(u.Jy).value,
-                                prior_criteria=priors,
-                                theta0=theta0,
-                                fixed_theta=fixed_theta,
-                                flux_func=model_sed.get_fluxes,
-                                verbose=True)
-    theta_fit = soln.x
-
-    print(f"Best fit parameters for {TARGET} from minimize fit")
-    theta_labels = [("TeffA", model_sed.teff_range.unit), ("TeffB", model_sed.teff_range.unit),
-                    ("RA", u.Rsun), ("RB", u.Rsun)]
-    for ix, (l, unit) in enumerate(theta_labels):
-        known_val = ufloat(target_config.get(l, np.NaN), target_config.get(l + "_err", None) or 0)
-        print(f"{l:>12s} = {theta_fit[ix]:.3f} {unit:unicode} (known value {known_val:.3f} {unit:unicode})")
-
+    theta_fit, soln = fit_sed.minimize_fit(x=model_sed.get_filter_indices(sed["sed_filter"]),
+                                           y=sed["sed_der_flux"].quantity.to(u.Jy).value,
+                                           y_err=sed["sed_eflux"].quantity.to(u.Jy).value,
+                                           prior_criteria=priors,
+                                           theta0=theta0,
+                                           fit_mask=fit_mask,
+                                           flux_func=model_sed.get_fluxes,
+                                           verbose=True)
 
     # MCMC fit, starting from where the minimize fit finished
     print()
-    sampler = fit_sed.mcmc_fit(x=model_sed.get_filter_indices(sed["sed_filter"]),
-                            y=sed["sed_der_flux"].quantity.to(u.Jy).value,
-                            y_err=sed["sed_eflux"].quantity.to(u.Jy).value,
-                            prior_criteria=priors,
-                            theta0=theta_fit,
-                            fixed_theta=fixed_theta,
-                            flux_func=model_sed.get_fluxes,
-                            processes=8, verbose=True)
-
+    theta_fit, sampler = fit_sed.mcmc_fit(x=model_sed.get_filter_indices(sed["sed_filter"]),
+                                          y=sed["sed_der_flux"].quantity.to(u.Jy).value,
+                                          y_err=sed["sed_eflux"].quantity.to(u.Jy).value,
+                                          prior_criteria=priors,
+                                          theta0=theta_fit,
+                                          fit_mask=fit_mask,
+                                          flux_func=model_sed.get_fluxes,
+                                          processes=8,
+                                          progress=True,
+                                          verbose=True)
 
     tau = sampler.get_autocorr_time(c=5, tol=50, quiet=True)
     burn_in_steps = int(max(np.nan_to_num(tau, copy=True, nan=1000)) * 2)
 
-    # Gets the median fitted values (currently M1, M2 and log(age))
+    # Gets the median fitted values and 1-sigma uncertainties for the fitted parameters
     samples = sampler.get_chain(discard=burn_in_steps, flat=True)
     theta_fit = np.median(samples[burn_in_steps:], axis=0)
     theta_err_high = np.quantile(samples[burn_in_steps:], 0.84, axis=0) - theta_fit
     theta_err_low = theta_fit - np.quantile(samples[burn_in_steps:], 0.16, axis=0)
 
-    print(f"Best fit parameters for {TARGET} from subsequent MCMC fit")
+    # Output a comparison with known values (assuming we've fitted teffs and radii)
+    print(f"Final parameters for {TARGET} with nominals & 1-sigma error bars from MCMC fit")
+    theta_labels = [("TeffA", model_sed.teff_range.unit), ("TeffB", model_sed.teff_range.unit),
+                    ("RA", u.Rsun), ("RB", u.Rsun)]
     for ix, (l, unit) in enumerate(theta_labels):
         known_val = ufloat(target_config.get(l, np.NaN), target_config.get(l + "_err", None) or 0)
         print(f"{l:>12s} = {theta_fit[ix]:.3f} +/- {theta_err_high[ix]:.3f}/{theta_err_low[ix]:.3f}",

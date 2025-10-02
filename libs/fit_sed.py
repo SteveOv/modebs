@@ -24,7 +24,10 @@ from deblib import constants as _deblib_const
 # GLOBALS which will be set by (minimize|mcmc)_fit prior to fitting. Hateful things!
 # Unfortunately this is how we get fast MCMC, as the way emcee works makes
 # using a class or passing these between functions in args way too sloooow!
+# The code expects _fixed_theta, _fit_mask & each row of _prior_criteria to be the same size, so
+# masks & indices apply equally to all three arrays making code within iterations simple & quick.
 _fixed_theta: _np.ndarray[float]
+_fit_mask: _np.ndarray[bool]
 _prior_criteria: _np.ndarray[float]
 _x: _np.ndarray[float]
 _y: _np.ndarray[float]
@@ -42,43 +45,38 @@ def _ln_prior_func(theta: _np.ndarray[float]) -> float:
     against the prior criteria and returns a single value indicating the goodness of the parameters.
 
     Accesses the following global variables which will be set by call to (minimize|mcmc)_fit()
-    - _fixed_theta: the set of fixed parameters combined with theta to describe system
-    - _prior_criteria: the prior limits and ratio +/- sigma criteria
+    - _fit_nask: mask to select those members of theta which are fitted
+    - _prior_criteria: limits and ratio +/- sigma criteria with rows indices corresponding to theta
+        - _prior_criteria[0] are limits, each a tuple of (low, high)
+        - _prior_criteria[1] are ratio nominal (float) values
+        - _prior_criteria[2] are ratio sigma (float) values
 
-    :theta: the current set of candidate fitted parameters which "fill the gaps" in fixed theta
+    :theta: the full set of parameters from which to generate model fluxes
     :returns: a single negative value indicating the goodness of this set of parameters 
     """
     # Limit criteria checks - hard pass/fail on these
-    ft_mask = _np.isnan(_fixed_theta)
-    if not all(lm[0] < t < lm[1] for t, lm in zip(theta, _prior_criteria[0][ft_mask], strict=True)):
+    if not all(lim[0] < th < lim[1] for th, lim in zip(theta[_fit_mask],
+                                                       _prior_criteria[0][_fit_mask])):
         return -_np.inf
 
     # With 3 params per star + dist the #stars is...
-    nstars = (_fixed_theta.shape[0] - 1) // 3
-    if nstars == 1: # no ratios
+    nstars = (theta.shape[0] - 1) // 3
+    if nstars < 2: # no ratios
         return 0
 
-    # We check the ratio wherever a companion value is fitted, or if the primary value is fitted
-    # it's all compaions for the parameter type (i.e. if rad0 is fitted all ratio of radii checked)
-    # Coalesce the fitted and fixed values, so that we can calculate any required ratios.
-    full_theta = _fixed_theta.copy()
-    _np.putmask(full_theta, ft_mask, theta)
+    # Check the ratio wherever a companion value is fitted, or if the primary value is fitted then
+    # check all companions for the parameter type (i.e. rad0 is fitted all ratio of radii checked).
 
-    # Find the components of the ratios are in the coalesced theta. Always 1 less ratio than stars.
-    tert_ixs = [i for i, v in enumerate(full_theta) if i % nstars > 0 and v is not None]
-    prim_ixs = [int(_np.floor(ix / nstars) * nstars) for ix in tert_ixs]
+    # These indices apply equally across theta, _fit_mask and each type of _prior_criteria.
+    comp_ixs = [ix for ix, _ in enumerate(theta) if ix % nstars != 0]       # omit the primaries
+    prim_ixs = [int(_np.floor(ix / nstars) * nstars) for ix in comp_ixs]    # primary for each comp
 
     # Gaussian priors: g(x) = 1/(σ*sqrt(2*pi)) * exp(-1/2 * (x-µ)^2/σ^2)
-    # Omitting scaling expressions for now and note the implicit log cancelling the exp
-    inners = []
-    for prim_ix, tert_ix in zip(prim_ixs, tert_ixs):
-        # Need to evaluate these for the tert, where either the tert or the prim are fitted
-        if _np.isnan(_fixed_theta[prim_ix]) or _np.isnan(_fixed_theta[tert_ix]):
-            prior_rat = _prior_criteria[1][tert_ix]
-            prior_sig = _prior_criteria[2][tert_ix]
-
-            inners += [((full_theta[tert_ix] / full_theta[prim_ix] - prior_rat) / prior_sig)**2]
-    return -0.5 * _np.sum(inners)
+    # Omitting scaling expressions for now and note the implicit ln cancelling the exp
+    return -0.5 * _np.sum([
+        ((theta[cix] / theta[pix] - _prior_criteria[1][cix]) / _prior_criteria[2][cix])**2
+                    for pix, cix in zip(prim_ixs, comp_ixs) if _fit_mask[pix] or _fit_mask[cix]
+    ])
 
 
 def _ln_likelihood_func(y_model: _np.ndarray[float], degrees_of_freedom: int) -> float:
@@ -103,26 +101,22 @@ def _ln_likelihood_func(y_model: _np.ndarray[float], degrees_of_freedom: int) ->
 def model_func(theta: _np.ndarray[float],
                combine: bool=True):
     """
-    Generate the model fluxes at points x from the candidate parameters theta & fixed_theta.
+    Generate the model fluxes at points x from the candidate parameters theta.
 
     flux(*) = model(x, teff, logg) * radius^2 / dist^2
 
     Accesses the following global variables which will be set by call to (minimize|mcmc)_fit()
     - _x: the x points to generate model data for
-    - _fixed_theta: corresponding set of fixed parameters; combined with theta to describe each star
+    - _flux_func: the function to call to generate model fluxes
 
-    :theta: the current set of candidate fitted parameters which "fill the gaps" in fixed theta
+    :theta: the full set of parameters from which to generate model fluxes
     :combine: whether to return a single set of summed fluxes
     :returns: the model fluxes at points x, either per star if combine==False or aggregated
     """
-    # Coalesce theta with the underlying fixed params.
-    full_theta = _fixed_theta.copy()
-    _np.putmask(full_theta, _np.isnan(full_theta), theta)
-
     # The teff, rad and logg for each star is interleaved, so if two stars we expect:
     # [teff0, teff1, rad0, rad1, logg0, logg1, dist]. With 3 params per star + dist the #stars is...
-    nstars = (len(_fixed_theta) - 1) // 3
-    params_by_star = full_theta[:-1].reshape((3, nstars)).transpose()
+    nstars = (theta.shape[0] - 1) // 3
+    params_by_star = theta[:-1].reshape((3, nstars)).transpose()
     y_model = _np.array([
         _flux_func(_x, teff, logg).value * (rad * _deblib_const.R_sun.n)**2
                                                     for teff, rad, logg in params_by_star
@@ -130,22 +124,28 @@ def model_func(theta: _np.ndarray[float],
 
     # Finally, divide by the dist^2, which is the remaining param not used above
     if combine:
-        return _np.sum(y_model, axis=0) / full_theta[-1]**2
-    return y_model / full_theta[-1]**2
+        return _np.sum(y_model, axis=0) / theta[-1]**2
+    return y_model / theta[-1]**2
 
 
-def _objective_func(theta: _np.ndarray[float], minimizable: bool=False) -> float:
+def _objective_func(fit_theta: _np.ndarray[float], minimizable: bool=False) -> float:
     """
     The function to be optimized by adjusting theta so that the return value converges to zero.
 
-    :theta: the current set of candidate fitted parameters which "fill the gaps" in fixed theta
+    :fit_theta: current set of candidate fitted parameters only
     :minimizable: whether this function is minimizable (returns positive) or not (returns negative)
     :returns: the result of evaluating the fitted model against the observations
     """
+    # Combine the fitted and fixed parameters to make a full set.
+    theta = _fixed_theta.copy()
+    theta[_fit_mask] = fit_theta
+
     if _np.isfinite(retval := _ln_prior_func(theta)):
         y_model = model_func(theta, combine=True)
-        degr_freedom = y_model.shape[0] - theta.shape[0]
+
+        degr_freedom = y_model.shape[0] - fit_theta.shape[0]
         retval += _ln_likelihood_func(y_model, degr_freedom)
+
         _np.nan_to_num(retval, copy=False, nan=-_np.inf)
 
     if minimizable:
@@ -153,15 +153,27 @@ def _objective_func(theta: _np.ndarray[float], minimizable: bool=False) -> float
     return retval
 
 
+def _print_theta(theta: _np.ndarray[float],
+                 fit_mask: _np.ndarray[bool],
+                 prefix: str="",
+                 suffix: str=""):
+    """ Utility function for pretty printing theta arrays & highlighting which items are fitted. """
+    print((prefix if prefix else '') +
+          "[" +
+          ", ".join(f"{t:.3e}{'*' if f else ''}" for t, f in zip(theta, fit_mask)) +
+          "]" +
+          (suffix if suffix else ''))
+
+
 def minimize_fit(x: _np.ndarray[float],
                  y: _np.ndarray[float],
                  y_err: _np.ndarray[float],
                  prior_criteria: _np.ndarray[float],
                  theta0: _np.ndarray[float],
-                 fixed_theta: _np.ndarray[float],
+                 fit_mask: _np.ndarray[float],
                  flux_func: Callable[[_np.ndarray[float], float, float], _np.ndarray[float]],
                  methods: List[str]=None,
-                 verbose: bool=False) -> OptimizeResult:
+                 verbose: bool=False) -> Tuple[_np.ndarray[float], OptimizeResult]:
     """
     Quick fit model star(s) to the SED with scipy minimize fit of the model data generated from
     a combination of the fixed params on class iniialization and the fitted ones given here.
@@ -171,36 +183,38 @@ def minimize_fit(x: _np.ndarray[float],
     :y: the flux values, at x, for the observed SED data
     :y_err: the flux error bars, at x, for the observed SED data
     :prior_criteria: the criteria for limits and ratios used in evaluating theta against priors
-    :theta0: the initial set of candidate fitted parameters which "fill the gaps" in theta_fixed
-    :theta_fixed: the fixed, non-fitted parameters required to produced the model the SED data
+    :theta0: the initial set of candidate parameters for the model SED
+    :fit_mask: a mask on theta0 to pick the parameters that are fitted, the rest being fixed
     :flux_func: the function, with form func(x, teff, logg), called to generate fluxes
     :methods: scipy optimize fitting algorithms to try, defaults to [Nelder-Mead, SLSQP, None]
-    :returns: a scipy OptimizeResult with the details of the outcome
+    :returns: the final set of parameters & a scipy OptimizeResult with the details of the outcome
     """
     if verbose:
-        print("minimize_fit(theta0=[" + ", ".join(f"{t:.6f}" for t in theta0) + "])")
+        _print_theta(theta0, fit_mask, "minimize_fit(theta0=", ")")
 
     if methods is None:
         methods = ["Nelder-Mead", "SLSQP", None]
     elif isinstance(methods, str):
         methods = [methods]
 
+    max_iters = int(1000 * sum(fit_mask))
+
     with _fit_mutex, _catch_warnings(category=[RuntimeWarning, OptimizeWarning]):
-        _filterwarnings("ignore", "invalid value encountered in subtract")
+        _filterwarnings("ignore", "invalid value encountered in ")
         _filterwarnings("ignore", "Desired error not necessarily achieved due to precision loss.")
         _filterwarnings("ignore", "Unknown solver options:")
 
         # Now we've got exclusive access, we can set the globals required for fitting
         # pylint: disable=global-statement
-        global _x, _y, _weights, _fixed_theta, _prior_criteria, _flux_func
+        global _x, _y, _weights, _fixed_theta, _fit_mask, _prior_criteria, _flux_func
         _x, _y, _weights = x, y, 1 / y_err**2
-        _fixed_theta, _prior_criteria = fixed_theta, prior_criteria
-        _flux_func = flux_func
+        _fixed_theta, _fit_mask = _np.where(fit_mask, None, theta0), fit_mask
+        _prior_criteria, _flux_func = prior_criteria, flux_func
 
-        the_soln, the_method = None, None
+        the_soln, the_meth = None, None
         for method in methods:
-            a_soln = _minimize(_objective_func, x0=theta0, args=(True), # minimizable
-                               method=method, options={ "maxiter": 5000, "maxfev": 5000 })
+            a_soln = _minimize(_objective_func, x0=theta0[fit_mask], args=(True), # minimizable
+                               method=method, options={ "maxiter": max_iters, "maxfev": max_iters })
             if verbose:
                 print(f"({method})",
                         "succeeded" if a_soln.success else f"failed [{a_soln.message}]",
@@ -210,12 +224,16 @@ def minimize_fit(x: _np.ndarray[float],
             if the_soln is None \
                     or (a_soln.success and not the_soln.success) \
                     or (a_soln.fun < the_soln.fun):
-                the_soln, the_method = a_soln, method
+                the_soln, the_meth = a_soln, method
 
-    if verbose:
-        print(f"The best fit used the '{the_method}' method, yielding final theta = [" +
-                ", ".join(f"{t:.6f}" for t in the_soln.x) + "]")
-    return the_soln
+    if the_soln.success:
+        theta0[fit_mask] = the_soln.x
+        if verbose:
+            _print_theta(theta0, fit_mask, f"The best fit with {the_meth} method yielded theta=")
+    else:
+        _print_theta(theta0, fit_mask, "The fit failed so returning input, theta0=")
+
+    return theta0, the_soln
 
 
 def mcmc_fit(x: _np.ndarray[float],
@@ -223,7 +241,7 @@ def mcmc_fit(x: _np.ndarray[float],
              y_err: _np.ndarray[float],
              prior_criteria: _np.ndarray[float],
              theta0: _np.ndarray[float],
-             fixed_theta: _np.ndarray[float],
+             fit_mask: _np.ndarray[bool],
              flux_func: Callable[[_np.ndarray[float], float, float], _np.ndarray[float]],
              nwalkers: int=100,
              nsteps: int=100000,
@@ -231,7 +249,8 @@ def mcmc_fit(x: _np.ndarray[float],
              seed: int=42,
              processes: int=1,
              early_stopping: bool=True,
-             verbose: bool=False) -> EnsembleSampler:
+             progress: Union[bool, str]=False,
+             verbose: bool=False) -> Tuple[_np.ndarray[float], EnsembleSampler]:
     """
     Full fit model star(s) to the SED with an MCMC fit of the model data generated from
     a combination of the fixed params on class iniialization and the fitted ones given here.
@@ -243,41 +262,44 @@ def mcmc_fit(x: _np.ndarray[float],
     :y: the flux values, at x, for the observed SED data
     :y_err: the flux error bars, at x, for the observed SED data
     :prior_criteria: the criteria for limits and ratios used in evaluating theta against priors
-    :theta0: the initial set of candidate fitted parameters which "fill the gaps" in theta_fixed
-    :theta_fixed: the fixed, non-fitted parameters required to produced the model the SED data
+    :theta0: the initial set of candidate parameters for the model SED
+    :fit_mask: a mask on theta0 to pick the parameters that are fitted, the rest being fixed
     :flux_func: the function, with form func(x, teff, logg), called to generate fluxes
     :nwalker: the number of mcmc walkers to employ
     :nsteps: the maximium number of mcmc steps to make for each walker
     :thin_by: step interval to inspect fit progress
     :seed: optional seed for random behaviour
     :processes: optional number of parallel processes to use, or None to let code choose
+    :progress: whether to show a progress bar (see emcee documentation for other values)
     :early_stopping: stop fitting if solution has converged & further improvements are negligible
-    :returns: a emcee EnsembleSampler with the details of the outcome
+    :returns: the final set of parameters (nominals only) and an emcee EnsembleSampler with the
+    details of the outcome
     """
     if verbose:
-        print("mcmc_fit(theta0=[" + ", ".join(f"{t:.6f}" for t in theta0) + "])")
+        _print_theta(theta0, fit_mask, "mcmc_fit(theta0=", ")")
 
     rng = _np.random.default_rng(seed)
-    ndim = len(theta0)
+    theta_fit = theta0[fit_mask]
+    ndim = len(theta_fit)
     autocor_tol = 50 / thin_by
     tau = [_np.inf] * ndim
 
     # Starting positions for the walkers clustered around theta0
-    p0 = [theta0 + (theta0 * rng.normal(0, 0.05, ndim)) for _ in _np.arange(int(nwalkers))]
+    p0 = [theta_fit + (theta_fit * rng.normal(0, 0.05, ndim)) for _ in _np.arange(int(nwalkers))]
 
     with _fit_mutex, \
             _Pool(processes=processes) as pool, \
             _catch_warnings(category=[RuntimeWarning, UserWarning]):
 
-        _filterwarnings("ignore", message="invalid value encountered in scalar subtract")
+        _filterwarnings("ignore", message="invalid value encountered in ")
         _filterwarnings("ignore", message="Using UFloat objects with std_dev==0")
 
         # Now we've got exclusive access, we can set the globals required for fitting
         # pylint: disable=global-statement
-        global _x, _y, _weights, _fixed_theta, _prior_criteria, _flux_func
+        global _x, _y, _weights, _fixed_theta, _fit_mask, _prior_criteria, _flux_func
         _x, _y, _weights = x, y, 1 / y_err**2
-        _fixed_theta, _prior_criteria = fixed_theta, prior_criteria
-        _flux_func = flux_func
+        _fixed_theta, _fit_mask = _np.where(fit_mask, None, theta0), fit_mask
+        _prior_criteria, _flux_func = prior_criteria, flux_func
 
         # Min steps required by Autocorr algo to avoid a warn msg (not a warning so can't filter)
         min_steps_es = int(50 * autocor_tol * thin_by)
@@ -288,7 +310,7 @@ def mcmc_fit(x: _np.ndarray[float],
         sampler = EnsembleSampler(int(nwalkers), ndim, _objective_func, pool=pool)
 
         for _ in sampler.sample(initial_state=p0, iterations=nsteps // thin_by,
-                                thin_by=thin_by, tune=True, progress=True):
+                                thin_by=thin_by, tune=True, progress=progress):
 
             if (step := sampler.iteration * thin_by) > min_steps_es and step % 1000 == 0:
                 if early_stopping:
@@ -297,20 +319,26 @@ def mcmc_fit(x: _np.ndarray[float],
                     prev_tau = tau
                     tau = sampler.get_autocorr_time(c=5, tol=autocor_tol, quiet=True) * thin_by
                     if not any(_np.isnan(tau)) \
-                        and all(tau < step / 100) \
-                        and all(abs(prev_tau - tau) / prev_tau < 0.01):
-                        if verbose:
-                            print(f"Halting MCMC after {step:,} steps as we're past",
-                                    "100 times the autocorrelation time & the fit has converged.")
+                            and all(tau < step / 100) \
+                            and all(abs(prev_tau - tau) / prev_tau < 0.01):
+                        print(f"Halting MCMC after {step:,} steps as the walkers are past",
+                              "100 times the autocorrelation time & the fit has converged.")
                         break
 
+    tau = sampler.get_autocorr_time(c=5, tol=autocor_tol, quiet=True) * thin_by
+    burn_in_steps = int(max(_np.nan_to_num(tau, copy=True, nan=1000)) * 2)
+    samples = sampler.get_chain(discard=burn_in_steps, flat=True)
+    theta_fit = _np.median(samples[burn_in_steps:], axis=0)
+
+    theta0[fit_mask] = theta_fit
+
     if verbose:
-        tau = sampler.get_autocorr_time(c=5, tol=autocor_tol, quiet=True) * thin_by
         print( "Autocorrelation steps (tau):", ", ".join(f"{t:.3f}" for t in tau))
         print(f"Estimated burn-in steps:     {int(max(_np.nan_to_num(tau, nan=1000)) * 2):,}")
         print(f"Mean Acceptance fraction:    {_np.mean(sampler.acceptance_fraction):.3f}")
+        _print_theta(theta0, fit_mask, "Nominals of fitted theta:    ")
 
-    return sampler
+    return theta0, sampler
 
 
 def create_prior_criteria(
@@ -409,7 +437,7 @@ def create_prior_criteria(
             sig_list[cix : cix + exp_ct] = [rat_val.s] * exp_ct
         elif isinstance(rat_val, List|_np.ndarray) \
                 and len(rat_val) == exp_ct and all(isinstance(v, Number) for v in rat_val):
-            rat_list[cix : cix + exp_ct] = [v for v in sig_val]
+            rat_list[cix : cix + exp_ct] = [v for v in rat_val]
         elif isinstance(rat_val, List|_np.ndarray) \
                 and len(rat_val) == exp_ct and all(isinstance(v, _UFloat) for v in rat_val):
             rat_list[cix : cix + exp_ct] = [v for v in _noms(rat_val)]
@@ -437,35 +465,21 @@ def create_prior_criteria(
     return criteria
 
 
-def create_theta(teffs: Union[List[float], float]=None,
-                 radii: Union[List[float], float]=None,
-                 loggs: Union[List[float], float]=None,
-                 dist: float=None,
+def create_theta(teffs: Union[List[float], float],
+                 radii: Union[List[float], float],
+                 loggs: Union[List[float], float],
+                 dist: float,
                  nstars: int=2,
-                 build_delta: bool=False,
-                 fixed_theta: _np.ndarray[float]=None,
                  verbose: bool=False) -> _np.ndarray[float]:
     """
     Will validate the teffs, radii, loggs and dist values and create a theta list from them.
-    This is the set of parameters needed to generate a model SED from nstars components.
+    This is the full set of parameters needed to generate a model SED from nstars components.
 
-    If build_delta is false we get a full theta, which will have the form:
+    The resulting theta array will have the form:
     ```python
     theta = [teff0, ... , teffN, rad0, ... , radN, logg0, ..., loggN, dist]
     ```
-    where N is nstars - 1, and values of None are stored wherever they are present
-    in the input teffs, radii, loggs and dist parameters.
-    
-    If build_delta is True and fixed_theta supplied we get a delta(theta) which is just the
-    values missing from fixed_theta (with Nones omiited). For example, if:
-    ```python
-    fixed_theta = [teff0, teff1, rad0, rad1, None, None, dist]
-    ```
-    with teffs, radii and dist all None, and loggs with values, the resulting delta(theta) will be:
-    ```python
-    theta = [logg0, logg1]
-    ```
-    where, in this case, nstars == 2.
+    where N is nstars - 1.
 
     Note: theta has to be one-dimensional as scipy minimize will not fit multidimensional theta
 
@@ -474,41 +488,26 @@ def create_theta(teffs: Union[List[float], float]=None,
     :loggs: either a list of floats nstars long, a single float (same for each) or None
     :dist: either a float, Quantity or None
     :nstars: the number of stars we're building for 
-    :build_delta: whether to compress out Nones (True) or not (False)
-    :fixed_theta: if build_delta==True this is the set of fixed params to validate and build a
     delta for - the resulting theta list must contain values for all missing values in fixed_theta
     :returns: the resulting theta list
     """
-    theta = []
-    for ix, (name, value) in enumerate([
-                        ("teffs", teffs), ("radii", radii), ("loggs", loggs), ("dist", dist)]):
-        val_params = None
-        exp_count = nstars if ix < 3 else 1
+    theta = _np.empty((nstars * 3 + 1), dtype=float)
+    ix = 0
+    for name, val in [("teffs", teffs), ("radii", radii), ("loggs", loggs), ("dist", dist)]:
+        exp_count = 1 if name == "dist" else nstars
 
         # Attempt to interpret the value as a List[Number]
-        if isinstance(value, Number|None):
-            val_params = [value] * exp_count
-        elif isinstance(value, Tuple|List) and len(value) == exp_count \
-                    and all(isinstance(v, Number|None) for v in value):
-            val_params = value
+        if isinstance(val, Number):
+            theta[ix : ix+exp_count] += [val] * exp_count
+        elif isinstance(val, Tuple|List|_np.ndarray) \
+                and len(val) == exp_count \
+                and all(isinstance(v, Number|None) for v in val):
+            theta[ix : ix+exp_count] = [t for t in val]
         else:
-            raise ValueError(f"{name}=={value} cannot be interpreted as a List[Number]*{exp_count}")
+            raise ValueError(f"{name}=={val} cannot be interpreted as a List[Number]*{exp_count}")
 
-        if build_delta: # Building a delta; expected to supply all the params missing in fixed_theta
-            if fixed_theta is None:
-                raise ValueError("fixed_theta must be supplied if build_delta == True")
-
-            fix = ix * nstars
-            fixed_params = fixed_theta[fix : fix+exp_count]
-            if not _np.array_equal(_np.isnan(fixed_params),
-                                   _np.array([v is not None for v in val_params])):
-                raise ValueError(f"{name}={val_params} does not exactly overlay {fixed_params}")
-
-            theta += [t for t in val_params if t is not None]   # Delta doesn't need the Nones
-        else:
-            theta += [t for t in val_params]                    # Keep the Nones
+        ix += exp_count
 
     if verbose:
-        print("theta:\t",
-              ", ".join(f"{t:.3e}" if isinstance(t, Number) else f"{t}" for t in theta))
-    return _np.array(theta, dtype=float)
+        print("theta:\t", ", ".join(f"{t:.3e}" if isinstance(t, Number) else f"{t}" for t in theta))
+    return theta
