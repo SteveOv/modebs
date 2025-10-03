@@ -16,10 +16,16 @@ from scipy.optimize import OptimizeResult, OptimizeWarning
 from emcee import EnsembleSampler
 
 import astropy.units as _u
+from astropy.constants import iau2015 as _iau2015
+
 from uncertainties import UFloat as _UFloat
 from uncertainties.unumpy import nominal_values as _noms, std_devs as _std_devs
 
-from deblib import constants as _deblib_const
+
+# pylint: disable=line-too-long, no-member
+pc = (1 * _u.pc).to(_u.m).value
+R_sun = _iau2015.R_sun.to(_u.m).value
+
 
 # GLOBALS which will be set by (minimize|mcmc)_fit prior to fitting. Hateful things!
 # Unfortunately this is how we get fast MCMC, as the way emcee works makes
@@ -37,7 +43,6 @@ _flux_func: Callable[[_np.ndarray[float], float, float], _np.ndarray]
 # Try to protect them as much as possible by wrapping writes within a critical section
 _fit_mutex = _Lock()
 
-# pylint: disable=line-too-long
 
 def _ln_prior_func(theta: _np.ndarray[float]) -> float:
     """
@@ -118,14 +123,14 @@ def model_func(theta: _np.ndarray[float],
     nstars = (theta.shape[0] - 1) // 3
     params_by_star = theta[:-1].reshape((3, nstars)).transpose()
     y_model = _np.array([
-        _flux_func(_x, teff, logg).value * (rad * _deblib_const.R_sun.n)**2
-                                                    for teff, rad, logg in params_by_star
+        _flux_func(_x, teff, logg).value * (rad * R_sun)**2 for teff, rad, logg in params_by_star
     ])
 
-    # Finally, divide by the dist^2, which is the remaining param not used above
+    # Finally, divide by the dist^2 (m^2), which is the remaining param not used above
+    dist = theta[-1] * pc
     if combine:
-        return _np.sum(y_model, axis=0) / theta[-1]**2
-    return y_model / theta[-1]**2
+        return _np.sum(y_model, axis=0) / dist**2
+    return y_model / dist**2
 
 
 def _objective_func(fit_theta: _np.ndarray[float], minimizable: bool=False) -> float:
@@ -481,14 +486,15 @@ def create_theta(teffs: Union[List[float], float],
     ```
     where N is nstars - 1.
 
+    Units: teffs in K, radii in Rsun, logg in dex[cgs] and distance in parsecs
+
     Note: theta has to be one-dimensional as scipy minimize will not fit multidimensional theta
 
-    :teffs: either a list of floats nstars long, a single float (same for each) or None
-    :radii: either a list of floats nstars long, a single float (same for each) or None
-    :loggs: either a list of floats nstars long, a single float (same for each) or None
-    :dist: either a float, Quantity or None
+    :teffs: effective temps [K] as a list of floats nstars long or a single float (same value each)
+    :radii: stars' radii [Rsun] as a list of floats nstars long or a single float (same value each)
+    :loggs: stars' log(g) as a list of floats nstars long or a single float (same value each)
+    :dist: the distance [parsecs] as a single float
     :nstars: the number of stars we're building for 
-    delta for - the resulting theta list must contain values for all missing values in fixed_theta
     :returns: the resulting theta list
     """
     theta = _np.empty((nstars * 3 + 1), dtype=float)

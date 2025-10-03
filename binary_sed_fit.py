@@ -132,7 +132,7 @@ if __name__ == "__main__":
     EBV = 0.000515
     sed["sed_der_flux"] = sed["sed_flux"] / ext_model.extinguish(sed["sed_wl"].to(u.um), Ebv=EBV)
 
-    dist = target_data["skycoords"].distance.to(u.m).value
+    dist = target_data["skycoords"].distance.to(u.pc).value
     radius = 0.3
 
     NUM_STARS = 2
