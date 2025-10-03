@@ -104,6 +104,8 @@ def _ln_likelihood_func(y_model: _np.ndarray[float], degrees_of_freedom: int) ->
 
 
 def model_func(theta: _np.ndarray[float],
+               x: _np.ndarray[float]=None,
+               flux_func: Callable[[_np.ndarray[float], float, float], _np.ndarray[float]]=None,
                combine: bool=True):
     """
     Generate the model fluxes at points x from the candidate parameters theta.
@@ -115,15 +117,23 @@ def model_func(theta: _np.ndarray[float],
     - _flux_func: the function to call to generate model fluxes
 
     :theta: the full set of parameters from which to generate model fluxes
+    :x: optional filter/wavelengths to generate fluxes for - if omitted will use _x
+    :flux_func: optional function to call to generate fluxes - if omitted will use _flux_func
     :combine: whether to return a single set of summed fluxes
     :returns: the model fluxes at points x, either per star if combine==False or aggregated
     """
+    # These can be taken as args for external calls but fall back in the hateful globals
+    if x is None:
+        x = _x
+    if flux_func is None:
+        flux_func = _flux_func
+
     # The teff, rad and logg for each star is interleaved, so if two stars we expect:
     # [teff0, teff1, rad0, rad1, logg0, logg1, dist]. With 3 params per star + dist the #stars is...
     nstars = (theta.shape[0] - 1) // 3
     params_by_star = theta[:-1].reshape((3, nstars)).transpose()
     y_model = _np.array([
-        _flux_func(_x, teff, logg).value * (rad * R_sun)**2 for teff, rad, logg in params_by_star
+        flux_func(x, teff, logg).value * (rad * R_sun)**2 for teff, rad, logg in params_by_star
     ])
 
     # Finally, divide by the dist^2 (m^2), which is the remaining param not used above
@@ -504,7 +514,7 @@ def create_theta(teffs: Union[List[float], float],
 
         # Attempt to interpret the value as a List[Number]
         if isinstance(val, Number):
-            theta[ix : ix+exp_count] += [val] * exp_count
+            theta[ix : ix+exp_count] = [val] * exp_count
         elif isinstance(val, Tuple|List|_np.ndarray) \
                 and len(val) == exp_count \
                 and all(isinstance(v, Number|None) for v in val):
