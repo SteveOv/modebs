@@ -1,6 +1,6 @@
 """ Training and testing specific plots. """
 # pylint: disable=too-many-arguments, too-many-locals, too-many-branches, too-many-statements
-from typing import Union, Tuple, Iterable, Generator, Callable
+from typing import Union, Tuple, Iterable, Generator, Callable, List
 from itertools import zip_longest
 
 import numpy as np
@@ -8,8 +8,66 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure as _Figure
 from matplotlib.axes import Axes as _Axes
 
+# pylint: disable=no-member
 import astropy.units as u
 from lightkurve import LightCurve as _LC, FoldedLightCurve as _FLC, LightCurveCollection as _LCC
+
+
+def plot_sed(x: u.Quantity,
+             fluxes: List[u.Quantity],
+             flux_errs: List[u.Quantity]=None,
+             fmts: List[str]=None,
+             labels: List[str]=None,
+             figsize: Tuple[float, float]=(6, 4),
+             **format_kwargs) -> _Figure:
+    """
+    Will create a new figure with a single set of axes and will plot one or more sets of SED flux
+    datapoints.
+
+    The data and axes will be coerced to units of x=wavelength [um] and y=nu*F(nu) [W / m^2].
+    The axes will be set to log-log scale.
+
+    :x: the x-axis/wavelength datapoints
+    :fluxes: one or more sets of flux values at frequencies/wavelengths x
+    :flux_errs: optional corresponding flux error bars
+    :fmts: fmt options for each set of fluxes or leave as None for default (see the matplotlib docs
+    https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.plot.html#matplotlib.pyplot.plot)
+    :labels: optional labels for the fluxes
+    :title: optional title for the plot
+    :figsize: optional size for the figure
+    :format_kwargs: kwargs to be passed on to format_axes()
+    :returns: the final Figure
+    """
+    if isinstance(fluxes, u.Quantity):
+        fluxes = [fluxes]
+    if isinstance(flux_errs, u.Quantity):
+        flux_errs = [flux_errs]
+    if isinstance(fmts, str):
+        fmts = [fmts]
+    if isinstance(labels, str):
+        labels = [labels] + [None] * len(fluxes)-1
+
+    fig, ax = plt.subplots(1, 1, figsize=figsize, constrained_layout=True)
+
+    lam = x.to(u.um, equivalencies=u.spectral())
+    freq = x.to(u.Hz, equivalencies=u.spectral())
+
+    for flux, flux_err, fmt, label in zip(fluxes, flux_errs, fmts, labels):
+        vfv, vfv_err = None, None
+        if flux is not None:
+            vfv = (freq * flux).to(u.W/u.m**2, equivalencies=u.spectral())
+        if flux_err is not None:
+            vfv_err = (freq * flux_err).to(u.W/u.m**2, equivalencies=u.spectral())
+
+        if vfv is not None:
+            ax.errorbar(lam, vfv, vfv_err, fmt=fmt, alpha=0.5, label=label)
+
+    ax.set(xscale="log", xlabel=f"Wavelength [{u.um:latex_inline}]",
+           yscale="log", ylabel=f"${{\\rm \\nu F(\\nu)}}$ [{u.W/u.m**2:latex_inline}]")
+    ax.grid(True, which="both", axis="both", alpha=0.33, color="lightgray")
+    legend_loc = "best" if labels is not None and any(l is not None for l in labels) else None
+    format_axes(ax, legend_loc=legend_loc, **format_kwargs)
+    return fig
 
 
 def plot_lightcurves(lcs: Union[_LCC, _LC, _FLC],
@@ -28,6 +86,7 @@ def plot_lightcurves(lcs: Union[_LCC, _LC, _FLC],
     :normalize_lcs: whether or not to normalize the y-axis data before plotting
     :cols: the number of columns on the grid of Axes
     :ax_func: callback taking (ax index, ax) called for each Axes prior to applying format_kwargs
+    :format_kwargs: kwargs to be passed on to format_axes()
     :returns: the final Figure
     """
     # Ensure the data and titles are iterable, even if there is none
