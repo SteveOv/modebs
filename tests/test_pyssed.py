@@ -83,36 +83,39 @@ class TestModelSed(unittest.TestCase):
         """ Tests get_fluxes() with happy path requests with exact row match (no interp fluxes) """
         model_sed = ModelSed()
 
-        for filters, teff, logg, metal, exp_response, msg in [
-            ("Gaia:Gbp", 5000, 4.0, 0.0, [3.333e18], "test single str filter"),
-            (["Gaia:Gbp"], 5000, 4.0, 0.0, [3.333e18], "test single list[str] filter"),
-            (["Gaia:G", "Gaia:Grp", "Gaia:Gbp"], 5000, 4.0, 0.0, [4.729e18, 6.273e18, 3.333e18],
+        for filters, teff, logg, metal, as_quantity, exp_response, msg in [
+            ("Gaia:Gbp", 5000, 4.0, 0.0, True, [3.333e18], "test single str filter"),
+            (["Gaia:Gbp"], 5000, 4.0, 0.0, True, [3.333e18], "test single list[str] filter"),
+            (["Gaia:G", "Gaia:Grp", "Gaia:Gbp"], 5000, 4.0, 0.0, True, [4.729e18, 6.273e18, 3.333e18],
                                                     "test filters in different order to file cols"),
-            ("Gaia:Gbp", 5100, 4.0, 0.0, [3.747e18], "test different teff"),
-            ("Gaia:Gbp", 5000, 4.5, 0.0, [3.300e18], "test different logg"),
-            ("Gaia:Gbp", 5000, 4.0, 0.3, [3.270e18], "test different metal"),
+            ("Gaia:Gbp", 5100, 4.0, 0.0, True, [3.747e18], "test different teff"),
+            ("Gaia:Gbp", 5000, 4.5, 0.0, True, [3.300e18], "test different logg"),
+            ("Gaia:Gbp", 5000, 4.0, 0.3, True, [3.270e18], "test different metal"),
+            ("Gaia:Gbp", 5000, 4.0, 0.3, False, [3.270e18], "test as_quantity=False"),
         ]:
             with self.subTest(msg=msg):
-                fluxes = model_sed.get_fluxes(filters, teff, logg, metal)
+                fluxes = model_sed.get_fluxes(filters, teff, logg, metal, as_quantity)
                 self.assertIsInstance(fluxes, np.ndarray)
-                self.assertListEqual(exp_response, fluxes.value.tolist())
+                self.assertListEqual(exp_response, fluxes.value.tolist() if as_quantity else fluxes.tolist())
 
     def test_get_fluxes_happy_path_interp(self):
         """ Tests get_fluxes() with happy path requests which require linear interpolation """
         model_sed = ModelSed()
 
-        for filters, teff, logg, metal, exp_response, msg in [
-            ("Gaia:Gbp", 5050, 4.0, 0.0, [np.median([3.333e18, 3.747e18])],
+        for filters, teff, logg, metal, as_quantity, exp_response, msg in [
+            ("Gaia:Gbp", 5050, 4.0, 0.0, True, [np.median([3.333e18, 3.747e18])],
                                                             "test linear interpolation on teff"),
-            ("Gaia:Gbp", 5000, 4.25, 0.0, [np.median([3.333e18, 3.300e18])],
+            ("Gaia:Gbp", 5000, 4.25, 0.0, True, [np.median([3.333e18, 3.300e18])],
                                                             "test linear interpolation on logg"),
-            ("Gaia:Gbp", 5000, 4.0, 0.15, [np.median([3.333e18, 3.270e18])],
+            ("Gaia:Gbp", 5000, 4.0, 0.15, True, [np.median([3.333e18, 3.270e18])],
                                                             "test linear interpolation on metal"),
+            ("Gaia:Gbp", 5050, 4.0, 0.0, False, [np.median([3.333e18, 3.747e18])],
+                                                            "test as_quantity=False"),                                                            
         ]:
             with self.subTest(msg=msg):
-                fluxes = model_sed.get_fluxes(filters, teff, logg, metal)
+                fluxes = model_sed.get_fluxes(filters, teff, logg, metal, as_quantity)
                 self.assertIsInstance(fluxes, np.ndarray)
-                self.assertListEqual(exp_response, fluxes.value.tolist())
+                self.assertListEqual(exp_response, fluxes.value.tolist() if as_quantity else fluxes.tolist())
 
     def test_get_fluxes_unknown_filter_name(self):
         """ Tests get_fluxes() with unknown filter names -> assert KeyError """

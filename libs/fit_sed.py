@@ -110,11 +110,11 @@ def model_func(theta: _np.ndarray[float],
     """
     Generate the model fluxes at points x from the candidate parameters theta.
 
-    flux(*) = model(x, teff, logg) * radius^2 / dist^2
+    flux(star_N) = flux_func(x, teff_N, logg_N) * radius_N^2 / dist^2
 
     Accesses the following global variables which will be set by call to (minimize|mcmc)_fit()
     - _x: the x points to generate model data for
-    - _flux_func: the function to call to generate model fluxes
+    - _flux_func: function to call to generate model fluxes, returning floats in same units as SED
 
     :theta: the full set of parameters from which to generate model fluxes
     :x: optional filter/wavelengths to generate fluxes for - if omitted will use _x
@@ -133,7 +133,7 @@ def model_func(theta: _np.ndarray[float],
     nstars = (theta.shape[0] - 1) // 3
     params_by_star = theta[:-1].reshape((3, nstars)).transpose()
     y_model = _np.array([
-        flux_func(x, teff, logg).value * (rad * R_sun)**2 for teff, rad, logg in params_by_star
+        flux_func(x, teff, logg) * (rad * R_sun)**2 for teff, rad, logg in params_by_star
     ])
 
     # Finally, divide by the dist^2 (m^2), which is the remaining param not used above

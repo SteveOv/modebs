@@ -132,7 +132,8 @@ class ModelSed():
                    filters: Union[np.ndarray[str], np.ndarray[int]],
                    teff: float,
                    logg: float,
-                   metal: float=0.) -> u.Quantity:
+                   metal: float=0.,
+                   as_quantity: bool=False) -> Union[np.ndarray[float], u.Quantity]:
         """
         Will return a ndarray of flux values calculated for requested filter names at
         the chosen effective temperature, logg and metallicity values.
@@ -144,6 +145,7 @@ class ModelSed():
         :teff: the effective temperature for the fluxes
         :logg: the logg for the fluxes
         :metal: the metallicity for the fluxes
+        :as_quantity: whether to return the fluxes as a Quantity (True) or a ndarray[float] (False)
         :returns: the resulting flux values (in the units of the underlying data file)
         """
         # Find the unique filters and the map onto the request/response (a filter can appear > once)
@@ -159,4 +161,7 @@ class ModelSed():
         fluxes = [self._model_interps[filter]["interp"](xi=xi) for filter in unique_filters]
 
         # Map these fluxes onto the response, where a filter/flux may appear >1 times
-        return np.array([fluxes[m] for m in flux_mappings], dtype=float) << self.flux_unit
+        values = np.array([fluxes[m] for m in flux_mappings], dtype=float)
+        if as_quantity:
+            return values << self.flux_unit
+        return values
