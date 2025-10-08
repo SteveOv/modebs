@@ -77,25 +77,25 @@ def get_sed_for_target(target: str,
     rcount = len(sed)
     if verbose: print(f"Opened SED table {sed_fname.name} containing {rcount} row(s).")
 
+    # Add wavelength which will be useful downstream
+    sed["sed_wl"] = sed["sed_freq"].to(wl_unit, equivalencies=u.spectral())
+
     # Set flux uncertainties where none given
     mask_no_err = (sed["sed_eflux"].value == 0) | np.isnan(sed["sed_eflux"])
     sed["sed_eflux"][mask_no_err] = sed["sed_flux"][mask_no_err] * missing_uncertainty_ratio
 
     # Get the data into desired units
     if sed["sed_flux"].unit != flux_unit:
-        sed["sed_flux"].convert_unit_to(flux_unit)
-        sed["sed_eflux"].convert_unit_to(flux_unit)
+        sed["sed_flux"].convert_unit_to(flux_unit, equivalencies=u.spectral_density(sed["sed_wl"]))
+        sed["sed_eflux"].convert_unit_to(flux_unit, equivalencies=u.spectral_density(sed["sed_wl"]))
     if sed["sed_freq"].unit != freq_unit:
-        sed["sed_freq"].convert_unit_to(freq_unit)
+        sed["sed_freq"].convert_unit_to(freq_unit, equivalencies=u.spectral())
 
     if remove_duplicates:
         sed = unique(sed, keys=["sed_filter", "sed_freq", "sed_flux", "sed_eflux"], keep="first")
         ucount = len(sed)
         if verbose: print(f"Dropped {rcount-ucount} duplicate(s) leaving {ucount} unique row(s).")
         sed.sort(["sed_freq"], reverse=True)
-
-    # Add wavelength which we may be useful downstream
-    sed["sed_wl"] = np.divide(c * u.m / u.s, sed["sed_freq"].to(u.Hz)).to(wl_unit)
     return sed
 
 
@@ -123,7 +123,8 @@ def calculate_vfv(sed: Table,
     vfv = freqs.quantity * fluxes.quantity
     evfv = freqs.quantity * flux_errs.quantity
     if unit is not None:
-        return vfv.to(unit), evfv.to(unit)
+        return vfv.to(unit, equivalencies=u.spectral_density(freqs.quantity)), \
+                evfv.to(unit, equivalencies=u.spectral_density(freqs.quantity))
     return vfv, evfv
 
 
@@ -214,9 +215,9 @@ def create_outliers_mask(sed: Table,
     temp_limits = (min(temps0) * 0.75, max(temps0) * 1.25)
 
     # Prepare the x, y & y_err data for the model & objective funcs which access these data directly
-    x = sed["sed_freq"].to(u.Hz).value
-    y = sed["sed_flux"].to(u.Jy).value
-    y_err = sed["sed_eflux"].to(u.Jy).value
+    x = sed["sed_freq"].to(u.Hz, equivalencies=u.spectral()).value
+    y = sed["sed_flux"].to(u.Jy, equivalencies=u.spectral_density(sed["sed_wl"])).value
+    y_err = sed["sed_eflux"].to(u.Jy, equivalencies=u.spectral_density(sed["sed_wl"])).value
 
     # The model func scaling is in log space, as the range is large, but it returns linear fluxes.
     y_log = log10(y)
