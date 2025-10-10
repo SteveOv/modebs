@@ -58,8 +58,8 @@ with np.load(output_file, allow_pickle=True) as of:
 
     print("Ranges:", ", ".join(f"{r['column']}={r['range']:unicode}" for r in of["ranges"]))
 
-    # Expecting 4.019e16
     row_mask = (loaded_grid["teff"] == 3000) & (loaded_grid["logg"] == 4.0) \
             & (loaded_grid["metal"] == 0.0) & (loaded_grid["alpha"] == 0)
-    print("'Gaia:G' filter flux for teff=3000, logg=4.0, metal==0, alpha==0:",
-          loaded_grid["Gaia:Gbp"][row_mask], f"{units[units['column']=='flux']['unit'][0]:unicode}")
+    print("'Gaia:Gbp' filter flux for teff=3000, logg=4.0, metal==0, alpha==0:",
+          loaded_grid["Gaia:Gbp"][row_mask], f"{units[units['column']=='flux']['unit'][0]:unicode}",
+          "(expecting 4.019e16)")
