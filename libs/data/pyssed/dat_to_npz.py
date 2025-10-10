@@ -10,6 +10,8 @@ import astropy.units as u
 
 
 # The source for this is the pre-convolved grid of summed fluxes by filter from pyssed.
+# Download into this directory from:
+# https://github.com/iain-mcdonald/PySSED/blob/v1.1.20250129/src/model-bt-settl-recast.dat
 this_dir = _Path(_getsourcefile(lambda:0)).parent
 source_file = this_dir / "model-bt-settl-recast.dat"
 in_grid = np.genfromtxt(source_file, names=True, delimiter=" ",
