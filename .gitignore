@@ -188,5 +188,8 @@ libs/data/mist/*.txz
 libs/data/mist/MIST*/*.iso
 libs/data/newera/PHOENIX*.*
 
+# pyysed data files which should be downloaded from source
+libs/data/modelgrids/pyssed/*.dat
+
 # Output and "in flight" files
 drop/

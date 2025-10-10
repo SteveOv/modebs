@@ -1,70 +1,73 @@
 """ A class for handling the generation of model fluxes for filters sourced from Pyssed data """
 # pylint: disable=no-member
-from typing import Union, Tuple, Iterable
+from typing import Union, Iterable
 from pathlib import Path as _Path
 from inspect import getsourcefile as _getsourcefile
-from json import load as _json_load
 
 import numpy as np
-import astropy.units as u
+import astropy.units as _u
 
 from scipy.interpolate import RegularGridInterpolator as _RegularGridInterpolator
 
 class ModelSed():
     """
-    Generates model SED fluxes from pyssed model
+    Generates model SED fluxes from pre-built pyssed model_grid.
+    This uses a grid of interpolators based on pre-convolved filter fluxes. The pre-convolved
+    nature of the fluxes ensures minimal processing is required to produce a model sed, so
+    it's fast. However, this model is only suitable for SED observations which are dereddened.
     """
 
     def __init__(self, data_file: Union[_Path, str]=None):
         """
         Initializes a new instance of this class.
 
-        :data_file: the source of the model data, in pyssed dat format
+        :data_file: the source of the model data, in numpy npz format
         """
         this_dir = _Path(_getsourcefile(lambda:0)).parent
         if data_file is None:
-            data_file = this_dir / "data/pyssed/model-bt-settl-recast.dat"
+            data_file = this_dir / "data/pyssed/model-bt-settl-recast.npz"
         self._data_file = data_file
-        self._flux_unit = u.Jy
 
-        # Read the pre-built model file. The delete chars is to handle some of the
-        # column/filter names which contain spaces and grammar chars.
-        model_grid = np.genfromtxt(self._data_file, names=True, delimiter=" ",
-                                   deletechars=r" ~!@#$%^&*()=+~\|]}[{';: ?>,<")
-        model_grid = model_grid[model_grid["alpha"] == 0]
+        with np.load(self._data_file, allow_pickle=True) as df:
+            # Load the model_grid of pre-convolved filter fluxes. These fluxes are not reddened
+            # and are suitable for quickly fitting to a SED which has been dereddened.
+            model_grid_conv = df["model_grid_conv"]
+            ranges = df["ranges"]
+            units = df["units"]
 
-        # Should already be in this order, but just in case as we depend on this order below
-        model_grid.sort(order=["teff", "logg", "metal"])
+        # Code to populate pivots below depends on fixing to alpha==0 and this ordering of fluxes
+        model_grid_conv = model_grid_conv[model_grid_conv["alpha"]==0]
+        model_grid_conv.sort(order=["teff", "logg", "metal"])
 
-        # The cols 0 to 4 are expected to be teff, logg, metal, alpha and lum.
+        # The cols 0 to 3 are expected to be teff, logg, metal and alpha
         # The rest of the cols are the filters and corresponding fluxes.
-        teffs, teff_ixs = np.unique(model_grid["teff"], return_inverse=True)
-        loggs, logg_ixs = np.unique(model_grid["logg"], return_inverse=True)
-        metals, metal_ixs = np.unique(model_grid["metal"], return_inverse=True)
-        filter_names = list(model_grid.dtype.names)[5:]
+        teffs, teff_ixs = np.unique(model_grid_conv["teff"], return_inverse=True)
+        loggs, logg_ixs = np.unique(model_grid_conv["logg"], return_inverse=True)
+        metals, metal_ixs = np.unique(model_grid_conv["metal"], return_inverse=True)
+        filter_names = list(model_grid_conv.dtype.names)[4:]
 
-        # Set up a table of interpolators, one per filter. Each interpolator is based on
-        # a pivot table with the teffs and loggs as the axes and filter fluxes as the values.
+        # Set up a table of interpolators, one per filter. Each interpolator is based on a
+        # pivot table with the teffs, loggs and metals as the axes and filter fluxes as the values.
         self._model_interps = np.empty(shape=(len(filter_names), ),
                                        dtype=[("filter", object), ("interp", object)])
         for filter_ix, filter_name in enumerate(filter_names):
-            # Need model_grid[filter_name] as teffs*loggs*metals items to write tl_pivot this way
-            tl_pivot = np.zeros((teffs.shape[0], loggs.shape[0], metals.shape[0]),
-                                dtype=model_grid[filter_name].dtype)
-            tl_pivot[teff_ixs, logg_ixs, metal_ixs] = model_grid[filter_name]
+            # Need model_grid[filter_name] of teffs*loggs*metals items long and to be sorted by
+            # [teff, logg, metal] in order to write to the pivot directly like this. If model_table
+            # not limited to alpha==0 then we will have to include the extra dimension.
+            pivot_table = np.empty(shape=(teffs.shape[0], loggs.shape[0], metals.shape[0]),
+                                   dtype=model_grid_conv[filter_name].dtype)
+            pivot_table[teff_ixs, logg_ixs, metal_ixs] = model_grid_conv[filter_name]
 
-            interp = _RegularGridInterpolator((teffs, loggs, metals), tl_pivot, "linear")
+            interp = _RegularGridInterpolator((teffs, loggs, metals), pivot_table, "linear")
             self._model_interps[filter_ix] = (filter_name, interp)
-        del model_grid
+        del model_grid_conv
 
-        self._wavelength_range = (0.3, 22) << u.micron
-        self._model_teff_range = (min(teffs), max(teffs)) << u.K
-        self._model_logg_range = (min(loggs), max(loggs)) << u.dex
-        self._model_metal_range = (min(metals), max(metals)) << u.dimensionless_unscaled
-
-        # Lookup for translating the SED service filter names into those used here & within the dat
-        with open(this_dir / "data/pyssed/sed-filter-translation.json", "r", encoding="utf8") as j:
-            self._sed_filter_name_map = _json_load(j)
+        self._filter_names = filter_names
+        self._wavelength_range = ranges[ranges["column"]=="lambda"]["range"][0]
+        self._model_teff_range = ranges[ranges["column"]=="teff"]["range"][0]
+        self._model_logg_range = ranges[ranges["column"]=="logg"]["range"][0]
+        self._model_metal_range = ranges[ranges["column"]=="metal"]["range"][0]
+        self._flux_unit = units[units["column"]=="flux"]["unit"][0]
 
     @property
     def data_file(self) -> _Path:
@@ -77,68 +80,59 @@ class ModelSed():
         return self._model_interps.shape[0]
 
     @property
-    def wavelength_range(self) -> u.Quantity["length"]:
+    def wavelength_range(self) -> _u.Quantity["length"]:
         """ Gets the range of wavelength covered by this model """
         return self._wavelength_range
 
     @property
-    def teff_range(self) -> u.Quantity["temperature"]:
+    def teff_range(self) -> _u.Quantity["temperature"]:
         """ Gets the range of effective temperatures covered by this model """
         return self._model_teff_range
 
     @property
-    def logg_range(self) -> u.Dex:
+    def logg_range(self) -> _u.Quantity:
         """ Gets the range of logg covered by this model """
         return self._model_logg_range
 
     @property
-    def metal_range(self) -> u.Quantity:
+    def metal_range(self) -> _u.Quantity:
         """ Gets the range of metallicities covered by this model """
         return self._model_metal_range
 
     @property
-    def flux_unit(self) -> u.Unit:
+    def flux_unit(self) -> _u.Unit:
         """ Gets the unit of the returned fluxes """
         return self._flux_unit
 
-    def map_filter_name(self, name: str) -> str:
-        """ Get the name of the equivalent filter within this model """        
-        if name in self._model_interps["filter"]:
-            return name
-        # We want an index error if the mapping does not exist
-        return self._sed_filter_name_map[name]
-
     def has_filter(self, name: str) -> bool:
         """ Gets whether this model knows of the requested filter """
-        return name in self._sed_filter_name_map or name in self._sed_filter_name_map.values()
+        return name in self._filter_names
 
     def get_filter_indices(self, filter_names: Iterable[str]) -> np.ndarray[int]:
         """
         Get the indices of the given filters. Useful in optimizing filter access when iterating
         as the indices can be used in place of the names. Handles mapping filter names.
 
-        Will raise a KeyError if a filter is unknown.
+        Will raise a ValueError if a filter is unknown.
 
         :filter_names: a list of filters for which we want the indices
         :returns: an array of the equivalent indices
         """
         if isinstance(filter_names, str):
             filter_names = [filter_names]
-        ixs = [np.where(self._model_interps['filter'] == self.map_filter_name(f))[0]
-                for f in filter_names]
-        return np.array(ixs, dtype=int).squeeze(axis=1)
+        return np.array([self._filter_names.index(n) for n in filter_names], dtype=int)
 
     def get_fluxes(self,
                    filters: Union[np.ndarray[str], np.ndarray[int]],
                    teff: float,
                    logg: float,
                    metal: float=0.,
-                   as_quantity: bool=False) -> Union[np.ndarray[float], u.Quantity]:
+                   as_quantity: bool=False) -> Union[np.ndarray[float], _u.Quantity]:
         """
         Will return a ndarray of flux values calculated for requested filter names at
         the chosen effective temperature, logg and metallicity values.
 
-        Will raise a KeyError if a named filter is unknown.
+        Will raise a ValueError if a named filter is unknown.
         Will raise IndexError if an indexed filter is out of range.
 
         :filters: a list of filter names or indices for which we are generating fluxes

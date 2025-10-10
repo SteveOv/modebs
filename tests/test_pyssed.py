@@ -19,13 +19,13 @@ class TestModelSed(unittest.TestCase):
     def test_init_happy_path(self):
         """ Tests __init__() basic happy path test for ModelSed instance initialization """
         for data_file, msg in [
-            (self._this_dir/"../libs/data/pyssed/model-bt-settl-recast.dat", "tests __init__ loafs specified data file"),
-            (None, "test __init__ falls back on the default dat file under libs/data/pyssed/"),
+            (self._this_dir/"../libs/data/pyssed/model-bt-settl-recast.npz", "tests __init__ loafs specified data file"),
+            (None, "test __init__ falls back on the default npz file under libs/data/pyssed/"),
         ]:
             with self.subTest(msg=msg):
                 model_sed = ModelSed(data_file=data_file)
 
-                self.assertEqual("model-bt-settl-recast.dat", model_sed.data_file.name)
+                self.assertEqual("model-bt-settl-recast.npz", model_sed.data_file.name)
 
                 self.assertTrue(model_sed.num_interpolators > 0)
                 self.assertEqual(1900 << u.K, model_sed.teff_range[0])
@@ -37,6 +37,26 @@ class TestModelSed(unittest.TestCase):
 
 
     #
+    #   has_filter(name) -> bool:
+    #
+    def test_has_filter_various_names(self):
+        """ Tests has_filter(name) with various requests """
+        model_sed = ModelSed()
+
+        for name, exp_response, msg in [
+            ("Gaia:Gbp",    True,   "test filter name is known"),
+            ("Gaia:Gesso",  False,  "test filter name is unknown"),
+            # Edge cases
+            ("",            False,  "test empty name is unknown"),
+            (None,          False,  "test None name is unknown"),
+            (12,            False,  "test non-str filter name is unknown"),
+        ]:
+            with self.subTest(msg=msg):
+                response = model_sed.has_filter(name)
+                self.assertEqual(exp_response, response)
+
+
+    #
     #   get_filter_indices(filter_names) -> np.ndarray[int]:
     #
     def test_get_filter_indices_happy_path(self):
@@ -44,13 +64,9 @@ class TestModelSed(unittest.TestCase):
         model_sed = ModelSed()
 
         for request, exp_response, msg in [
-            ("GAIA/GAIA3.Gbp", [0], "test filter list is a single str with known dat filter name"),
-            (["GAIA/GAIA3.Gbp"], [0], "test filter list is a list holding a single str with known dat filter name"),
-
             ("Gaia:Gbp", [0], "test filter list is a single str with known SED service filter name"),
             (["Gaia:Gbp"], [0], "test filter list is a list holding a single str with known SED service filter name"),
 
-            (["GAIA/GAIA3.G", "GAIA/GAIA3.Grp", "GAIA/GAIA3.Gbp"], [1, 2, 0], "test filter list with known dat filter names"),
             (["Gaia:G", "Gaia:Grp", "Gaia:Gbp"], [1, 2, 0], "test filter list with known SED service filter names"),
         ]:
             with self.subTest(msg=msg):
@@ -66,7 +82,7 @@ class TestModelSed(unittest.TestCase):
             (["Unknown:filter"], "test single item with unknown filter name"),
             (["Gaia:G", "Unknown:filter"], "test list containing known and unknown filter name"),
         ]:
-            with self.subTest(msg=msg) and self.assertRaises(KeyError):
+            with self.subTest(msg=msg) and self.assertRaises(ValueError):
                 model_sed.get_filter_indices(request)
 
     #
@@ -127,7 +143,7 @@ class TestModelSed(unittest.TestCase):
             (["Gaia:G", "Unknwon:Fitler", "Gaia:Gbp"], "test list with one unknown filter"),
         ]:
             with self.subTest(msg=msg):
-                with self.assertRaises(KeyError):
+                with self.assertRaises(ValueError):
                     model_sed.get_fluxes(filters, **kwargs)
 
     def test_get_fluxes_unknown_filter_index(self):
