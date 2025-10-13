@@ -183,6 +183,7 @@ def create_outliers_mask(sed: Table,
                          temps0: Union[Tuple[float], List[float]]=(5000., 5000.),
                          min_unmasked: float=15,
                          min_improvement_ratio: float=0.10,
+                         test_stat_cutoff: float=10.,
                          verbose: bool=False) -> np.ndarray[bool]:
     """
     Will create a mask indicating the farthest outliers.
@@ -196,6 +197,7 @@ def create_outliers_mask(sed: Table,
     :min_unmasked: the minimum number of observations to leave unmasked, either as an explicit
     count (if > 1) or as a ratio of the initial number (if within (0, 1])
     :min_improvement_ratio: minimum ratio of test stat improvement required to add to outlier_mask
+    :test_stat_cutoff: will stop iterating when the test stats gets below this value
     :verbose: whether to print progress messages or not
     :returns: a mask indicating those observations selected as outliers
     """
@@ -235,6 +237,7 @@ def create_outliers_mask(sed: Table,
     # Iteratively fit the observations, remove the worst fitted points until fit no longer improves
     test_mask = outlier_mask.copy()   # for initial/baseline fit nothing is excluded
     last_test_stat = np.inf
+    degree_freedon = len(sed) - len(temps0)
     for _iter in range(sed_count):
         if sed_count - sum(test_mask) < min_unmasked:
             if verbose: print(f"[{_iter:03d}] stopped as the {'next' if _iter > 1 else ''} mask",
@@ -257,18 +260,18 @@ def create_outliers_mask(sed: Table,
             if verbose: print(f"[{_iter:03d}] stopped as unable to get a good fit")
             break
 
-        # Calculate a comperable summary stat on this fit. TODO: refine test stat & weights
+        # Calculate a summary stat on this fit.
         this_temps = soln.x
         this_y_model = scaled_bb_model(this_temps, test_mask)
-        weights = np.ones_like(this_y_model)
         this_resids_sq = ((y[~test_mask] - this_y_model) / y_err[~test_mask])**2
-        this_test_stat = np.sum(this_resids_sq * weights) / (len(this_resids_sq) - 1)
+        this_test_stat = np.sum(this_resids_sq) / degree_freedon
 
         # After the first iter, which sets the unmasked baseline, evaluate this fit (with mask) vs
         # that of the previous iter. If it's significantly better, we adopt the mask and try again.
         if verbose: print(f"[{_iter:03d}] stat = {this_test_stat:.3e}", end="; " if _iter else "\n")
         if _iter > 0:
-            if last_test_stat - this_test_stat > last_test_stat * min_improvement_ratio:
+            if this_test_stat > test_stat_cutoff \
+                    and last_test_stat - this_test_stat > last_test_stat * min_improvement_ratio:
                 outlier_mask = test_mask
                 if verbose: print(f"{sum(test_mask)}/{sed_count} outliers masked for",
                             f"{', '.join(f'{f}' for f in np.unique(sed['sed_filter'][test_mask]))}")
