@@ -107,7 +107,7 @@ class Testsed(unittest.TestCase):
         """ Tests get_sed_for_target() asserts UnitConversionError when a unit is incompatible """
         for unit_kwargs in [
             { "flux_unit": u.Jy / u.sr },
-            { "freq_unit": u.micron },
+            { "freq_unit": u.s },
             { "wl_unit": u.K },
         ]:
             with self.subTest():
