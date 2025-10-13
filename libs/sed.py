@@ -224,33 +224,33 @@ def create_outliers_mask(sed: Table,
     # The model func scaling is in log space, as the range is large, but it returns linear fluxes.
     y_log = log10(y)
     def scaled_bb_model(temps, mask):
-        y_model_log = log10(np.sum([blackbody_flux(x[~mask], t) for t in temps], 0)) + 26 # to Jy
-        return 10**(y_model_log + np.median(y_log[~mask] - y_model_log))
+        y_model_log = log10(np.sum([blackbody_flux(x[mask], t) for t in temps], 0)) + 26 # to Jy
+        return 10**(y_model_log + np.median(y_log[mask] - y_model_log))
 
     # The minimize target func; checks temps against priors, calls the model func and evals the fit
     def objective_func(temps, mask) -> float:
         if all(temp_limits[0] < t < temp_limits[1] for t in temps) \
                 and abs(temps[-1] / temps[0] - temp_ratio) < temp_ratio_flex:
-            return simple_like_func(scaled_bb_model(temps, mask), y[~mask], y_err[~mask])
+            return simple_like_func(scaled_bb_model(temps, mask), y[mask], y_err[mask])
         return np.inf
 
     # Iteratively fit the observations, remove the worst fitted points until fit no longer improves
-    test_mask = outlier_mask.copy()   # for initial/baseline fit nothing is excluded
-    last_test_stat = np.inf
-    degree_freedon = len(sed) - len(temps0)
+    retain_mask = ~outlier_mask.copy()   # for initial/baseline fit nothing is excluded
+    prev_test_stat = np.inf
     for _iter in range(sed_count):
-        if sed_count - sum(test_mask) < min_unmasked:
+        num_retained = sum(retain_mask)
+        if num_retained < min_unmasked:
             if verbose: print(f"[{_iter:03d}] stopped as the {'next' if _iter > 1 else ''} mask",
                         f"will reduce the number of SED rows below the minimum of {min_unmasked}.")
             break
 
-        # Perform fits on the target fluxes which are still unmasked, retaining the best fit
+        # Perform fits on the target fluxes which are still retained, retaining the best fit
         soln = None
         with warnings.catch_warnings(category=RuntimeWarning|OptimizeWarning):
             warnings.filterwarnings("ignore", message="invalid value encountered in subtract")
             warnings.filterwarnings("ignore", message="Unknown solver options")
             for method in ["Nelder-Mead", "SLSQP"]:
-                this_soln = minimize(objective_func, x0=temps0, args=test_mask,
+                this_soln = minimize(objective_func, x0=temps0, args=retain_mask,
                                      method=method, options={ "maxiter": 5000, "maxfev": 5000 })
                 if soln is None \
                         or (not soln.success and this_soln.success) or (soln.fun > this_soln.fun):
@@ -261,27 +261,28 @@ def create_outliers_mask(sed: Table,
             break
 
         # Calculate a summary stat on this fit.
-        this_temps = soln.x
-        this_y_model = scaled_bb_model(this_temps, test_mask)
-        this_resids_sq = ((y[~test_mask] - this_y_model) / y_err[~test_mask])**2
-        this_test_stat = np.sum(this_resids_sq) / degree_freedon
+        fitted_temps = soln.x
+        y_model = scaled_bb_model(fitted_temps, retain_mask)
+        resids_sq = ((y[retain_mask] - y_model) / y_err[retain_mask])**2
+        test_stat = np.sum(resids_sq) / (num_retained - len(fitted_temps))
 
         # After the first iter, which sets the unmasked baseline, evaluate this fit (with mask) vs
         # that of the previous iter. If it's significantly better, we adopt the mask and try again.
-        if verbose: print(f"[{_iter:03d}] stat = {this_test_stat:.3e}", end="; " if _iter else "\n")
+        if verbose: print(f"[{_iter:03d}] stat = {test_stat:.3e}", end="; " if _iter else "\n")
         if _iter > 0:
-            if this_test_stat > test_stat_cutoff \
-                    and last_test_stat - this_test_stat > last_test_stat * min_improvement_ratio:
-                outlier_mask = test_mask
-                if verbose: print(f"{sum(test_mask)}/{sed_count} outliers masked for",
-                            f"{', '.join(f'{f}' for f in np.unique(sed['sed_filter'][test_mask]))}")
+            if test_stat > test_stat_cutoff \
+                            and prev_test_stat - test_stat > prev_test_stat * min_improvement_ratio:
+                outlier_mask = ~retain_mask
+                if verbose: print(f"{sum(~retain_mask)}/{sed_count} outliers masked for",
+                                  ", ".join(np.unique(sed['sed_filter'][~retain_mask])))
             else:
                 if verbose: print("no significant improvement so stopped further masking")
                 break
 
         # Create the next test mask from the current outlier mask & farthest outliers from this fit.
-        (test_mask := outlier_mask.copy())[~outlier_mask] = this_resids_sq == this_resids_sq.max()
-        last_test_stat = this_test_stat
+        # Note: the resids are only the size of the retain_mask == True, hence the double masking.
+        retain_mask[retain_mask] = ~(resids_sq == resids_sq.max())
+        prev_test_stat = test_stat
 
     return outlier_mask
 
