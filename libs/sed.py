@@ -85,7 +85,7 @@ def get_sed_for_target(target: str,
     sed["sed_eflux"][mask_no_err] = sed["sed_flux"][mask_no_err] * missing_uncertainty_ratio
 
     # Get the data into desired units
-    if sed["sed_flux"].unit != flux_unit:
+    if sed["sed_flux"].unit != flux_unit: # It's actually flux density, usually received in Jy
         sed["sed_flux"].convert_unit_to(flux_unit, equivalencies=u.spectral_density(sed["sed_wl"]))
         sed["sed_eflux"].convert_unit_to(flux_unit, equivalencies=u.spectral_density(sed["sed_wl"]))
     if sed["sed_freq"].unit != freq_unit:
