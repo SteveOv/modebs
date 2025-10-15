@@ -17,7 +17,7 @@ from astropy.io.votable import parse_single_table
 import astropy.units as u
 from astropy.units import UnitsWarning
 
-OUT_LAM_UNIT = u.AA
+OUT_LAM_UNIT = u.um
 OUT_FLUX_DENSITY_UNIT = u.W / u.m**2 / u.Hz
 OUT_FLUX_UNIT = u.W / u.m**2
 PRE_BIN_MODEL = False
@@ -112,7 +112,7 @@ for file_ix, source_file in enumerate(source_files[:]):
 
     if PRE_BIN_MODEL:
         # Optionally, bin & window the data so we can get the volumes down to something manageable.
-        lam_bin = 10**np.arange(np.log10(913), np.log10(320000), 0.003) # Angstrom
+        lam_bin = np.logspace(np.log10(0.1), np.log10(300), num=5000, base=10) # um
         lam_bin_half_gap = np.diff(lam_bin) / 2
         lam_bin_edge = np.concatenate([[lam_bin[0] - (lam_bin_half_gap[0])],
                                        lam_bin[:-1] + (lam_bin_half_gap),
