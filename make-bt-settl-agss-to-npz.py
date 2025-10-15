@@ -17,6 +17,11 @@ from astropy.io.votable import parse_single_table
 import astropy.units as u
 from astropy.units import UnitsWarning
 
+OUT_LAM_UNIT = u.AA
+OUT_FLUX_DENSITY_UNIT = u.W / u.m**2 / u.Hz
+OUT_FLUX_UNIT = u.W / u.m**2
+PRE_BIN_MODEL = False
+
 # We parse units as text from votables & text files. Stop us getting swamped format with warnings.
 warnings.filterwarnings("ignore", category=UnitsWarning)
 
@@ -40,10 +45,11 @@ def get_filter(svo_name) -> Table:
     table["Norm-Transmission"] = (ftrans - ftrans.min()) / (ftrans.max() - ftrans.min())
 
     # Add metadata on the filter coverage
-    flam = table["Wavelength"].to(u.AA, equivalencies=u.spectral())
-    table.meta["filter_short"] = flam.min()
-    table.meta["filter_long"] = flam.max()
-    table.meta["filter_mid"] = np.median(flam)
+    if table["Wavelength"].unit != OUT_LAM_UNIT:
+        table["Wavelength"] = table["Wavelength"].to(OUT_LAM_UNIT, equivalencies=u.spectral())
+    table.meta["filter_short"] = np.min(table["Wavelength"].quantity)
+    table.meta["filter_long"] = np.max(table["Wavelength"].quantity)
+    table.meta["filter_mid"] = np.median(table["Wavelength"].quantity)
 
     table.sort("Wavelength")
     return table
@@ -66,10 +72,6 @@ filters = { f: get_filter(svoname) for f, svoname in filter_translator.items() }
 # Metadata for the output grid and pre-allocate it
 index_col_names = ["teff", "logg", "metal", "alpha"]    # These are present for every model grid
 col_names = index_col_names + list(filters.keys())
-OUT_LAM_UNIT = u.um                             # u.AA
-OUT_FLUX_DENSITY_UNIT = u.W / u.m**2 / u.Hz     # u.erg / u.s / u.cm**2 / u.AA
-OUT_FLUX_UNIT = u.W / u.m**2                    # u.erg / u.s / u.cm**2
-PRE_BIN_MODEL = True
 filters_short, filters_long = np.inf * OUT_LAM_UNIT, 0 * OUT_LAM_UNIT
 out_grid_conv = np.zeros((len(source_files), len(col_names)), dtype=float)
 
@@ -99,11 +101,11 @@ for file_ix, source_file in enumerate(source_files[:]):
     # "Index" values
     out_grid_conv[file_ix, 0:4] = [metadata[k] for k in index_col_names]
 
-    # Get the data, and then coerce them to CGS units for ease of processing
+    # Get the data, and then coerce them to output units for ease of processing
     lam, flux_density = np.genfromtxt(source_file, dtype=float, comments="#", unpack=True)
-    lam = (lam * metadata["lambda_unit"]).to(u.AA, equivalencies=u.spectral())
-    flux_density = (flux_density * metadata["flux_unit"]).to(u.erg / u.s / u.cm**2 / u.AA,
-                                                         equivalencies=u.spectral_density(lam))
+    lam = (lam * metadata["lambda_unit"]).to(OUT_LAM_UNIT, equivalencies=u.spectral())
+    flux_density = (flux_density * metadata["flux_unit"]).to(OUT_FLUX_DENSITY_UNIT,
+                                                             equivalencies=u.spectral_density(lam))
 
     print(f"{file_ix+1}/{len(source_files)} {source_file.name} [{len(lam):,d} rows]:",
           ", ".join(f"{k}={metadata[k]: .2f}" for k in index_col_names), end="...")
@@ -121,9 +123,9 @@ for file_ix, source_file in enumerate(source_files[:]):
         del lam_bin, lam_bin_edge, lam_bin_half_gap
 
         # Finally calculate the binned fluxes, based on its nominal wavelength
-        fluxes = (binres.statistic << flux_density.unit) * lam
+        fluxes = (binres.statistic << flux_density.unit) * lam.to(u.Hz, equivalencies=u.spectral())
     else:
-        fluxes = flux_density * lam
+        fluxes = (flux_density * lam.to(u.Hz, equivalencies=u.spectral()))
 
     # This is where the magic happens! We need to overlay the filter onto the flux densities to
     # apply its sensitivity, then sum what is transmitted and finally convert to fluxes
@@ -141,13 +143,12 @@ for file_ix, source_file in enumerate(source_files[:]):
             filter_trans = filter_grid["Norm-Transmission"][filter_ol_mask].value
 
             # Apply the filter & calculate overall transmitted flux value
-            interp = np.interp(filter_lam, lam, fluxes / lam)
+            interp = np.interp(filter_lam, lam, fluxes)
             filter_flux = np.sum((interp * filter_trans / np.sum(filter_trans)))
-            filter_flux *= filter_grid.meta["filter_mid"] # from flux density to flux
 
             # # For teff=2000.0, logg=3.5, metal=0.0 and GAIA:Gbp ~ 1.7e-14 erg / s / cm^2
-            # test_flux = ( filter_flux * (1.0 * u.Rsun).to(u.cm)**2) \
-            #             / (190.91243807532035 * u.pc).to(u.cm)**2
+            # test_flux = (( filter_flux * (1.0 * u.Rsun).to(u.cm)**2) \
+            #             / (190.91243807532035 * u.pc).to(u.cm)**2).to(u.erg / u.s / u.cm**2)
 
             out_grid_conv[file_ix, 4 + filter_ix] = \
                                     filter_flux.to(OUT_FLUX_UNIT, equivalencies=u.spectral()).value
