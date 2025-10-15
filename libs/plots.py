@@ -49,15 +49,22 @@ def plot_sed(x: u.Quantity,
 
     fig, ax = plt.subplots(1, 1, figsize=figsize, constrained_layout=True)
 
+    vfv_unit = u.W / u.m**2
     lam = x.to(u.um, equivalencies=u.spectral())
     freq = x.to(u.Hz, equivalencies=u.spectral())
 
     for flux, flux_err, fmt, label in zip(fluxes, flux_errs, fmts, labels):
         vfv, vfv_err = None, None
         if flux is not None:
-            vfv = (freq * flux).to(u.W / u.m**2, equivalencies=u.spectral_density(freq))
+            if flux.unit.is_equivalent(vfv_unit):
+                vfv = flux.to(vfv_unit).to(vfv_unit , equivalencies=u.spectral_density(freq))
+            else:
+                vfv = (flux * freq).to(vfv_unit , equivalencies=u.spectral_density(freq))
         if flux_err is not None:
-            vfv_err = (freq * flux_err).to(u.W / u.m**2, equivalencies=u.spectral_density(freq))
+            if flux_err.unit.is_equivalent(vfv_unit):
+                vfv_err = flux_err.to(vfv_unit , equivalencies=u.spectral_density(freq))
+            else:
+                vfv_err = (freq * flux_err).to(vfv_unit, equivalencies=u.spectral_density(freq))
 
         if vfv is not None:
             ax.errorbar(lam, vfv, vfv_err, fmt=fmt, alpha=0.5, label=label)
