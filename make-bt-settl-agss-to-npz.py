@@ -8,6 +8,7 @@ import warnings
 from urllib.parse import quote_plus
 
 import numpy as np
+from scipy.stats import binned_statistic
 
 from astropy.table import Table
 from astropy.io.votable import parse_single_table
@@ -68,6 +69,7 @@ col_names = index_col_names + list(filters.keys())
 OUT_LAM_UNIT = u.um                             # u.AA
 OUT_FLUX_DENSITY_UNIT = u.W / u.m**2 / u.Hz     # u.erg / u.s / u.cm**2 / u.AA
 OUT_FLUX_UNIT = u.W / u.m**2                    # u.erg / u.s / u.cm**2
+PRE_BIN_MODEL = True
 filters_short, filters_long = np.inf * OUT_LAM_UNIT, 0 * OUT_LAM_UNIT
 out_grid_conv = np.zeros((len(source_files), len(col_names)), dtype=float)
 
@@ -106,40 +108,42 @@ for file_ix, source_file in enumerate(source_files[:]):
     print(f"{file_ix+1}/{len(source_files)} {source_file.name} [{len(lam):,d} rows]:",
           ", ".join(f"{k}={metadata[k]: .2f}" for k in index_col_names), end="...")
 
-    # Bin the lambdas so we can get the data volumes down to something manageable
-    lam_bins = 10**np.arange(np.log10(913), np.log10(320000), 0.003) # Angstrom
-    lam_bins_short, lam_bins_long = lam_bins.min() * u.AA, lam_bins.max() * u.AA
+    if PRE_BIN_MODEL:
+        # Optionally, bin & window the data so we can get the volumes down to something manageable.
+        lam_bin = 10**np.arange(np.log10(913), np.log10(320000), 0.003) # Angstrom
+        lam_bin_half_gap = np.diff(lam_bin) / 2
+        lam_bin_edge = np.concatenate([[lam_bin[0] - (lam_bin_half_gap[0])],
+                                       lam_bin[:-1] + (lam_bin_half_gap),
+                                       [lam_bin[-1] + (lam_bin_half_gap[-1])]])
+        binres = binned_statistic(lam.value, flux_density.value, statistic="mean",
+                                  bins=lam_bin_edge, range=(lam_bin_edge.min(), lam_bin_edge.max()))
+        lam = lam_bin << lam.unit
+        del lam_bin, lam_bin_edge, lam_bin_half_gap
 
-    # Bin the fluxes
-    lam_to_bin_ixs = np.searchsorted(lam_bins, lam, "left")
-    flux_bins = np.zeros_like(lam_bins, dtype=float)
-    for lam_bin_ix in range(len(lam_bins)):
-        lam_ixs = np.where(lam_to_bin_ixs == lam_bin_ix)[0]
-        if len(lam_ixs) > 0:
-            flux_bins[lam_bin_ix] = flux_density[lam_ixs].value.mean()
-
-    # Apply the units and multiply flux density by wavelength to give us the binned fluxes
-    lam_bins = lam_bins << lam.unit
-    flux_bins = (flux_bins << flux_density.unit) * lam_bins
-    del lam, flux_density
-
+        # Finally calculate the binned fluxes, based on its nominal wavelength
+        fluxes = (binres.statistic << flux_density.unit) * lam
+    else:
+        fluxes = flux_density * lam
 
     # This is where the magic happens! We need to overlay the filter onto the flux densities to
     # apply its sensitivity, then sum what is transmitted and finally convert to fluxes
+    lam_short, lam_long = lam.min(), lam.max()
     for filter_ix, (filter_name, filter_grid) in enumerate(filters.items()):
 
         # Work out the lambda range where the filter and binned data overlap
-        ol_lam_short = max(lam_bins_short, filter_grid.meta["filter_short"])
-        ol_lam_long = min(lam_bins_long, filter_grid.meta["filter_long"])
+        ol_lam_short = max(lam_short, filter_grid.meta["filter_short"])
+        ol_lam_long = min(lam_long, filter_grid.meta["filter_long"])
 
         if ol_lam_short < ol_lam_long:
-            lam_filter = filter_grid["Wavelength"].quantity
-            ol_filter = filter_grid[(ol_lam_short <= lam_filter) & (lam_filter <= ol_lam_long)]
-            trans = ol_filter["Norm-Transmission"].value
+            filter_lam = filter_grid["Wavelength"].quantity
+            filter_ol_mask = (ol_lam_short <= filter_lam) & (filter_lam <= ol_lam_long)
+            filter_lam = filter_lam[filter_ol_mask]
+            filter_trans = filter_grid["Norm-Transmission"][filter_ol_mask].value
 
             # Apply the filter & calculate overall transmitted flux value
-            interp = np.interp(ol_filter["Wavelength"].to(u.AA), lam_bins, flux_bins / lam_bins)
-            filter_flux = np.sum((interp * trans / np.sum(trans))) * filter_grid.meta["filter_mid"]
+            interp = np.interp(filter_lam, lam, fluxes / lam)
+            filter_flux = np.sum((interp * filter_trans / np.sum(filter_trans)))
+            filter_flux *= filter_grid.meta["filter_mid"] # from flux density to flux
 
             # # For teff=2000.0, logg=3.5, metal=0.0 and GAIA:Gbp ~ 1.7e-14 erg / s / cm^2
             # test_flux = ( filter_flux * (1.0 * u.Rsun).to(u.cm)**2) \
