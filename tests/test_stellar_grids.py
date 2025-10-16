@@ -43,17 +43,29 @@ class TestBtSettlGrid(unittest.TestCase):
         """ Tests has_filter(name) with various requests """
         model_grid = BtSettlGrid()
 
-        for name, exp_response, msg in [
-            ("GAIA/GAIA3:Gbp",      True,   "test filter name is known"),
-            ("GAIA/GAIA3:Gesso",    False,  "test filter name is unknown"),
+        for name,                           exp_response,   msg in [
+            ("GAIA/GAIA3:Gbp",              True,           "test filter name is known"),
+            ("GAIA/GAIA3:Gesso",            False,          "test filter name is unknown"),
+            # Multiple
+            (["GAIA/GAIA3:Gbp", "Gaia:G"],  [True, True],   "test filters, both known"),
+            (["GAIA/GAIA3:Gbp", "Who?"],    [True, False],  "test filters, one unknown"),
+            (["GAIA/GAIA3:Gbp"],            [True],         "test single known filter in list"),
+            (np.array(["GAIA/GAIA3:Gbp"]),  [True],         "test single known filter in ndarray"),
             # Edge cases
-            ("",                    False,  "test empty name is unknown"),
-            (None,                  False,  "test None name is unknown"),
-            (12,                    False,  "test non-str filter name is unknown"),
+            ("",                            False,          "test empty name is unknown"),
+            (None,                          False,          "test None name is unknown"),
+            (12,                            False,          "test non-str filter name is unknown"),
         ]:
             with self.subTest(msg=msg):
                 response = model_grid.has_filter(name)
-                self.assertEqual(exp_response, response)
+                self.assertIsInstance(response, np.ndarray)
+                self.assertEqual(response.dtype, bool)
+
+                # Call always returns a ndarray, but if single then can be treated like a bool
+                if len(response) == 1:
+                    self.assertTrue(exp_response == response)
+                else:
+                    self.assertListEqual(exp_response, response.tolist())
 
 
     #
@@ -103,7 +115,7 @@ class TestBtSettlGrid(unittest.TestCase):
             # ("GAIA/GAIA3:Gbp",      5000,   4.0,    0.3,    "test different metal"), # not currently in grid
         ]:
             with self.subTest(msg=msg):
-                fluxes = model_sed.get_fluxes(filters, teff, logg, metal, as_quantity=False)
+                fluxes = model_sed.get_filter_fluxes(filters, teff, logg, metal, as_quantity=False)
 
                 xi = (teff, logg, metal)
                 filter_list = model_sed.get_filter_indices([filters] if isinstance(filters, str) else filters)
@@ -123,7 +135,7 @@ class TestBtSettlGrid(unittest.TestCase):
             # ("GAIA/GAIA3:Gbp",      5000,   4.0,    0.15,   "test linear interpolation on metal"), # not currently in grid
         ]:
             with self.subTest(msg=msg):
-                fluxes = model_sed.get_fluxes(filters, teff, logg, metal, as_quantity=False)
+                fluxes = model_sed.get_filter_fluxes(filters, teff, logg, metal, as_quantity=False)
 
                 xi = (teff, logg, metal)
                 filter_list = model_sed.get_filter_indices([filters] if isinstance(filters, str) else filters)
@@ -143,7 +155,7 @@ class TestBtSettlGrid(unittest.TestCase):
             (["GAIA/GAIA3:Gbp", "GAIA/GAIA3:Grp"],  False, "multipls filters / as value"),
         ]:
             with self.subTest(msg=msg):
-                fluxes = model_sed.get_fluxes(filters, 4000, 4.0, 0.0, as_quantity)
+                fluxes = model_sed.get_filter_fluxes(filters, 4000, 4.0, 0.0, as_quantity)
                 self.assertEqual(as_quantity, isinstance(fluxes, u.Quantity))
 
     def test_get_fluxes_unknown_filter_name(self):
@@ -157,7 +169,7 @@ class TestBtSettlGrid(unittest.TestCase):
         ]:
             with self.subTest(msg=msg):
                 with self.assertRaises(ValueError):
-                    model_sed.get_fluxes(filters, **kwargs)
+                    model_sed.get_filter_fluxes(filters, **kwargs)
 
     def test_get_fluxes_unknown_filter_index(self):
         """ Tests get_fluxes() with unknown filter indices -> assert IndexError """
@@ -170,7 +182,7 @@ class TestBtSettlGrid(unittest.TestCase):
         ]:
             with self.subTest(msg=msg):
                 with self.assertRaises(IndexError):
-                    model_sed.get_fluxes(filters, **kwargs)
+                    model_sed.get_filter_fluxes(filters, **kwargs)
 
     def test_get_fluxes_stellar_params_out_of_range(self):
         """ Tests get_fluxes() with Teff, logg or metal outside the model's range -> ValueError """
@@ -183,4 +195,4 @@ class TestBtSettlGrid(unittest.TestCase):
         ]:
             with self.subTest(msg=msg):
                 with self.assertRaises(ValueError):
-                    model_sed.get_fluxes("Gaia:Gbp", teff, logg, metal)
+                    model_sed.get_filter_fluxes("Gaia:Gbp", teff, logg, metal)

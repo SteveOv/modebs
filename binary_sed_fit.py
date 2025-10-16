@@ -112,7 +112,7 @@ if __name__ == "__main__":
 
     # Filter SED to those covered by our models and also remove any outliers
     model_mask = np.ones((len(sed)), dtype=bool)
-    model_mask &= np.array([model_grid.has_filter(f) for f in sed["sed_filter"]])
+    model_mask &= model_grid.has_filter(sed["sed_filter"])
     model_mask &= (sed["sed_wl"] >= min(ext_wl_range)) \
                 & (sed["sed_wl"] <= max(ext_wl_range)) \
                 & (sed["sed_wl"] >= min(model_grid.wavelength_range)) \
@@ -174,14 +174,13 @@ if __name__ == "__main__":
 
     # Quick initial minimize fit
     print()
-    theta_fit, soln = fit_sed.minimize_fit(x, y, y_err, prior_criteria=priors, theta0=theta0,
-                                           fit_mask=fit_mask, flux_func=model_grid.get_fluxes,
-                                           verbose=True)
+    theta_fit, soln = fit_sed.minimize_fit(x, y, y_err, priors, theta0, fit_mask,
+                                           flux_func=model_grid.get_filter_fluxes, verbose=True)
 
     # MCMC fit, starting from where the minimize fit finished
     print()
-    theta_fit, sampler = fit_sed.mcmc_fit(x, y, y_err, prior_criteria=priors, theta0=theta_fit,
-                                          fit_mask=fit_mask, flux_func=model_grid.get_fluxes,
+    theta_fit, sampler = fit_sed.mcmc_fit(x, y, y_err, priors, theta_fit, fit_mask,
+                                          flux_func=model_grid.get_filter_fluxes,
                                           processes=8, progress=True, verbose=True)
 
     tau = sampler.get_autocorr_time(c=5, tol=50, quiet=True)
