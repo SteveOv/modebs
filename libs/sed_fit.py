@@ -1,4 +1,4 @@
-""" TODO """
+""" A module for fitting models to stellar SEDs """
 from typing import Tuple, List, Callable, Union
 from numbers import Number
 from math import floor as _floor

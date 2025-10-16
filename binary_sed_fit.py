@@ -21,7 +21,7 @@ from deblib.stellar import log_g
 from libs.stellar_grids import BtSettlGrid
 from libs.pipeline import get_teff_from_spt
 from libs.sed import get_sed_for_target, create_outliers_mask, group_and_average_fluxes
-from libs import fit_sed
+from libs import sed_fit
 
 if __name__ == "__main__":
     TARGET = "CM Dra"
@@ -144,14 +144,14 @@ if __name__ == "__main__":
 
     # Set up the initial fit position. The fit mask indicates we're only fitting teffs & radii
     print("\nSetting up data for fitting")
-    theta0 = fit_sed.create_theta(teffs=target_data["teffs0"],
+    theta0 = sed_fit.create_theta(teffs=target_data["teffs0"],
                                   radii=[radius] * NUM_STARS,
                                   loggs=[target_data["logg_sys"].n] * NUM_STARS,
                                   dist=dist,
                                   nstars=NUM_STARS,
                                   verbose=True)
 
-    priors = fit_sed.create_prior_criteria(
+    priors = sed_fit.create_prior_criteria(
             teff_limits=tuple(model_grid.teff_range.value),
             radius_limits=(0.1, 100),
             logg_limits=tuple(model_grid.logg_range.value),
@@ -174,12 +174,12 @@ if __name__ == "__main__":
 
     # Quick initial minimize fit
     print()
-    theta_fit, soln = fit_sed.minimize_fit(x, y, y_err, priors, theta0, fit_mask,
+    theta_fit, soln = sed_fit.minimize_fit(x, y, y_err, priors, theta0, fit_mask,
                                            flux_func=model_grid.get_filter_fluxes, verbose=True)
 
     # MCMC fit, starting from where the minimize fit finished
     print()
-    theta_fit, sampler = fit_sed.mcmc_fit(x, y, y_err, priors, theta_fit, fit_mask,
+    theta_fit, sampler = sed_fit.mcmc_fit(x, y, y_err, priors, theta_fit, fit_mask,
                                           flux_func=model_grid.get_filter_fluxes,
                                           processes=8, progress=True, verbose=True)
 
