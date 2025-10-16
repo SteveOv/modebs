@@ -180,7 +180,7 @@ ranges = np.array(key_columns_and_ranges
 filter_map = np.array([(v, k) for k, v in filter_translator.items()],
                       dtype=[("vizier", "<U50"), ("column", "<U50")])
 
-out_file = this_dir / f"libs/data/modelgrids/{out_file_stem}/{out_file_stem}.npz"
+out_file = this_dir / f"libs/data/stellar_grids/{out_file_stem}/{out_file_stem}.npz"
 print(f"Saving model grid and metadata to {out_file}")
 np.savez_compressed(out_file, model_grid_conv=out_grid_conv,
                     units=units, ranges=ranges, filter_map=filter_map)

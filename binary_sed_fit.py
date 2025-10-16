@@ -18,7 +18,7 @@ from dust_extinction.parameter_averages import G23
 from deblib.constants import M_sun, R_sun
 from deblib.stellar import log_g
 
-from libs.pyssed import ModelSed
+from libs.stellar_grids import BtSettlGrid
 from libs.pipeline import get_teff_from_spt
 from libs.sed import get_sed_for_target, create_outliers_mask, group_and_average_fluxes
 from libs import fit_sed
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     TARGET = "CM Dra"
 
     # Read the pre-built bt-settl model file
-    model_sed = ModelSed("libs/data/pyssed/model-bt-settl-recast.dat")
+    model_grid = BtSettlGrid()
 
     # The G23 (Gordon et al., 2023) Milky Way R(V) filter gives us the broadest coverage
     ext_model = G23(Rv=3.1)
@@ -112,11 +112,12 @@ if __name__ == "__main__":
 
     # Filter SED to those covered by our models and also remove any outliers
     model_mask = np.ones((len(sed)), dtype=bool)
-    model_mask &= np.array([model_sed.has_filter(f) for f in sed["sed_filter"]])
+    model_mask &= np.array([model_grid.has_filter(f) for f in sed["sed_filter"]])
     model_mask &= (sed["sed_wl"] >= min(ext_wl_range)) \
                 & (sed["sed_wl"] <= max(ext_wl_range)) \
-                & (sed["sed_wl"] >= min(model_sed.wavelength_range)) \
-                & (sed["sed_wl"] <= max(model_sed.wavelength_range))
+                & (sed["sed_wl"] >= min(model_grid.wavelength_range)) \
+                & (sed["sed_wl"] <= max(model_grid.wavelength_range)) \
+                & (sed["sed_wl"] <= 22 * u.um) # Dirty fix to avoid WISE:W4 which causes problems
     sed = sed[model_mask]
 
     out_mask = create_outliers_mask(sed, target_data["teffs0"], min_unmasked=15, verbose=True)
@@ -142,6 +143,7 @@ if __name__ == "__main__":
                         + [False])              # dist
 
     # Set up the initial fit position. The fit mask indicates we're only fitting teffs & radii
+    print("\nSetting up data for fitting")
     theta0 = fit_sed.create_theta(teffs=target_data["teffs0"],
                                   radii=[radius] * NUM_STARS,
                                   loggs=[target_data["logg_sys"].n] * NUM_STARS,
@@ -150,9 +152,9 @@ if __name__ == "__main__":
                                   verbose=True)
 
     priors = fit_sed.create_prior_criteria(
-            teff_limits=tuple(model_sed.teff_range.value),
+            teff_limits=tuple(model_grid.teff_range.value),
             radius_limits=(0.1, 100),
-            logg_limits=tuple(model_sed.logg_range.value),
+            logg_limits=tuple(model_grid.logg_range.value),
             dist_limits=(dist * 0.99, dist * 1.01),
             teff_ratios=target_data["teff_ratio"].n,
             radius_ratios=target_data["k"].n,
@@ -163,29 +165,24 @@ if __name__ == "__main__":
             nstars=NUM_STARS,
             verbose=True)
 
+    # Get the sed data to be fitted
+    x = model_grid.get_filter_indices(sed["sed_filter"])
+    y = (sed["sed_der_flux"].quantity * sed["sed_freq"].quantity)\
+                                    .to(model_grid.flux_unit, equivalencies=u.spectral()).value
+    y_err = (sed["sed_eflux"].quantity * sed["sed_freq"].quantity)\
+                                    .to(model_grid.flux_unit, equivalencies=u.spectral()).value
+
     # Quick initial minimize fit
     print()
-    theta_fit, soln = fit_sed.minimize_fit(x=model_sed.get_filter_indices(sed["sed_filter"]),
-                                           y=sed["sed_der_flux"].quantity.to(u.Jy).value,
-                                           y_err=sed["sed_eflux"].quantity.to(u.Jy).value,
-                                           prior_criteria=priors,
-                                           theta0=theta0,
-                                           fit_mask=fit_mask,
-                                           flux_func=model_sed.get_fluxes,
+    theta_fit, soln = fit_sed.minimize_fit(x, y, y_err, prior_criteria=priors, theta0=theta0,
+                                           fit_mask=fit_mask, flux_func=model_grid.get_fluxes,
                                            verbose=True)
 
     # MCMC fit, starting from where the minimize fit finished
     print()
-    theta_fit, sampler = fit_sed.mcmc_fit(x=model_sed.get_filter_indices(sed["sed_filter"]),
-                                          y=sed["sed_der_flux"].quantity.to(u.Jy).value,
-                                          y_err=sed["sed_eflux"].quantity.to(u.Jy).value,
-                                          prior_criteria=priors,
-                                          theta0=theta_fit,
-                                          fit_mask=fit_mask,
-                                          flux_func=model_sed.get_fluxes,
-                                          processes=8,
-                                          progress=True,
-                                          verbose=True)
+    theta_fit, sampler = fit_sed.mcmc_fit(x, y, y_err, prior_criteria=priors, theta0=theta_fit,
+                                          fit_mask=fit_mask, flux_func=model_grid.get_fluxes,
+                                          processes=8, progress=True, verbose=True)
 
     tau = sampler.get_autocorr_time(c=5, tol=50, quiet=True)
     burn_in_steps = int(max(np.nan_to_num(tau, copy=True, nan=1000)) * 2)
@@ -197,8 +194,8 @@ if __name__ == "__main__":
     theta_err_low = theta_fit - np.quantile(samples[burn_in_steps:], 0.16, axis=0)
 
     # Output a comparison with known values (assuming we've fitted teffs and radii)
-    print(f"Final parameters for {TARGET} with nominals & 1-sigma error bars from MCMC fit")
-    theta_labels = [("TeffA", model_sed.teff_range.unit), ("TeffB", model_sed.teff_range.unit),
+    print(f"\nFinal parameters for {TARGET} with nominals & 1-sigma error bars from MCMC fit")
+    theta_labels = [("TeffA", model_grid.teff_range.unit), ("TeffB", model_grid.teff_range.unit),
                     ("RA", u.Rsun), ("RB", u.Rsun)]
     for ix, (l, unit) in enumerate(theta_labels):
         known_val = ufloat(target_config.get(l, np.NaN), target_config.get(l + "_err", None) or 0)

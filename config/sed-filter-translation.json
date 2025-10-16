@@ -1,11 +1,11 @@
 {  
     "GAIA/GAIA3:Gbp":       "GAIA/GAIA3.Gbp",
-    "GAIA/GAIA3.G":         "GAIA/GAIA3.G",
-    "GAIA/GAIA3.Grp":       "GAIA/GAIA3.Grp",
+    "GAIA/GAIA3:G":         "GAIA/GAIA3.G",
+    "GAIA/GAIA3:Grp":       "GAIA/GAIA3.Grp",
 
     "GAIA/GAIA2:Gbp":       "GAIA/GAIA2.Gbp",
-    "GAIA/GAIA2.G":         "GAIA/GAIA2.G",
-    "GAIA/GAIA2.Grp":       "GAIA/GAIA2.Grp",
+    "GAIA/GAIA2:G":         "GAIA/GAIA2.G",
+    "GAIA/GAIA2:Grp":       "GAIA/GAIA2.Grp",
 
     "Gaia:G":               "GAIA/GAIA0.G",
 
