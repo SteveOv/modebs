@@ -298,16 +298,16 @@ def mcmc_fit(x: _np.ndarray[float],
                               "100 times the autocorrelation time & the fit has converged.")
                         break
 
-    tau = sampler.get_autocorr_time(c=5, tol=autocor_tol, quiet=True) * thin_by
-    burn_in_steps = int(max(_np.nan_to_num(tau, copy=True, nan=1000)) * 2)
-    samples = sampler.get_chain(discard=burn_in_steps, flat=True)
+        tau = sampler.get_autocorr_time(c=5, tol=autocor_tol, quiet=True) * thin_by
+        burn_in_steps = int(max(_np.nan_to_num(tau, copy=True, nan=1000)) * 2)
+        samples = sampler.get_chain(discard=burn_in_steps, flat=True)
 
-    # Get theta into ufloats with std_dev based on the mean +/- 1-sigma values (where fitted)
-    theta_fit = _uarray(theta0, 0)
-    fitted_noms = _np.median(samples[burn_in_steps:], axis=0)
-    fitted_err_high = _np.quantile(samples[burn_in_steps:], 0.84, axis=0) - fitted_noms
-    fitted_err_low = fitted_noms - _np.quantile(samples[burn_in_steps:], 0.16, axis=0)
-    theta_fit[fit_mask] = _uarray(fitted_noms, _np.mean([fitted_err_high, fitted_err_low], axis=0))
+        # Get theta into ufloats with std_dev based on the mean +/- 1-sigma values (where fitted)
+        theta_fit = _uarray(theta0, 0)
+        fit_nom = _np.median(samples[burn_in_steps:], axis=0)
+        fit_err_high = _np.quantile(samples[burn_in_steps:], 0.84, axis=0) - fit_nom
+        fit_err_low = fit_nom - _np.quantile(samples[burn_in_steps:], 0.16, axis=0)
+        theta_fit[fit_mask] = _uarray(fit_nom, _np.mean([fit_err_high, fit_err_low], axis=0))
 
     if verbose:
         print( "Autocorrelation steps (tau):", ", ".join(f"{t:.3f}" for t in tau))
