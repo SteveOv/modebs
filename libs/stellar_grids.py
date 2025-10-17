@@ -1,7 +1,7 @@
 """ A class for handling the generation of model fluxes for filters sourced from bt-settl data """
 # pylint: disable=no-member
 from abc import ABC as _AbstractBaseClass, abstractmethod as _abstractmethod
-from typing import Union as _Union, Iterable as _Iterable
+from typing import Union as _Union, Tuple as _Tuple, Iterable as _Iterable
 from pathlib import Path as _Path
 from inspect import getsourcefile as _getsourcefile
 from warnings import filterwarnings as _filterwarnings
@@ -12,7 +12,7 @@ from urllib.parse import quote_plus as _quote_plus
 import numpy as _np
 from numpy.typing import ArrayLike as _ArrayLike
 
-# from scipy.stats import binned_statistic as _binned_statistic
+from scipy.stats import binned_statistic as _binned_statistic
 from scipy.interpolate import RegularGridInterpolator as _RegularGridInterpolator
 
 import astropy.units as _u
@@ -188,6 +188,47 @@ class StellarGrid(_AbstractBaseClass):
         # Apply the filter & calculate overall transmitted flux value
         interp = _np.interp(filter_lam, lambdas, fluxes)
         return _np.sum((interp * filter_trans / _np.sum(filter_trans)))
+
+    @classmethod
+    def _bin_fluxes(cls,
+                    lambdas: _ArrayLike,
+                    fluxes: _ArrayLike,
+                    num_bins: int,
+                    window: _Tuple[_u.Quantity, _u.Quantity],
+                    lin_space: bool=False) -> _Tuple[_u.Quantity, _u.Quantity]:
+        """
+        Will bin the means of the lambdas & fluxes into the requested number of bins.
+        By default the bins will be geometrically spaced over the requested window
+        (see https://numpy.org/doc/stable/reference/generated/numpy.geomspace.html).
+
+        :lambdas: source flux wavelengths
+        :fluxes: source fluxes
+        :num_bins: the number of bins to create
+        :over: the window (from, to) over which the bins are to range
+        :lin_space: whether to the bin itervals are linearly (True) or geometrically spaced (False)
+        :returns: a tuple of the binned lambdas and fluxes in the same units as the input
+        """
+        if window.unit != lambdas.unit:
+            window = window.to(lambdas.unit, equivalencies=_u.spectral())
+
+        # Find the bin midpoints.
+        if lin_space:
+            bin_lams = _np.linspace(window[0].value, window[-1].value, num=num_bins, endpoint=True)
+        else:
+            bin_lams = _np.geomspace(window[0].value, window[-1].value, num=num_bins, endpoint=True)
+
+        # Scipy wants bin edges so find midpoints between bins then extend by one at start & end.
+        bin_mid_gaps = _np.diff(bin_lams) / 2
+        bin_edges = _np.concatenate([[bin_lams[0] - (bin_mid_gaps[0])],
+                                    bin_lams[:-1] + (bin_mid_gaps),
+                                    [bin_lams[-1] + (bin_mid_gaps[-1])]])
+
+        result = _binned_statistic(lambdas.value, fluxes.value, statistic=_np.nanmean,
+                                   bins=bin_edges, range=(bin_edges.min(), bin_edges.max()))
+
+        # In case there are empty bins
+        bin_fluxes = _np.nan_to_num(result.statistic, nan=0.0)
+        return bin_lams << lambdas.unit, bin_fluxes << fluxes.unit
 
 
 class BtSettlGrid(StellarGrid):
