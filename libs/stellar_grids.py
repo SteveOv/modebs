@@ -273,6 +273,37 @@ class BtSettlGrid(StellarGrid):
         return values
 
     @classmethod
+    def _get_filtered_flux_total(cls,
+                                 lambdas: _ArrayLike,
+                                 fluxes: _ArrayLike,
+                                 filter_grid: _Table) -> _u.Quantity:
+        """
+        Calculate the total flux across a filter's bandpass.
+
+        :lambdas: the wavelengths of the model fluxes
+        :fluxes: the model fluxes
+        :filter_grid: the grid (as returned by get_filter()) which describes the filter
+        :returns: the summed flux passed through the filter
+        """
+        # Work out the lambda range where the filter and binned data overlap
+        ol_lam_short = max(lambdas.min(), filter_grid.meta["filter_short"])
+        ol_lam_long = min(lambdas.max(), filter_grid.meta["filter_long"])
+
+        if ol_lam_short > ol_lam_long: # No overlap
+            return _np.array([0.0], dtype=float)
+
+        # Get the filter's transmission coeffs in the region it overlaps the fluxes
+        filter_lam = filter_grid["Wavelength"].quantity
+        filter_ol_mask = (ol_lam_short <= filter_lam) & (filter_lam <= ol_lam_long)
+        filter_lam = filter_lam[filter_ol_mask]
+        filter_trans = filter_grid["Norm-Transmission"][filter_ol_mask].value
+
+        # Apply the filter & calculate overall transmitted flux value
+        interp = _np.interp(filter_lam, lambdas, fluxes)
+        return _np.sum((interp * filter_trans / _np.sum(filter_trans)))
+
+
+    @classmethod
     def make_grid_file(cls,
                        source_files: _Iterable,
                        out_file: _Path=_DEF_MODEL_FILE,
@@ -334,12 +365,12 @@ class BtSettlGrid(StellarGrid):
             model_grid_filtered[file_ix, 0:4] = [metadata[k] for k in index_col_names]
 
             # Get the data, and then coerce them to output units for ease of processing
-            lam, flux_density = _np.genfromtxt(source_file, dtype=float, comments="#", unpack=True)
-            lam = (lam * metadata["lambda_unit"]).to(cls._LAM_UNIT, equivalencies=_u.spectral())
-            flux_density = (flux_density * metadata["flux_unit"])\
-                                .to(cls._FLUX_DENSITY_UNIT, equivalencies=_u.spectral_density(lam))
+            lams, flux_dens = _np.genfromtxt(source_file, dtype=float, comments="#", unpack=True)
+            lams = (lams * metadata["lambda_unit"]).to(cls._LAM_UNIT, equivalencies=_u.spectral())
+            flux_dens = (flux_dens * metadata["flux_unit"])\
+                                .to(cls._FLUX_DENSITY_UNIT, equivalencies=_u.spectral_density(lams))
 
-            print(f"{file_ix+1}/{len(source_files)} {source_file.name} [{len(lam):,d} rows]:",
+            print(f"{file_ix+1}/{len(source_files)} {source_file.name} [{len(lams):,d} rows]:",
                     ", ".join(f"{k}={metadata[k]: .2f}" for k in index_col_names), end="...")
 
             # TODO: sample code for binning fluxes to be used when building full (non-filtered grid)
@@ -358,34 +389,20 @@ class BtSettlGrid(StellarGrid):
             # fluxes = (binres.statistic << flux_density.unit) \
             #             * lam.to(_u.Hz, equivalencies=_u.spectral())
 
-            fluxes = (flux_density * lam.to(_u.Hz, equivalencies=_u.spectral()))
+            fluxes = (flux_dens * lams.to(_u.Hz, equivalencies=_u.spectral()))
 
             # This is where the magic happens! We need to overlay the filter onto the flux densities
             # to apply its sensitivity, then sum what is transmitted and finally convert to fluxes
-            lam_short, lam_long = lam.min(), lam.max()
-            for filter_ix, (filter_name, filter_grid) in enumerate(filters.items()):
+            for filter_ix, (filter_name, filter_grid) in enumerate(filters.items()):    # pylint: disable=unused-variable
+                filter_flux = cls._get_filtered_flux_total(lams, fluxes, filter_grid)
+                model_grid_filtered[file_ix, 4 + filter_ix]\
+                                = filter_flux.to(cls._FLUX_UNIT, equivalencies=_u.spectral()).value
 
-                # Work out the lambda range where the filter and binned data overlap
-                ol_lam_short = max(lam_short, filter_grid.meta["filter_short"])
-                ol_lam_long = min(lam_long, filter_grid.meta["filter_long"])
+                # # For teff=2000.0, logg=3.5, metal=0.0 and GAIA:Gbp ~ 1.7e-14 erg / s / cm^2
+                # test_flux = (( filter_flux * (1.0 * u.Rsun).to(u.cm)**2) \
+                #         / (190.91243807532035 * u.pc).to(u.cm)**2).to(u.erg / u.s / u.cm**2)
 
-                if ol_lam_short < ol_lam_long:
-                    filter_lam = filter_grid["Wavelength"].quantity
-                    filter_ol_mask = (ol_lam_short <= filter_lam) & (filter_lam <= ol_lam_long)
-                    filter_lam = filter_lam[filter_ol_mask]
-                    filter_trans = filter_grid["Norm-Transmission"][filter_ol_mask].value
-
-                    # Apply the filter & calculate overall transmitted flux value
-                    interp = _np.interp(filter_lam, lam, fluxes)
-                    filter_flux = _np.sum((interp * filter_trans / _np.sum(filter_trans)))
-
-                    # # For teff=2000.0, logg=3.5, metal=0.0 and GAIA:Gbp ~ 1.7e-14 erg / s / cm^2
-                    # test_flux = (( filter_flux * (1.0 * u.Rsun).to(u.cm)**2) \
-                    #         / (190.91243807532035 * u.pc).to(u.cm)**2).to(u.erg / u.s / u.cm**2)
-
-                    model_grid_filtered[file_ix, 4 + filter_ix] = \
-                                filter_flux.to(cls._FLUX_UNIT, equivalencies=_u.spectral()).value
-
+                if filter_flux.value:
                     # Record the maximum extent of the filter coverage
                     filters_short = min(filters_short, filter_grid.meta["filter_short"])
                     filters_long = max(filters_long, filter_grid.meta["filter_long"])
