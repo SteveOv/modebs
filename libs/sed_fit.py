@@ -282,12 +282,12 @@ def mcmc_fit(x: _np.ndarray[float],
             f"{thin_by}, on {processes}" if processes else f"up to {_cpu_count()}", "process(es).",
             f"Early stopping is enabled after {min_steps_es:d} steps." if early_stopping else "")
         sampler = EnsembleSampler(int(nwalkers), ndim, _objective_func, pool=pool)
-
+        step = 0
         for _ in sampler.sample(initial_state=p0, iterations=nsteps // thin_by,
                                 thin_by=thin_by, tune=True, progress=progress):
-
-            if (step := sampler.iteration * thin_by) > min_steps_es and step % 1000 == 0:
-                if early_stopping:
+            if early_stopping:
+                step = sampler.iteration * thin_by
+                if step > min_steps_es and step % 1000 == 0:
                     # The autocor time (tau) is the steps to effectively forget start position.
                     # As the fit converges the change in tau will tend towards zero.
                     prev_tau = tau
@@ -295,9 +295,11 @@ def mcmc_fit(x: _np.ndarray[float],
                     if not any(_np.isnan(tau)) \
                             and all(tau < step / 100) \
                             and all(abs(prev_tau - tau) / prev_tau < 0.01):
-                        print(f"Halting MCMC after {step:,} steps as the walkers are past",
-                              "100 times the autocorrelation time & the fit has converged.")
                         break
+
+        if early_stopping and 0 < step < nsteps:
+            print(f"Halting MCMC after {step:d} steps as the walkers are past",
+                  "100 times the autocorrelation time & the fit has converged.")
 
         tau = sampler.get_autocorr_time(c=5, tol=autocor_tol, quiet=True) * thin_by
         burn_in_steps = int(max(_np.nan_to_num(tau, copy=True, nan=1000)) * 2)

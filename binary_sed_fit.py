@@ -184,7 +184,7 @@ if __name__ == "__main__":
     print()
     theta_mcmc, _ = sed_fit.mcmc_fit(x, y, y_err, theta_min, fit_mask,
                                      ln_prior_func=ln_prior_func, stellar_grid=model_grid,
-                                     processes=8, progress=True, verbose=True)
+                                     processes=8, early_stopping=True, progress=True, verbose=True)
 
     # Output a comparison with known values (assuming we've fitted teffs and radii)
     print(f"\nFinal parameters for {TARGET} with nominals & 1-sigma error bars from MCMC fit")
