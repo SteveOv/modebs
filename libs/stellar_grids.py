@@ -159,6 +159,35 @@ class StellarGrid(_AbstractBaseClass):
         table.sort("Wavelength")
         return table
 
+    @classmethod
+    def _get_filtered_flux_total(cls,
+                                 lambdas: _ArrayLike,
+                                 fluxes: _ArrayLike,
+                                 filter_table: _Table) -> _u.Quantity:
+        """
+        Calculate the total flux across a filter's bandpass.
+
+        :lambdas: the wavelengths of the model fluxes
+        :fluxes: the model fluxes
+        :filter_grid: the grid (as returned by get_filter()) which describes the filter
+        :returns: the summed flux passed through the filter
+        """
+        # Work out the lambda range where the filter and binned data overlap
+        ol_lam_short = max(lambdas.min(), filter_table.meta["filter_short"])
+        ol_lam_long = min(lambdas.max(), filter_table.meta["filter_long"])
+
+        if ol_lam_short > ol_lam_long: # No overlap; no flux
+            return 0.0 * fluxes.unit
+
+        # Get the filter's transmission coeffs in the region it overlaps the fluxes
+        filter_lam = filter_table["Wavelength"].quantity
+        filter_ol_mask = (ol_lam_short <= filter_lam) & (filter_lam <= ol_lam_long)
+        filter_lam = filter_lam[filter_ol_mask]
+        filter_trans = filter_table["Norm-Transmission"][filter_ol_mask].value
+
+        # Apply the filter & calculate overall transmitted flux value
+        interp = _np.interp(filter_lam, lambdas, fluxes)
+        return _np.sum((interp * filter_trans / _np.sum(filter_trans)))
 
 
 class BtSettlGrid(StellarGrid):
@@ -272,36 +301,6 @@ class BtSettlGrid(StellarGrid):
             return values << self.flux_unit
         return values
 
-    @classmethod
-    def _get_filtered_flux_total(cls,
-                                 lambdas: _ArrayLike,
-                                 fluxes: _ArrayLike,
-                                 filter_grid: _Table) -> _u.Quantity:
-        """
-        Calculate the total flux across a filter's bandpass.
-
-        :lambdas: the wavelengths of the model fluxes
-        :fluxes: the model fluxes
-        :filter_grid: the grid (as returned by get_filter()) which describes the filter
-        :returns: the summed flux passed through the filter
-        """
-        # Work out the lambda range where the filter and binned data overlap
-        ol_lam_short = max(lambdas.min(), filter_grid.meta["filter_short"])
-        ol_lam_long = min(lambdas.max(), filter_grid.meta["filter_long"])
-
-        if ol_lam_short > ol_lam_long: # No overlap
-            return _np.array([0.0], dtype=float)
-
-        # Get the filter's transmission coeffs in the region it overlaps the fluxes
-        filter_lam = filter_grid["Wavelength"].quantity
-        filter_ol_mask = (ol_lam_short <= filter_lam) & (filter_lam <= ol_lam_long)
-        filter_lam = filter_lam[filter_ol_mask]
-        filter_trans = filter_grid["Norm-Transmission"][filter_ol_mask].value
-
-        # Apply the filter & calculate overall transmitted flux value
-        interp = _np.interp(filter_lam, lambdas, fluxes)
-        return _np.sum((interp * filter_trans / _np.sum(filter_trans)))
-
 
     @classmethod
     def make_grid_file(cls,
@@ -393,8 +392,8 @@ class BtSettlGrid(StellarGrid):
 
             # This is where the magic happens! We need to overlay the filter onto the flux densities
             # to apply its sensitivity, then sum what is transmitted and finally convert to fluxes
-            for filter_ix, (filter_name, filter_grid) in enumerate(filters.items()):    # pylint: disable=unused-variable
-                filter_flux = cls._get_filtered_flux_total(lams, fluxes, filter_grid)
+            for filter_ix, (filter_name, filter_table) in enumerate(filters.items()):    # pylint: disable=unused-variable
+                filter_flux = cls._get_filtered_flux_total(lams, fluxes, filter_table)
                 model_grid_filtered[file_ix, 4 + filter_ix]\
                                 = filter_flux.to(cls._FLUX_UNIT, equivalencies=_u.spectral()).value
 
@@ -404,8 +403,8 @@ class BtSettlGrid(StellarGrid):
 
                 if filter_flux.value:
                     # Record the maximum extent of the filter coverage
-                    filters_short = min(filters_short, filter_grid.meta["filter_short"])
-                    filters_long = max(filters_long, filter_grid.meta["filter_long"])
+                    filters_short = min(filters_short, filter_table.meta["filter_short"])
+                    filters_long = max(filters_long, filter_table.meta["filter_long"])
 
             print(f"added row of {len(filters)} total filter fluxes")
 
