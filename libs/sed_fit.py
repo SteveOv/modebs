@@ -1,4 +1,4 @@
-""" A module for fitting models to stellar SEDs """
+""" A module for fitting stellar model fluxes for multiple stars to stellar SEDs """
 from typing import Tuple, List, Callable, Union
 from numbers import Number
 from math import floor as _floor
@@ -21,8 +21,7 @@ from astropy.constants import iau2015 as _iau2015
 from uncertainties import UFloat as _UFloat
 from uncertainties.unumpy import nominal_values as _noms, std_devs as _std_devs
 
-
-# pylint: disable=line-too-long, no-member
+# pylint: disable=too-many-arguments, too-many-positional-arguments, too-many-locals, no-member
 pc = (1 * _u.pc).to(_u.m).value
 R_sun = _iau2015.R_sun.to(_u.m).value
 
@@ -30,11 +29,9 @@ R_sun = _iau2015.R_sun.to(_u.m).value
 # GLOBALS which will be set by (minimize|mcmc)_fit prior to fitting. Hateful things!
 # Unfortunately this is how we get fast MCMC, as the way emcee works makes
 # using a class or passing these between functions in args way too sloooow!
-# The code expects _fixed_theta, _fit_mask & each row of _prior_criteria to be the same size, so
-# masks & indices apply equally to all three arrays making code within iterations simple & quick.
+# The code expects _fixed_theta and _fit_mask to be the same size.
 _fixed_theta: _np.ndarray[float]
 _fit_mask: _np.ndarray[bool]
-_prior_criteria: _np.ndarray[float]
 _x: _np.ndarray[float]
 _y: _np.ndarray[float]
 _weights: _np.ndarray[float]
