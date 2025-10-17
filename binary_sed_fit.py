@@ -182,26 +182,15 @@ if __name__ == "__main__":
 
     # MCMC fit, starting from where the minimize fit finished
     print()
-    thin_by = 10
-    theta_fit, sampler = sed_fit.mcmc_fit(x, y, y_err, theta_min, fit_mask,
-                                          ln_prior_func=ln_prior_func,
-                                          flux_func=model_grid.get_filter_fluxes,
-                                          thin_by=thin_by, processes=8, progress=True)
-
-    tau = sampler.get_autocorr_time(c=5, tol=50, quiet=True) * thin_by
-    burn_in_steps = int(max(np.nan_to_num(tau, copy=True, nan=1000)) * 2)
-
-    # Gets the median fitted values and 1-sigma uncertainties for the fitted parameters
-    samples = sampler.get_chain(discard=burn_in_steps, flat=True)
-    theta_fit = np.median(samples[burn_in_steps:], axis=0)
-    theta_err_high = np.quantile(samples[burn_in_steps:], 0.84, axis=0) - theta_fit
-    theta_err_low = theta_fit - np.quantile(samples[burn_in_steps:], 0.16, axis=0)
+    theta_mcmc, _ = sed_fit.mcmc_fit(x, y, y_err, theta_min, fit_mask,
+                                     ln_prior_func=ln_prior_func,
+                                     flux_func=model_grid.get_filter_fluxes,
+                                     processes=8, progress=True, verbose=True)
 
     # Output a comparison with known values (assuming we've fitted teffs and radii)
     print(f"\nFinal parameters for {TARGET} with nominals & 1-sigma error bars from MCMC fit")
     theta_labels = [("TeffA", model_grid.teff_range.unit), ("TeffB", model_grid.teff_range.unit),
                     ("RA", u.Rsun), ("RB", u.Rsun)]
-    for ix, (l, unit) in enumerate(theta_labels):
-        known_val = ufloat(target_config.get(l, np.NaN), target_config.get(l + "_err", None) or 0)
-        print(f"{l:>12s} = {theta_fit[ix]:.3f} +/- {theta_err_high[ix]:.3f}/{theta_err_low[ix]:.3f}",
-            f"{unit:unicode} (known value {known_val:.3f} {unit:unicode})")
+    for (param, unit), fit in zip(theta_labels, theta_mcmc[fit_mask]):
+        known = ufloat(target_config.get(param, np.NaN), target_config.get(param+"_err", None) or 0)
+        print(f"{param:>12s} = {fit:.3f} {unit:unicode} (known value {known:.3f} {unit:unicode})")

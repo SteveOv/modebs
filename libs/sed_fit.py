@@ -19,7 +19,7 @@ import astropy.units as _u
 from astropy.constants import iau2015 as _iau2015
 
 from uncertainties import UFloat as _UFloat
-from uncertainties.unumpy import nominal_values as _noms, std_devs as _std_devs
+from uncertainties.unumpy import uarray as _uarray
 
 # pylint: disable=too-many-arguments, too-many-positional-arguments, too-many-locals, no-member
 pc = (1 * _u.pc).to(_u.m).value
@@ -224,7 +224,7 @@ def mcmc_fit(x: _np.ndarray[float],
              processes: int=1,
              early_stopping: bool=True,
              progress: Union[bool, str]=False,
-             verbose: bool=False) -> Tuple[_np.ndarray[float], EnsembleSampler]:
+             verbose: bool=False) -> Tuple[_np.ndarray[_UFloat], EnsembleSampler]:
     """
     Full fit model star(s) to the SED with an MCMC fit of the model data generated from
     a combination of the fixed params on class iniialization and the fitted ones given here.
@@ -246,8 +246,7 @@ def mcmc_fit(x: _np.ndarray[float],
     :processes: optional number of parallel processes to use, or None to let code choose
     :progress: whether to show a progress bar (see emcee documentation for other values)
     :early_stopping: stop fitting if solution has converged & further improvements are negligible
-    :returns: the final set of parameters (nominals only) and an emcee EnsembleSampler with the
-    details of the outcome
+    :returns: fitted set of parameters as UFloats and an EnsembleSampler with details of the outcome
     """
     if verbose:
         _print_theta(theta0, fit_mask, "mcmc_fit(theta0=", ")")
@@ -302,17 +301,21 @@ def mcmc_fit(x: _np.ndarray[float],
     tau = sampler.get_autocorr_time(c=5, tol=autocor_tol, quiet=True) * thin_by
     burn_in_steps = int(max(_np.nan_to_num(tau, copy=True, nan=1000)) * 2)
     samples = sampler.get_chain(discard=burn_in_steps, flat=True)
-    theta_fit = _np.median(samples[burn_in_steps:], axis=0)
 
-    theta0[fit_mask] = theta_fit
+    # Get theta into ufloats with std_dev based on the mean +/- 1-sigma values (where fitted)
+    theta_fit = _uarray(theta0, 0)
+    fitted_noms = _np.median(samples[burn_in_steps:], axis=0)
+    fitted_err_high = _np.quantile(samples[burn_in_steps:], 0.84, axis=0) - fitted_noms
+    fitted_err_low = fitted_noms - _np.quantile(samples[burn_in_steps:], 0.16, axis=0)
+    theta_fit[fit_mask] = _uarray(fitted_noms, _np.mean([fitted_err_high, fitted_err_low], axis=0))
 
     if verbose:
         print( "Autocorrelation steps (tau):", ", ".join(f"{t:.3f}" for t in tau))
         print(f"Estimated burn-in steps:     {int(max(_np.nan_to_num(tau, nan=1000)) * 2):,}")
         print(f"Mean Acceptance fraction:    {_np.mean(sampler.acceptance_fraction):.3f}")
-        _print_theta(theta0, fit_mask, "Nominals of fitted theta:    ")
+        _print_theta(theta_fit, fit_mask, "The MCMC fit yielded theta:  ")
 
-    return theta0, sampler
+    return theta_fit, sampler
 
 
 def create_theta(teffs: Union[List[float], float],
