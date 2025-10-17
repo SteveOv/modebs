@@ -38,50 +38,11 @@ _prior_criteria: _np.ndarray[float]
 _x: _np.ndarray[float]
 _y: _np.ndarray[float]
 _weights: _np.ndarray[float]
+_ln_prior_func: Callable[[_np.ndarray[float]], float]
 _flux_func: Callable[[_np.ndarray[float], float, float], _np.ndarray]
 
 # Try to protect them as much as possible by wrapping writes within a critical section
 _fit_mutex = _Lock()
-
-
-def _ln_prior_func(theta: _np.ndarray[float]) -> float:
-    """
-    The fitting prior function which evaluate the current set of candidate parameters (theta)
-    against the prior criteria and returns a single value indicating the goodness of the parameters.
-
-    Accesses the following global variables which will be set by call to (minimize|mcmc)_fit()
-    - _fit_nask: mask to select those members of theta which are fitted
-    - _prior_criteria: limits and ratio +/- sigma criteria with rows indices corresponding to theta
-        - _prior_criteria[0] are limits, each a tuple of (low, high)
-        - _prior_criteria[1] are ratio nominal (float) values
-        - _prior_criteria[2] are ratio sigma (float) values
-
-    :theta: the full set of parameters from which to generate model fluxes
-    :returns: a single negative value indicating the goodness of this set of parameters 
-    """
-    # Limit criteria checks - hard pass/fail on these
-    if not all(lim[0] < th < lim[1] for th, lim in zip(theta[_fit_mask],
-                                                       _prior_criteria[0][_fit_mask])):
-        return -_np.inf
-
-    # With 3 params per star + dist the #stars is...
-    nstars = (theta.shape[0] - 1) // 3
-    if nstars < 2: # no ratios
-        return 0
-
-    # Check the ratio wherever a companion value is fitted, or if the primary value is fitted then
-    # check all companions for the parameter type (i.e. rad0 is fitted all ratio of radii checked).
-
-    # These indices apply equally across theta, _fit_mask and each type of _prior_criteria.
-    comp_ixs = [ix for ix, _ in enumerate(theta) if ix % nstars != 0]       # omit the primaries
-    prim_ixs = [int(_np.floor(ix / nstars) * nstars) for ix in comp_ixs]    # primary for each comp
-
-    # Gaussian priors: g(x) = 1/(σ*sqrt(2*pi)) * exp(-1/2 * (x-µ)^2/σ^2)
-    # Omitting scaling expressions for now and note the implicit ln cancelling the exp
-    return -0.5 * _np.sum([
-        ((theta[cix] / theta[pix] - _prior_criteria[1][cix]) / _prior_criteria[2][cix])**2
-                    for pix, cix in zip(prim_ixs, comp_ixs) if _fit_mask[pix] or _fit_mask[cix]
-    ])
 
 
 def _ln_likelihood_func(y_model: _np.ndarray[float], degrees_of_freedom: int) -> float:
@@ -100,7 +61,7 @@ def _ln_likelihood_func(y_model: _np.ndarray[float], degrees_of_freedom: int) ->
     :returns: the goodness of the fit
     """
     chisq = _np.sum(_weights * (_y - y_model)**2) / degrees_of_freedom
-    return -0.5 * chisq
+    return 0.5 * chisq
 
 
 def model_func(theta: _np.ndarray[float],
@@ -161,9 +122,9 @@ def _objective_func(fit_theta: _np.ndarray[float], minimizable: bool=False) -> f
         degr_freedom = y_model.shape[0] - fit_theta.shape[0]
         retval += _ln_likelihood_func(y_model, degr_freedom)
 
-        _np.nan_to_num(retval, copy=False, nan=-_np.inf)
+        _np.nan_to_num(retval, copy=False, nan=_np.inf)
 
-    if minimizable:
+    if minimizable != (retval >= 0):
         return -retval
     return retval
 
@@ -183,9 +144,9 @@ def _print_theta(theta: _np.ndarray[float],
 def minimize_fit(x: _np.ndarray[float],
                  y: _np.ndarray[float],
                  y_err: _np.ndarray[float],
-                 prior_criteria: _np.ndarray[float],
                  theta0: _np.ndarray[float],
                  fit_mask: _np.ndarray[float],
+                 ln_prior_func: Callable[[_np.ndarray[float]], float],
                  flux_func: Callable[[_np.ndarray[float], float, float], _np.ndarray[float]],
                  methods: List[str]=None,
                  verbose: bool=False) -> Tuple[_np.ndarray[float], OptimizeResult]:
@@ -200,6 +161,7 @@ def minimize_fit(x: _np.ndarray[float],
     :prior_criteria: the criteria for limits and ratios used in evaluating theta against priors
     :theta0: the initial set of candidate parameters for the model SED
     :fit_mask: a mask on theta0 to pick the parameters that are fitted, the rest being fixed
+    :ln_prior_func:
     :flux_func: the function, with form func(x, teff, logg), called to generate fluxes
     :methods: scipy optimize fitting algorithms to try, defaults to [Nelder-Mead, SLSQP, None]
     :returns: the final set of parameters & a scipy OptimizeResult with the details of the outcome
@@ -221,10 +183,10 @@ def minimize_fit(x: _np.ndarray[float],
 
         # Now we've got exclusive access, we can set the globals required for fitting
         # pylint: disable=global-statement
-        global _x, _y, _weights, _fixed_theta, _fit_mask, _prior_criteria, _flux_func
+        global _x, _y, _weights, _fixed_theta, _fit_mask, _ln_prior_func, _flux_func
         _x, _y, _weights = x, y, 1 / y_err**2
         _fixed_theta, _fit_mask = _np.where(fit_mask, None, theta0), fit_mask
-        _prior_criteria, _flux_func = prior_criteria, flux_func
+        _ln_prior_func, _flux_func = ln_prior_func, flux_func
 
         the_soln, the_meth = None, None
         for method in methods:
@@ -254,9 +216,9 @@ def minimize_fit(x: _np.ndarray[float],
 def mcmc_fit(x: _np.ndarray[float],
              y: _np.ndarray[float],
              y_err: _np.ndarray[float],
-             prior_criteria: _np.ndarray[float],
              theta0: _np.ndarray[float],
              fit_mask: _np.ndarray[bool],
+             ln_prior_func: Callable[[_np.ndarray[float]], float],
              flux_func: Callable[[_np.ndarray[float], float, float], _np.ndarray[float]],
              nwalkers: int=100,
              nsteps: int=100000,
@@ -276,9 +238,9 @@ def mcmc_fit(x: _np.ndarray[float],
     :x: the wavelength/filter values for the observed SED data
     :y: the flux values, at x, for the observed SED data
     :y_err: the flux error bars, at x, for the observed SED data
-    :prior_criteria: the criteria for limits and ratios used in evaluating theta against priors
     :theta0: the initial set of candidate parameters for the model SED
     :fit_mask: a mask on theta0 to pick the parameters that are fitted, the rest being fixed
+    :ln_prior_func:
     :flux_func: the function, with form func(x, teff, logg), called to generate fluxes
     :nwalker: the number of mcmc walkers to employ
     :nsteps: the maximium number of mcmc steps to make for each walker
@@ -311,10 +273,10 @@ def mcmc_fit(x: _np.ndarray[float],
 
         # Now we've got exclusive access, we can set the globals required for fitting
         # pylint: disable=global-statement
-        global _x, _y, _weights, _fixed_theta, _fit_mask, _prior_criteria, _flux_func
+        global _x, _y, _weights, _fixed_theta, _fit_mask, _ln_prior_func, _flux_func
         _x, _y, _weights = x, y, 1 / y_err**2
         _fixed_theta, _fit_mask = _np.where(fit_mask, None, theta0), fit_mask
-        _prior_criteria, _flux_func = prior_criteria, flux_func
+        _ln_prior_func, _flux_func = ln_prior_func, flux_func
 
         # Min steps required by Autocorr algo to avoid a warn msg (not a warning so can't filter)
         min_steps_es = int(50 * autocor_tol * thin_by)
@@ -356,130 +318,6 @@ def mcmc_fit(x: _np.ndarray[float],
     return theta0, sampler
 
 
-def create_prior_criteria(
-        teff_limits: Union[List[Tuple[float, float]], Tuple[float, float]]=(2000, 20000),
-        radius_limits: Union[List[Tuple[float, float]], Tuple[float, float]]=(0.1, 100),
-        logg_limits: Union[List[Tuple[float, float]], Tuple[float, float]]=(0.0, 5.0),
-        dist_limits: Tuple[float, float]=(0.0, _np.inf),
-        teff_ratios: Union[List[float], float]=None,
-        radius_ratios: Union[list[float], float]=None,
-        logg_ratios: Union[list[float], float]=None,
-        teff_ratio_sigmas: Union[List[float], float]=None,
-        radius_ratio_sigmas: Union[List[float], float]=None,
-        logg_ratio_sigmas: Union[List[float], float]=None,
-        nstars: int=2,
-        verbose: bool=False) -> _np.ndarray:
-    """
-    Will validate the teffs, radii, loggs and dist criteria and create the prior_criteria array
-    from them. This will be in the format of a NDarray of shape (3, #items) where #items is
-    nstars*3+1 which breaks dowm as one per the teff, radius and logg for each star + one for the
-    whole system distance. With this approach, indices onto fixed_theta are directly applicable to
-    the corresponding criteria.
-
-    Note: these criteria are only evaluated on fitted values; they're ignored for fixed values
-
-    The criteria array will have the following general form:
-    ```python
-    np.ndarray([
-        [(teff0_lo,hi),...,(teffN_lo,hi),(rad0_lo,hi),...,(radN_lo,hi),(logg0_lo,hi),...,(loggN_lo,hi),(dist_lo,hi)],
-        [1, teff1_rat,...,teffN_rat, 1, rad1_rat,...,radN_rat, 1, logg1_rat,...,loggN_rat, 1],
-        [0, teff1_sig,...,teffN_sig, 0, rad1_sig,...,radN_sig, 0, logg1_sig,...,loggN_sig, 0],
-    ])
-    ```
-    where N is nstars - 1.
-
-    The teff|radius|logg _ratios and _ratio_sigmas can be provided through the corresponding args.
-    The ratio args will accept UFloats with the sigmas taken from the UFloats' std_dev attribute,
-    however these will be overridden by any values in the corresponding _ratio_sigmas args.
-
-    :teff_limits: (low, high) tuples for the T_eff limits for each star, or one tuple for all
-    :radius_limits: (low, high) tuples for the radius limits for each star, or one tuple for all
-    :logg_limits: (low, high) tuples for the log(g) limits for each star, or one tuple for all
-    :dist_limit: (low, high) tuple for the distance limits for all stars
-    :teff_ratios: the T_eff ratio criteria for each companion star
-    :radius_ratios: the radius ratio criteria for each companion star
-    :logg_ratios: the log(g) ratio criteria for each companion star
-    :teff_ratio_sigmas: the T_eff ratio sigma criteria for each companion star
-    :radius_ratio_sigmas: the radius ratio sigma criteria for each companion star
-    :logg_ratio_sigmas: the log(g) ratio sigma criteria for each companion star
-    :returns: the fully built up set of criteria usable by the (minimize|mcmc)_fit functions
-    """
-    criteria = _np.empty((3, nstars*3 + 1), dtype=object)
-
-    def to_limit_tuple(tval, name, i=None) -> Tuple[float, float]:
-        if isinstance(tval, Number):
-            return (0., tval)
-        if isinstance(tval, Tuple) and len(tval) > 0:
-            return (0., tval[0]) if len(tval) == 1 else tuple(tval[:2])
-        src = f"{name}[{i if i is not None else ''}]"
-        raise ValueError(f"{src}=={tval} cannot be interpreted as a Tuple(low, high)")
-
-    # Build the limits array; will have form [(low0, high0), ..., (lown, highn)]
-    limit_list = []
-    for cix, (name, val) in enumerate([("teff_limits", teff_limits),
-                                        ("radius_limits", radius_limits),
-                                        ("logg_limits", logg_limits),
-                                        ("dist_limits", dist_limits)]):
-        exp_ct = nstars if cix < 3 else 1
-
-        # Attempt to interpret the value as a List[(lower, upper)] * exp_ct
-        if isinstance(val, Number|Tuple):
-            limit_list += [to_limit_tuple(val, name)] * exp_ct
-        elif isinstance(val, List|_np.ndarray) \
-                    and len(val) == exp_ct and all(isinstance(v, Number|Tuple) for v in val):
-            limit_list += [to_limit_tuple(v, name, vix) for vix, v in enumerate(val)]
-        else:
-            raise ValueError(f"{name}=={val} can't be interpreted as List[(low,high)]*{exp_ct}")
-
-    # Build the ratio arrays into the following form. The 1s & 0s are for the primary component.
-    # We expect actual ratios for each companion component, so +1 for a binary, +2 for a triple.
-    rat_list = [1] * criteria.shape[1]
-    sig_list = [0] * criteria.shape[1]
-    cix = 0
-    for name, rat_val, sig_val in [("teff", teff_ratios, teff_ratio_sigmas),
-                                    ("radius", radius_ratios, radius_ratio_sigmas),
-                                    ("logg", logg_ratios, logg_ratio_sigmas)]:
-        cix += 1            # Skip the first item for this param - it's the primary component
-        exp_ct = nstars - 1 # so the ratio will always be prim/prim == 1 +/- 0
-
-        # Two ways of getting sigmas; either as sd of ufloat ratio or from sigma arg (overrides)
-        if rat_val is None:
-            pass
-        elif isinstance(rat_val, Number):
-            rat_list[cix : cix + exp_ct] = [rat_val] * exp_ct
-        elif isinstance(rat_val, _UFloat):
-            rat_list[cix : cix + exp_ct] = [rat_val.n] * exp_ct
-            sig_list[cix : cix + exp_ct] = [rat_val.s] * exp_ct
-        elif isinstance(rat_val, List|_np.ndarray) \
-                and len(rat_val) == exp_ct and all(isinstance(v, Number) for v in rat_val):
-            rat_list[cix : cix + exp_ct] = [v for v in rat_val]
-        elif isinstance(rat_val, List|_np.ndarray) \
-                and len(rat_val) == exp_ct and all(isinstance(v, _UFloat) for v in rat_val):
-            rat_list[cix : cix + exp_ct] = [v for v in _noms(rat_val)]
-            sig_list[cix : cix + exp_ct] = [v for v in _std_devs(rat_val)]
-        else:
-            raise ValueError(f"{name}_ratios=={rat_val} cannot be interpreted as List[float]*{exp_ct}")
-
-        if sig_val is None:
-            pass
-        elif isinstance(sig_val, Number):
-            sig_list[cix : cix + exp_ct] = [sig_val] * exp_ct
-        elif isinstance(sig_val, List|_np.ndarray) \
-                and len(sig_val) == exp_ct and all(isinstance(v, Number|None) for v in sig_val):
-            sig_list[cix : cix + exp_ct] = [v for v in sig_val]
-        else:
-            raise ValueError(f"{name}_ratio_sigmas=={sig_val} cannot be interpreted as List[float]*{exp_ct}")
-
-        cix += exp_ct
-
-    criteria[:, :] = [limit_list, rat_list, sig_list]
-    if verbose:
-        for ix, crit in enumerate(criteria):
-            print(f"prior_criteria[{ix}]: ",
-                  ", ".join(f"{c:.3e}" if isinstance(c, Number) else f"{c}" for c in crit))
-    return criteria
-
-
 def create_theta(teffs: Union[List[float], float],
                  radii: Union[List[float], float],
                  loggs: Union[List[float], float],
@@ -487,8 +325,8 @@ def create_theta(teffs: Union[List[float], float],
                  nstars: int=2,
                  verbose: bool=False) -> _np.ndarray[float]:
     """
-    Will validate the teffs, radii, loggs and dist values and create a theta list from them.
-    This is the full set of parameters needed to generate a model SED from nstars components.
+    Helper function to validate the teffs, radii, loggs and dist values and create a theta list from
+    them. This is the full set of parameters needed to generate a model SED from nstars components.
 
     The resulting theta array will have the form:
     ```python

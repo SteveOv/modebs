@@ -26,13 +26,6 @@ from libs import sed_fit
 if __name__ == "__main__":
     TARGET = "CM Dra"
 
-    # Read the pre-built bt-settl model file
-    model_grid = BtSettlGrid()
-
-    # The G23 (Gordon et al., 2023) Milky Way R(V) filter gives us the broadest coverage
-    ext_model = G23(Rv=3.1)
-    ext_wl_range = np.reciprocal(ext_model.x_range) * u.um # x_range has implicit units of 1/micron
-
     targets_config_file = Path("./config/fitting-a-sed-targets.json")
     with open(targets_config_file, mode="r", encoding="utf8") as f:
         full_dict = json.load(f)
@@ -101,13 +94,15 @@ if __name__ == "__main__":
     print(f"      teffs0 = [{', '.join(f'{t:.3f}' for t in target_data['teffs0'])}]")
 
 
+    # Read the pre-built bt-settl model file
+    model_grid = BtSettlGrid()
+
+    # The G23 (Gordon et al., 2023) Milky Way R(V) filter gives us the broadest coverage
+    ext_model = G23(Rv=3.1)
+    ext_wl_range = np.reciprocal(ext_model.x_range) * u.um # x_range has implicit units of 1/micron
 
     # Read in the SED for this target and de-duplicate (measurements may appear multiple times).
-    # Work in Jy rather than W/m^2/Hz as they are a more natural unit, giving values that minimize
-    # potential FP rounding. Plots are agnostic and plot wl [um] and vF(v) [W/m^2] on x and y.
-    sed = get_sed_for_target(TARGET, target_data["search_term"], radius=0.1, remove_duplicates=True,
-                            freq_unit=u.GHz, flux_unit=u.Jy, wl_unit=u.um, verbose=True)
-
+    sed = get_sed_for_target(TARGET, target_data["search_term"], radius=0.1, remove_duplicates=True)
     sed = group_and_average_fluxes(sed, verbose=True)
 
     # Filter SED to those covered by our models and also remove any outliers
@@ -133,37 +128,45 @@ if __name__ == "__main__":
     EBV = 0.000515
     sed["sed_der_flux"] = sed["sed_flux"] / ext_model.extinguish(sed["sed_wl"].to(u.um), Ebv=EBV)
 
-    dist = target_data["skycoords"].distance.to(u.pc).value
-    radius = 0.3
-
     NUM_STARS = 2
     fit_mask = np.array([True] * NUM_STARS      # Teff
                         + [True] * NUM_STARS    # radius
                         + [False] * NUM_STARS   # logg
                         + [False])              # dist
 
+    # For now, hard coded to 2 stars. Same order as theta: teff, radii (, logg, dist are not fitted)
+    teff_limits = model_grid.teff_range.value
+    radius_limits = (0.1, 100)
+    teff_ratio = (target_data["teff_ratio"].n, max(target_data["teff_ratio"].n * 0.05, target_data["teff_ratio"].s))
+    radius_ratio = (target_data["k"].n, max(target_data["k"].n * 0.05, target_data["k"].s))
+
+    def ln_prior_func(theta: np.ndarray[float]) -> float:
+        """
+        The fitting prior callback function to evaluate the current set of candidate
+        parameters (theta), returning a single ln(value) indicating their "goodness".
+        """
+        teffs, radii = theta[0:2], theta[2:4]
+
+        # Limit criteria checks - hard pass/fail on these
+        if not all(teff_limits[0] <= t <= teff_limits[1] for t in teffs) or \
+            not all(radius_limits[0] <= r <= radius_limits[1] for r in radii):
+            return np.inf
+
+        # Gaussian prior criteria: g(x) = 1/(σ*sqrt(2*pi)) * exp(-1/2 * (x-µ)^2/σ^2)
+        # Omitting scaling expressions for now and note the implicit ln() cancelling the exp
+        return 0.5 * np.sum([
+            ((teffs[1] / teffs[0] - teff_ratio[0]) / teff_ratio[1])**2,
+            ((radii[1] / radii[0] - radius_ratio[0]) / radius_ratio[1])**2,
+        ])
+
     # Set up the initial fit position. The fit mask indicates we're only fitting teffs & radii
     print("\nSetting up data for fitting")
     theta0 = sed_fit.create_theta(teffs=target_data["teffs0"],
-                                  radii=[radius] * NUM_STARS,
+                                  radii=[1.0] * NUM_STARS,
                                   loggs=[target_data["logg_sys"].n] * NUM_STARS,
-                                  dist=dist,
+                                  dist=target_data["skycoords"].distance.to(u.pc).value,
                                   nstars=NUM_STARS,
                                   verbose=True)
-
-    priors = sed_fit.create_prior_criteria(
-            teff_limits=tuple(model_grid.teff_range.value),
-            radius_limits=(0.1, 100),
-            logg_limits=tuple(model_grid.logg_range.value),
-            dist_limits=(dist * 0.99, dist * 1.01),
-            teff_ratios=target_data["teff_ratio"].n,
-            radius_ratios=target_data["k"].n,
-            logg_ratios=1.0,
-            teff_ratio_sigmas=max(target_data["teff_ratio"].n * 0.05, target_data["teff_ratio"].s),
-            radius_ratio_sigmas=max(target_data["k"].n * 0.05, target_data["k"].s),
-            logg_ratio_sigmas=0.05,
-            nstars=NUM_STARS,
-            verbose=True)
 
     # Get the sed data to be fitted
     x = model_grid.get_filter_indices(sed["sed_filter"])
@@ -174,16 +177,18 @@ if __name__ == "__main__":
 
     # Quick initial minimize fit
     print()
-    theta_fit, soln = sed_fit.minimize_fit(x, y, y_err, priors, theta0, fit_mask,
-                                           flux_func=model_grid.get_filter_fluxes, verbose=True)
+    theta_min, _ = sed_fit.minimize_fit(x, y, y_err, theta0, fit_mask, ln_prior_func=ln_prior_func,
+                                        flux_func=model_grid.get_filter_fluxes, verbose=True)
 
     # MCMC fit, starting from where the minimize fit finished
     print()
-    theta_fit, sampler = sed_fit.mcmc_fit(x, y, y_err, priors, theta_fit, fit_mask,
+    thin_by = 10
+    theta_fit, sampler = sed_fit.mcmc_fit(x, y, y_err, theta_min, fit_mask,
+                                          ln_prior_func=ln_prior_func,
                                           flux_func=model_grid.get_filter_fluxes,
-                                          processes=8, progress=True, verbose=True)
+                                          thin_by=thin_by, processes=8, progress=True)
 
-    tau = sampler.get_autocorr_time(c=5, tol=50, quiet=True)
+    tau = sampler.get_autocorr_time(c=5, tol=50, quiet=True) * thin_by
     burn_in_steps = int(max(np.nan_to_num(tau, copy=True, nan=1000)) * 2)
 
     # Gets the median fitted values and 1-sigma uncertainties for the fitted parameters
