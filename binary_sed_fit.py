@@ -177,14 +177,13 @@ if __name__ == "__main__":
 
     # Quick initial minimize fit
     print()
-    theta_min, _ = sed_fit.minimize_fit(x, y, y_err, theta0, fit_mask, ln_prior_func=ln_prior_func,
-                                        flux_func=model_grid.get_filter_fluxes, verbose=True)
+    theta_min, _ = sed_fit.minimize_fit(x, y, y_err, theta0, fit_mask, verbose=True,
+                                        ln_prior_func=ln_prior_func, stellar_grid=model_grid)
 
     # MCMC fit, starting from where the minimize fit finished
     print()
     theta_mcmc, _ = sed_fit.mcmc_fit(x, y, y_err, theta_min, fit_mask,
-                                     ln_prior_func=ln_prior_func,
-                                     flux_func=model_grid.get_filter_fluxes,
+                                     ln_prior_func=ln_prior_func, stellar_grid=model_grid,
                                      processes=8, progress=True, verbose=True)
 
     # Output a comparison with known values (assuming we've fitted teffs and radii)

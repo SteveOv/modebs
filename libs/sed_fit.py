@@ -21,6 +21,8 @@ from astropy.constants import iau2015 as _iau2015
 from uncertainties import UFloat as _UFloat
 from uncertainties.unumpy import uarray as _uarray
 
+from libs.stellar_grids import StellarGrid
+
 # pylint: disable=too-many-arguments, too-many-positional-arguments, too-many-locals, no-member
 pc = (1 * _u.pc).to(_u.m).value
 R_sun = _iau2015.R_sun.to(_u.m).value
@@ -36,7 +38,7 @@ _x: _np.ndarray[float]
 _y: _np.ndarray[float]
 _weights: _np.ndarray[float]
 _ln_prior_func: Callable[[_np.ndarray[float]], float]
-_flux_func: Callable[[_np.ndarray[float], float, float], _np.ndarray]
+_stellar_grid: StellarGrid
 
 # Try to protect them as much as possible by wrapping writes within a critical section
 _fit_mutex = _Lock()
@@ -63,7 +65,7 @@ def _ln_likelihood_func(y_model: _np.ndarray[float], degrees_of_freedom: int) ->
 
 def model_func(theta: _np.ndarray[float],
                x: _np.ndarray[float]=None,
-               flux_func: Callable[[_np.ndarray[float], float, float], _np.ndarray[float]]=None,
+               stellar_grid: StellarGrid=None,
                combine: bool=True):
     """
     Generate the model fluxes at points x from the candidate parameters theta.
@@ -72,27 +74,27 @@ def model_func(theta: _np.ndarray[float],
 
     Accesses the following global variables which will be set by call to (minimize|mcmc)_fit()
     - _x: the x points to generate model data for
-    - _flux_func: function to call to generate model fluxes, returning floats in same units as SED
+    - _stellar_grid: StellarGrid to generate model fluxes, returning floats in same units as SED
 
     :theta: the full set of parameters from which to generate model fluxes
     :x: optional filter/wavelengths to generate fluxes for - if omitted will use _x
-    :flux_func: optional function to call to generate fluxes - if omitted will use _flux_func
+    :stellar_grid: optional StellarGrid with which model fluxes will be generated - if ommited will
+    use global _stellar_grid instance
     :combine: whether to return a single set of summed fluxes
     :returns: the model fluxes at points x, either per star if combine==False or aggregated
     """
     # These can be taken as args for external calls but fall back in the hateful globals
     if x is None:
         x = _x
-    if flux_func is None:
-        flux_func = _flux_func
+    if stellar_grid is None:
+        stellar_grid = _stellar_grid
 
     # The teff, rad and logg for each star is interleaved, so if two stars we expect:
     # [teff0, teff1, rad0, rad1, logg0, logg1, dist]. With 3 params per star + dist the #stars is...
     nstars = (theta.shape[0] - 1) // 3
     params_by_star = theta[:-1].reshape((3, nstars)).transpose()
-    y_model = _np.array([
-        flux_func(x, teff, logg) * (rad * R_sun)**2 for teff, rad, logg in params_by_star
-    ])
+    y_model = _np.array([stellar_grid.get_filter_fluxes(x, teff, logg) * (rad * R_sun)**2
+                                                            for teff, rad, logg in params_by_star])
 
     # Finally, divide by the dist^2 (m^2), which is the remaining param not used above
     dist = theta[-1] * pc
@@ -144,7 +146,7 @@ def minimize_fit(x: _np.ndarray[float],
                  theta0: _np.ndarray[float],
                  fit_mask: _np.ndarray[float],
                  ln_prior_func: Callable[[_np.ndarray[float]], float],
-                 flux_func: Callable[[_np.ndarray[float], float, float], _np.ndarray[float]],
+                 stellar_grid: StellarGrid,
                  methods: List[str]=None,
                  verbose: bool=False) -> Tuple[_np.ndarray[float], OptimizeResult]:
     """
@@ -155,11 +157,10 @@ def minimize_fit(x: _np.ndarray[float],
     :x: the wavelength/filter values for the observed SED data
     :y: the flux values, at x, for the observed SED data
     :y_err: the flux error bars, at x, for the observed SED data
-    :prior_criteria: the criteria for limits and ratios used in evaluating theta against priors
     :theta0: the initial set of candidate parameters for the model SED
     :fit_mask: a mask on theta0 to pick the parameters that are fitted, the rest being fixed
-    :ln_prior_func:
-    :flux_func: the function, with form func(x, teff, logg), called to generate fluxes
+    :ln_prior_func: a callback function to evaluate the current theta against prior criteria
+    :stellar_grid: a StellarGrid instance with which model fluxes will be generated
     :methods: scipy optimize fitting algorithms to try, defaults to [Nelder-Mead, SLSQP, None]
     :returns: the final set of parameters & a scipy OptimizeResult with the details of the outcome
     """
@@ -180,10 +181,10 @@ def minimize_fit(x: _np.ndarray[float],
 
         # Now we've got exclusive access, we can set the globals required for fitting
         # pylint: disable=global-statement
-        global _x, _y, _weights, _fixed_theta, _fit_mask, _ln_prior_func, _flux_func
+        global _x, _y, _weights, _fixed_theta, _fit_mask, _ln_prior_func, _stellar_grid
         _x, _y, _weights = x, y, 1 / y_err**2
         _fixed_theta, _fit_mask = _np.where(fit_mask, None, theta0), fit_mask
-        _ln_prior_func, _flux_func = ln_prior_func, flux_func
+        _ln_prior_func, _stellar_grid = ln_prior_func, stellar_grid
 
         the_soln, the_meth = None, None
         for method in methods:
@@ -216,7 +217,7 @@ def mcmc_fit(x: _np.ndarray[float],
              theta0: _np.ndarray[float],
              fit_mask: _np.ndarray[bool],
              ln_prior_func: Callable[[_np.ndarray[float]], float],
-             flux_func: Callable[[_np.ndarray[float], float, float], _np.ndarray[float]],
+             stellar_grid: StellarGrid,
              nwalkers: int=100,
              nsteps: int=100000,
              thin_by: int=10,
@@ -237,15 +238,15 @@ def mcmc_fit(x: _np.ndarray[float],
     :y_err: the flux error bars, at x, for the observed SED data
     :theta0: the initial set of candidate parameters for the model SED
     :fit_mask: a mask on theta0 to pick the parameters that are fitted, the rest being fixed
-    :ln_prior_func:
-    :flux_func: the function, with form func(x, teff, logg), called to generate fluxes
-    :nwalker: the number of mcmc walkers to employ
+    :ln_prior_func: a callback function to evaluate the current theta against prior criteria
+    :stellar_grid: a StellarGrid instance with which model fluxes will be generated
+    :nwalkers: the number of mcmc walkers to employ
     :nsteps: the maximium number of mcmc steps to make for each walker
     :thin_by: step interval to inspect fit progress
     :seed: optional seed for random behaviour
     :processes: optional number of parallel processes to use, or None to let code choose
-    :progress: whether to show a progress bar (see emcee documentation for other values)
     :early_stopping: stop fitting if solution has converged & further improvements are negligible
+    :progress: whether to show a progress bar (see emcee documentation for other values)
     :returns: fitted set of parameters as UFloats and an EnsembleSampler with details of the outcome
     """
     if verbose:
@@ -269,10 +270,10 @@ def mcmc_fit(x: _np.ndarray[float],
 
         # Now we've got exclusive access, we can set the globals required for fitting
         # pylint: disable=global-statement
-        global _x, _y, _weights, _fixed_theta, _fit_mask, _ln_prior_func, _flux_func
+        global _x, _y, _weights, _fixed_theta, _fit_mask, _ln_prior_func, _stellar_grid
         _x, _y, _weights = x, y, 1 / y_err**2
         _fixed_theta, _fit_mask = _np.where(fit_mask, None, theta0), fit_mask
-        _ln_prior_func, _flux_func = ln_prior_func, flux_func
+        _ln_prior_func, _stellar_grid = ln_prior_func, stellar_grid
 
         # Min steps required by Autocorr algo to avoid a warn msg (not a warning so can't filter)
         min_steps_es = int(50 * autocor_tol * thin_by)
