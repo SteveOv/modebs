@@ -219,11 +219,7 @@ class StellarGrid(_AbstractBaseClass):
 
 class BtSettlGrid(StellarGrid):
     """
-    Generates model SED fluxes from pre-built grid of filtered fluxes.
-    For now, the grid file is created from bt-settl-agss data files with make-bt-settl-agss.py
-    This uses a grid of interpolators based on pre-convolved filter fluxes. The pre-filtered
-    nature of the fluxes ensures minimal processing is required to produce a model sed, so
-    it's fast. However, this model is only suitable for SED observations which are dereddened.
+    Generates model SED fluxes from pre-built grids of bt-settl-agss model fluxes.
     """
     # pylint: disable=too-many-arguments, too-many-positional-arguments, too-many-locals
 
@@ -342,7 +338,7 @@ class BtSettlGrid(StellarGrid):
                        filter_map_file: _Path=StellarGrid._DEF_FILTER_MAP_FILE,
                        dense_grids: bool=False):
         """
-        Will process the chosen bt-settl-agss ascii grid files to produce a grid file containing
+        Will ingest the chosen bt-settl-agss ascii grid files to produce a grid file containing
         the grids of fluxes and associated metadata to act as a source for instances of this class.
 
         Download bt-settl-aggs ascii model grids from following url
