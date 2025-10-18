@@ -214,10 +214,7 @@ class StellarGrid(_AbstractBaseClass):
 
         result = _binned_statistic(lambdas.value, fluxes.value, statistic=_np.nanmean,
                                    bins=bin_edges, range=(bin_edges.min(), bin_edges.max()))
-
-        # In case there are empty bins
-        bin_fluxes = _np.nan_to_num(result.statistic, nan=0.0)
-        return bin_fluxes << fluxes.unit
+        return result.statistic << fluxes.unit
 
 
 class BtSettlGrid(StellarGrid):
