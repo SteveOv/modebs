@@ -62,7 +62,7 @@ class TestBtSettlGrid(unittest.TestCase):
                 self.assertEqual(response.dtype, bool)
 
                 # Call always returns a ndarray, but if single then can be treated like a bool
-                if len(response) == 1:
+                if response.size == 1:
                     self.assertTrue(exp_response == response)
                 else:
                     self.assertListEqual(exp_response, response.tolist())
