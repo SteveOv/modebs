@@ -255,10 +255,8 @@ class StellarGrid(_AbstractBaseClass):
                 raise ValueError(f"No filter table in SVO for filter={svo_name}") from err
 
         table = _parse_single_table(filter_fname).to_table()
-
-        # Create a normalized copy of the transmission data
         ftrans = table["Transmission"]
-        table["Norm-Transmission"] = (ftrans - ftrans.min()) / (ftrans.max() - ftrans.min())
+        table["Norm-Transmission"] = ftrans / _np.sum(ftrans) # so total trans == 1
 
         # Add metadata on the filter coverage
         if table["Wavelength"].unit != lambda_unit:
@@ -297,8 +295,8 @@ class StellarGrid(_AbstractBaseClass):
         filter_trans = filter_table["Norm-Transmission"][filter_ol_mask].value
 
         # Apply the filter & calculate overall transmitted flux value
-        interp = _np.interp(filter_lam, lambdas, fluxes)
-        return _np.sum((interp * filter_trans / _np.sum(filter_trans)))
+        filter_fluxes = _np.interp(filter_lam, lambdas, fluxes) * filter_trans
+        return _np.sum(filter_fluxes)
 
     @classmethod
     def _bin_fluxes(cls,
