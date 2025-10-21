@@ -39,6 +39,10 @@ class StellarGrid(_AbstractBaseClass):
     _TEFF_UNIT = _u.K
     _LOGG_UNIT = _u.dex
 
+    # For calculating fluxes for stars with given radius in R_sun and distance in pc
+    _pc = (1 * _u.pc).to(_u.m).value
+    _R_sun = (1 * _u.R_sun).to(_u.m).value
+
     def __init__(self,
                  model_grid_full: _ArrayLike,
                  model_grid_filtered: _ArrayLike,
@@ -153,28 +157,42 @@ class StellarGrid(_AbstractBaseClass):
             filter_names = [filter_names]
         return _np.array([self._filter_names_list.index(n) for n in filter_names], dtype=int)
 
-    def get_fluxes(self, teff: float, logg: float, metal: float=0) \
+    def get_fluxes(self, teff: float, logg: float, metal: float=0,
+                   radius: float=None, distance: float=None) \
                                                         -> _Union[_np.ndarray[float], _u.Quantity]:
         """
         Will return a full spectrum of fluxes, over this model's wavelength range for the
         requested teff, logg and metal values.
 
+        If both radius and distance are given the fluxes will be modified for a star of the given
+        radius (in R_Sun) at the given distance (in pc).
+
         :teff: the effective temperature for the fluxes
         :logg: the logg for the fluxes
         :metal: the metallicity for the fluxes
+        :radius: optional stellar radius value in R_sun
+        :distance: optional stellar distance value in pc
         :returns: the resulting flux values (in the units of the underlying data file)
         """
-        return self._model_full_interp(xi=(teff, logg, metal))
+        flux = self._model_full_interp(xi=(teff, logg, metal))
+        if radius is not None and distance is not None:
+            return flux * ((radius * self._R_sun) / (distance * self._pc))**2
+        return flux
 
     def get_filter_fluxes(self,
                           filters: _ArrayLike,
                           teff: float,
                           logg: float,
                           metal: float=0.,
+                          radius: float=None,
+                          distance: float=None,
                           as_quantity: bool=False) -> _Union[_np.ndarray[float], _u.Quantity]:
         """
         Will return a ndarray of flux values calculated for requested filter names at
         the chosen effective temperature, logg and metallicity values.
+
+        If both radius and distance are given the fluxes will be modified for a star of the given
+        radius (in R_Sun) at the given distance (in pc).
 
         Will raise a ValueError if a named filter is unknown.
         Will raise IndexError if an indexed filter is out of range.
@@ -183,6 +201,8 @@ class StellarGrid(_AbstractBaseClass):
         :teff: the effective temperature for the fluxes
         :logg: the logg for the fluxes
         :metal: the metallicity for the fluxes
+        :radius: optional stellar radius value in R_sun
+        :distance: optional stellar distance value in pc
         :as_quantity: whether to return the fluxes as a Quantity (True) or a ndarray[float] (False)
         :returns: the resulting flux values (in the units of the underlying data file)
         """
@@ -200,6 +220,11 @@ class StellarGrid(_AbstractBaseClass):
 
         # Map these fluxes onto the response, where a filter/flux may appear >1 times
         values = _np.array([fluxes[m] for m in flux_mappings], dtype=float)
+
+        # Optionally adjust for stellar params
+        if radius is not None and distance is not None:
+            values *= ((radius * self._R_sun) / (distance * self._pc))**2
+
         if as_quantity:
             return values << self.flux_unit
         return values
@@ -428,7 +453,7 @@ class BtSettlGrid(StellarGrid):
             "index_names": index_names,
             "index_values": index_values,
             "filter_names": list(filters.keys()),
-            "wavelengths": grid_full_bin_lams
+            "wavelengths": grid_full_bin_lams.value
         }
 
         # Now we write out the model grids and metadata to a compressed npz file

@@ -92,15 +92,15 @@ def model_func(theta: _np.ndarray[float],
     # The teff, rad and logg for each star is interleaved, so if two stars we expect:
     # [teff0, teff1, rad0, rad1, logg0, logg1, dist]. With 3 params per star + dist the #stars is...
     nstars = (theta.shape[0] - 1) // 3
-    params_by_star = theta[:-1].reshape((3, nstars)).transpose()
-    y_model = _np.array([stellar_grid.get_filter_fluxes(x, teff, logg) * (rad * R_sun)**2
-                                                            for teff, rad, logg in params_by_star])
+    th_star = theta[:-1].reshape((3, nstars)).transpose()
+    dist = theta[-1]
+    y_model = _np.array([
+        stellar_grid.get_filter_fluxes(x, teff, logg, 0, rad, dist) for teff, rad, logg in th_star
+    ])
 
-    # Finally, divide by the dist^2 (m^2), which is the remaining param not used above
-    dist = theta[-1] * pc
     if combine:
-        return _np.sum(y_model, axis=0) / dist**2
-    return y_model / dist**2
+        return _np.sum(y_model, axis=0)
+    return y_model
 
 
 def _objective_func(fit_theta: _np.ndarray[float], minimizable: bool=False) -> float:
