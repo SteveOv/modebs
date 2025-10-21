@@ -164,9 +164,12 @@ class StellarGrid(_AbstractBaseClass):
             filter_names = [filter_names]
         return _np.array([self._filter_names_list.index(n) for n in filter_names], dtype=int)
 
-    def get_fluxes(self, teff: float, logg: float, metal: float=0,
-                   radius: float=None, distance: float=None) \
-                                                        -> _Union[_np.ndarray[float], _u.Quantity]:
+    def get_fluxes(self,
+                   teff: float,
+                   logg: float,
+                   metal: float=0,
+                   radius: float=None,
+                   distance: float=None) -> _np.ndarray[float]:
         """
         Will return a full spectrum of fluxes, over this model's wavelength range for the
         requested teff, logg and metal values.
@@ -179,7 +182,7 @@ class StellarGrid(_AbstractBaseClass):
         :metal: the metallicity for the fluxes
         :radius: optional stellar radius value in R_sun
         :distance: optional stellar distance value in pc
-        :returns: the resulting flux values (in the units of the underlying data file)
+        :returns: the resulting flux values (in implied flux_units)
         """
         flux = self._model_full_interp(xi=(teff, logg, metal))
         if radius is not None and distance is not None:
@@ -192,8 +195,7 @@ class StellarGrid(_AbstractBaseClass):
                           logg: float,
                           metal: float=0.,
                           radius: float=None,
-                          distance: float=None,
-                          as_quantity: bool=False) -> _Union[_np.ndarray[float], _u.Quantity]:
+                          distance: float=None) -> _np.ndarray[float]:
         """
         Will return a ndarray of flux values calculated for requested filter names at
         the chosen effective temperature, logg and metallicity values.
@@ -210,8 +212,7 @@ class StellarGrid(_AbstractBaseClass):
         :metal: the metallicity for the fluxes
         :radius: optional stellar radius value in R_sun
         :distance: optional stellar distance value in pc
-        :as_quantity: whether to return the fluxes as a Quantity (True) or a ndarray[float] (False)
-        :returns: the resulting flux values (in the units of the underlying data file)
+        :returns: the resulting flux values (in implied flux_units)
         """
         # Find the unique filters and the map onto the request/response (a filter can appear > once)
         if isinstance(filters, (str|int)):
@@ -231,9 +232,6 @@ class StellarGrid(_AbstractBaseClass):
         # Optionally adjust for stellar params
         if radius is not None and distance is not None:
             values *= ((radius * self._R_sun) / (distance * self._pc))**2
-
-        if as_quantity:
-            return values << self.flux_unit
         return values
 
 

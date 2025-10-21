@@ -132,7 +132,7 @@ class TestBtSettlGrid(unittest.TestCase):
             ("GAIA/GAIA3:Gbp",      5000,   4.0,    0.3,    "test different metal"), # not currently in grid
         ]:
             with self.subTest(msg=msg):
-                fluxes = model_sed.get_filter_fluxes(filters, teff, logg, metal, as_quantity=False)
+                fluxes = model_sed.get_filter_fluxes(filters, teff, logg, metal)
 
                 xi = (teff, logg, metal)
                 filter_list = model_sed.get_filter_indices([filters] if isinstance(filters, str) else filters)
@@ -152,7 +152,7 @@ class TestBtSettlGrid(unittest.TestCase):
             ("GAIA/GAIA3:Gbp",      5000,   4.0,    0.15,   "test linear interpolation on metal"), # not currently in grid
         ]:
             with self.subTest(msg=msg):
-                fluxes = model_sed.get_filter_fluxes(filters, teff, logg, metal, as_quantity=False)
+                fluxes = model_sed.get_filter_fluxes(filters, teff, logg, metal)
 
                 xi = (teff, logg, metal)
                 filter_list = model_sed.get_filter_indices([filters] if isinstance(filters, str) else filters)
@@ -160,20 +160,6 @@ class TestBtSettlGrid(unittest.TestCase):
 
                 self.assertIsInstance(fluxes, np.ndarray)
                 self.assertListEqual(exp_fluxes, fluxes.tolist())
-
-    def test_get_filter_fluxes_happy_path_as_quantity(self):
-        """ Tests get_fluxes() with happy path requests excersing the as_quantity arg """
-        model_sed = BtSettlGrid(self._test_file)
-
-        for filters,                                as_quantity, msg in [
-            ("GAIA/GAIA3:Gbp",                      True, "single filter / as quantity"),
-            (["GAIA/GAIA3:Gbp", "GAIA/GAIA3:Grp"],  True, "multipls filters / as quantity"),
-            ("GAIA/GAIA3:Gbp",                      False, "single filter / as value"),
-            (["GAIA/GAIA3:Gbp", "GAIA/GAIA3:Grp"],  False, "multipls filters / as value"),
-        ]:
-            with self.subTest(msg=msg):
-                fluxes = model_sed.get_filter_fluxes(filters, 5000, 4.0, 0, as_quantity=as_quantity)
-                self.assertEqual(as_quantity, isinstance(fluxes, u.Quantity))
 
     def test_get_filter_fluxes_unknown_filter_name(self):
         """ Tests get_filter_fluxes() with unknown filter names -> assert KeyError """
