@@ -12,33 +12,53 @@ from libs.stellar_grids import BtSettlGrid
 class TestBtSettlGrid(unittest.TestCase):
     """ Unit tests for the BtSettlGrid class. """
     _this_dir = Path(getsourcefile(lambda:0)).parent
+    _test_file = _this_dir / "data/stellar_grids/bt-settl-agss-test.npz"
+
+    @classmethod
+    def setUpClass(cls):
+        """
+        Initialize the class.
+        """
+        if not cls._test_file.exists():
+            # Ensure the .cache/.modelgrids/bt-settl-agss-test/ directory is
+            # populated with bt-settl-agss grid files covering the following ranges;
+            #   - teff: 4900 to 5100
+            #   - logg: 3.5 to 5.0
+            #   - metal: -0.5 to 0.5
+            #   - alpha: 0.0 to 0.2
+            # pylint: disable=protected-access
+            in_files = (BtSettlGrid._CACHE_DIR / ".modelgrids/bt-settl-agss-test/").glob("lte*.dat.txt")
+            BtSettlGrid.make_grid_file(in_files, cls._test_file)
 
     #
     #   __init__(data_file):
     #
-    def test_init_happy_path(self):
-        """ Tests __init__() basic happy path test for ModelSed instance initialization """
-        for data_file, msg in [
-            (self._this_dir/"../libs/data/stellar_grids/bt-settl-agss/bt-settl-agss.npz", "tests __init__ loads specified data file"),
-            (None, "test __init__ falls back on the default npz file under libs/data/stellar_grids/bt-settl-agss/"),
-        ]:
-            with self.subTest(msg=msg):
-                model_grid = BtSettlGrid(data_file=data_file)
+    def test_init_default_data_file(self):
+        """ Tests __init__() will pick up the default model file """
+        model_grid = BtSettlGrid()
+        self.assertGreaterEqual(model_grid.teff_range[0], 1000)
+        self.assertLessEqual(model_grid.teff_range[1], 100000)
+        self.assertGreaterEqual(model_grid.logg_range[0], -0.5)
+        self.assertLessEqual(model_grid.logg_range[1], 6.0)
+        self.assertGreaterEqual(model_grid.metal_range[0], -2.0)
+        self.assertLessEqual(model_grid.metal_range[1], 2.0)
 
-                self.assertGreaterEqual(model_grid.teff_range[0], 1000)
-                self.assertLessEqual(model_grid.teff_range[1], 70000)
-                self.assertGreaterEqual(model_grid.logg_range[0], -0.5)
-                self.assertLessEqual(model_grid.logg_range[1], 6.0)
-                self.assertGreaterEqual(model_grid.metal_range[0], -2.0)
-                self.assertLessEqual(model_grid.metal_range[1], 0.5)
-
+    def test_init_specific_data_file(self):
+        """ Tests __init__(data_file) will load the specified model filt"""
+        model_grid = BtSettlGrid(data_file=self._test_file)
+        self.assertEqual(model_grid.teff_range[0], 4900)
+        self.assertEqual(model_grid.teff_range[1], 5100)
+        self.assertEqual(model_grid.logg_range[0], 3.5)
+        self.assertEqual(model_grid.logg_range[1], 5.0)
+        self.assertEqual(model_grid.metal_range[0], -0.5)
+        self.assertEqual(model_grid.metal_range[1], 0.5)
 
     #
     #   has_filter(name) -> bool:
     #
     def test_has_filter_various_names(self):
         """ Tests has_filter(name) with various requests """
-        model_grid = BtSettlGrid()
+        model_grid = BtSettlGrid(self._test_file)
 
         for name,                           exp_response,   msg in [
             ("GAIA/GAIA3:Gbp",              True,           "test filter name is known"),
@@ -70,7 +90,7 @@ class TestBtSettlGrid(unittest.TestCase):
     #
     def test_get_filter_indices_happy_path(self):
         """ Tests get_filter_indices() with simple happy path requests """
-        model_grid = BtSettlGrid()
+        model_grid = BtSettlGrid(self._test_file)
 
         for request, exp_response, msg in [
             ("GAIA/GAIA3:Gbp", [0], "test filter list is a single str with known SED service filter name"),
@@ -85,7 +105,7 @@ class TestBtSettlGrid(unittest.TestCase):
 
     def test_get_filter_indices_unknown_filter(self):
         """ Tests get_filter_indices() with unknown filters -> assert KeyError """
-        model_sed = BtSettlGrid()
+        model_sed = BtSettlGrid(self._test_file)
         for request, msg in [
             ("Unknown:filter", "test single str with unknown filter name"),
             (["Unknown:filter"], "test single item with unknown filter name"),
@@ -95,11 +115,11 @@ class TestBtSettlGrid(unittest.TestCase):
                 model_sed.get_filter_indices(request)
 
     #
-    #   get_fluxes(filters, teff, logg, metal=0) -> np.ndarray[float] or u.Quantity:
+    #   get_filter_fluxes(filters, teff, logg, metal=0, radius=None, distance=None) -> np.ndarray[float] or u.Quantity:
     #
-    def test_get_fluxes_happy_path_no_interp(self):
-        """ Tests get_fluxes() with happy path requests with exact row match (no interp fluxes) """
-        model_sed = BtSettlGrid()
+    def test_get_filter_fluxes_happy_path_no_interp(self):
+        """ Tests get_filter_fluxes() with happy path requests with exact row match (no interp fluxes) """
+        model_sed = BtSettlGrid(self._test_file)
         model_interps = model_sed._model_interps    # pylint: disable=protected-access
 
         for filters,                 teff,  logg,   metal,  msg in [
@@ -109,7 +129,7 @@ class TestBtSettlGrid(unittest.TestCase):
                                     5000,   4.0,    0.0,    "test filters in different order to file cols"),
             ("GAIA/GAIA3:Gbp",      5100,   4.0,    0.0,    "test different teff"),
             ("GAIA/GAIA3:Gbp",      5000,   4.5,    0.0,    "test different logg"),
-            # ("GAIA/GAIA3:Gbp",      5000,   4.0,    0.3,    "test different metal"), # not currently in grid
+            ("GAIA/GAIA3:Gbp",      5000,   4.0,    0.3,    "test different metal"), # not currently in grid
         ]:
             with self.subTest(msg=msg):
                 fluxes = model_sed.get_filter_fluxes(filters, teff, logg, metal, as_quantity=False)
@@ -121,15 +141,15 @@ class TestBtSettlGrid(unittest.TestCase):
                 self.assertIsInstance(fluxes, np.ndarray)
                 self.assertListEqual(exp_fluxes, fluxes.tolist())
 
-    def test_get_fluxes_happy_path_interp(self):
-        """ Tests get_fluxes() with happy path requests which require linear interpolation """
-        model_sed = BtSettlGrid()
+    def test_get_filter_fluxes_happy_path_interp(self):
+        """ Tests get_filter_fluxes() with happy path requests which require linear interpolation """
+        model_sed = BtSettlGrid(self._test_file)
         model_interps = model_sed._model_interps    # pylint: disable=protected-access
 
         for filters,                teff,   logg,   metal,  msg in [
             ("GAIA/GAIA3:Gbp",      5050,   4.0,    0.0,    "test linear interpolation on teff"),
             ("GAIA/GAIA3:Gbp",      5000,   4.25,   0.0,    "test linear interpolation on logg"),
-            # ("GAIA/GAIA3:Gbp",      5000,   4.0,    0.15,   "test linear interpolation on metal"), # not currently in grid
+            ("GAIA/GAIA3:Gbp",      5000,   4.0,    0.15,   "test linear interpolation on metal"), # not currently in grid
         ]:
             with self.subTest(msg=msg):
                 fluxes = model_sed.get_filter_fluxes(filters, teff, logg, metal, as_quantity=False)
@@ -141,9 +161,9 @@ class TestBtSettlGrid(unittest.TestCase):
                 self.assertIsInstance(fluxes, np.ndarray)
                 self.assertListEqual(exp_fluxes, fluxes.tolist())
 
-    def test_get_fluxes_happy_path_as_quantity(self):
+    def test_get_filter_fluxes_happy_path_as_quantity(self):
         """ Tests get_fluxes() with happy path requests excersing the as_quantity arg """
-        model_sed = BtSettlGrid()
+        model_sed = BtSettlGrid(self._test_file)
 
         for filters,                                as_quantity, msg in [
             ("GAIA/GAIA3:Gbp",                      True, "single filter / as quantity"),
@@ -152,12 +172,12 @@ class TestBtSettlGrid(unittest.TestCase):
             (["GAIA/GAIA3:Gbp", "GAIA/GAIA3:Grp"],  False, "multipls filters / as value"),
         ]:
             with self.subTest(msg=msg):
-                fluxes = model_sed.get_filter_fluxes(filters, 4000, 4.0, 0.0, as_quantity)
+                fluxes = model_sed.get_filter_fluxes(filters, 5000, 4.0, 0, as_quantity=as_quantity)
                 self.assertEqual(as_quantity, isinstance(fluxes, u.Quantity))
 
-    def test_get_fluxes_unknown_filter_name(self):
-        """ Tests get_fluxes() with unknown filter names -> assert KeyError """
-        model_sed = BtSettlGrid()
+    def test_get_filter_fluxes_unknown_filter_name(self):
+        """ Tests get_filter_fluxes() with unknown filter names -> assert KeyError """
+        model_sed = BtSettlGrid(self._test_file)
 
         kwargs = { "teff": 5000, "logg": 4.0, "metal": 0.0 }
         for filters, msg in [
@@ -168,9 +188,9 @@ class TestBtSettlGrid(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     model_sed.get_filter_fluxes(filters, **kwargs)
 
-    def test_get_fluxes_unknown_filter_index(self):
-        """ Tests get_fluxes() with unknown filter indices -> assert IndexError """
-        model_sed = BtSettlGrid()
+    def test_get_filter_fluxes_unknown_filter_index(self):
+        """ Tests get_filter_fluxes() with unknown filter indices -> assert IndexError """
+        model_sed = BtSettlGrid(self._test_file)
 
         kwargs = { "teff": 5000, "logg": 4.0, "metal": 0.0 }
         for filters, msg in [
@@ -181,9 +201,9 @@ class TestBtSettlGrid(unittest.TestCase):
                 with self.assertRaises(IndexError):
                     model_sed.get_filter_fluxes(filters, **kwargs)
 
-    def test_get_fluxes_stellar_params_out_of_range(self):
-        """ Tests get_fluxes() with Teff, logg or metal outside the model's range -> ValueError """
-        model_sed = BtSettlGrid()
+    def test_get_filter_fluxes_stellar_params_out_of_range(self):
+        """ Tests get_filter_fluxes() with Teff, logg or metal outside the model's range -> ValueError """
+        model_sed = BtSettlGrid(self._test_file)
 
         for teff, logg, metal, msg in [
             (1000, 4.0, 0.0, "test Teff out of range"),
@@ -193,3 +213,7 @@ class TestBtSettlGrid(unittest.TestCase):
             with self.subTest(msg=msg):
                 with self.assertRaises(ValueError):
                     model_sed.get_filter_fluxes("Gaia:Gbp", teff, logg, metal)
+
+
+if __name__ == "__main__":
+    unittest.main()
