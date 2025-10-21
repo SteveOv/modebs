@@ -25,15 +25,12 @@ class TestBtSettlGrid(unittest.TestCase):
             with self.subTest(msg=msg):
                 model_grid = BtSettlGrid(data_file=data_file)
 
-                self.assertEqual("bt-settl-agss.npz", model_grid.data_file.name)
-
-                self.assertTrue(model_grid.num_interpolators > 0)
-                self.assertGreaterEqual(model_grid.teff_range[0], 1000 << u.K)
-                self.assertLessEqual(model_grid.teff_range[1], 70000 << u.K, )
-                self.assertGreaterEqual(model_grid.logg_range[0], -0.5 << u.dex)
-                self.assertLessEqual(model_grid.logg_range[1], 6.0 << u.dex)
-                self.assertGreaterEqual(model_grid.metal_range[0], -2.0 << u.dimensionless_unscaled)
-                self.assertLessEqual(model_grid.metal_range[1], 0.5 << u.dimensionless_unscaled)
+                self.assertGreaterEqual(model_grid.teff_range[0], 1000)
+                self.assertLessEqual(model_grid.teff_range[1], 70000)
+                self.assertGreaterEqual(model_grid.logg_range[0], -0.5)
+                self.assertLessEqual(model_grid.logg_range[1], 6.0)
+                self.assertGreaterEqual(model_grid.metal_range[0], -2.0)
+                self.assertLessEqual(model_grid.metal_range[1], 0.5)
 
 
     #

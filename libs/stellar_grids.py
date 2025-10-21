@@ -32,59 +32,108 @@ class StellarGrid(_AbstractBaseClass):
     _CACHE_DIR = _this_dir / "../.cache"
     _DEF_FILTER_MAP_FILE = _this_dir / "data/stellar_grids/sed-filter-mappings.json"
 
-    def __init__(self, data_file: _Union[_Path, str], meta: dict[str, any]):
+    # Default output units
+    _LAM_UNIT = _u.um
+    _FLUX_DENSITY_UNIT = _u.W / _u.m**2 / _u.Hz
+    _FLUX_UNIT = _u.W / _u.m**2
+    _TEFF_UNIT = _u.K
+    _LOGG_UNIT = _u.dex
+
+    def __init__(self,
+                 model_grid_full: _ArrayLike,
+                 model_grid_filtered: _ArrayLike,
+                 index_values: _ArrayLike,
+                 wavelengths: _ArrayLike,
+                 filter_names: _ArrayLike):
         """
         Initializes a new instance of this class.
 
-        :data_file: the source of the model data, in numpy npz format
-        :meta: the metadata dictionary
+        :model_grid_full: full grid of un-filtered fluxes over a range of teff, logg & metal values
+        :model_grid_filtered: grid of pre-filtered fluxes over a range of teff, logg & metal values
+        :index_values: structured array of the teff, logg and metal row index values for both grids
+        :wavelengths: the wavelength column index values of the full grid
+        :filter_names: the filter column index values of the pre-filtered grid
         """
-        self._data_file = data_file
-        self._meta = meta
-        # use a list so we can use index()
-        if isinstance(meta["filters"], _np.ndarray):
-            self._filter_names_list = meta["filters"].tolist()
+        # Below we'll be building interpolators over multi-D arrays of fluxes, with
+        # the axes being the teffs, loggs and metals (and in the future alphas).
+        # The saved input arrays are currently flat, and for the following code to work
+        # they must be sorted by teff, logg & metal with each column being teffs*loggs*metals long.
+        sorted_rows = _np.argsort(index_values)
+
+        # Index points common to both types of interpolator.
+        self._teffs = _np.unique(index_values["teff"])
+        self._loggs = _np.unique(index_values["logg"])
+        self._metals = _np.unique(index_values["metal"])
+        index_points = (self._teffs, self._loggs, self._metals)
+
+        # Create the single interpolator over the full grid of flux data. Used for the interpolation
+        # of the full spectrum of fluxes (over the wavelength range) for given teff, logg and metal.
+        full_vals_shape = (len(self._teffs), len(self._loggs), len(self._metals), len(wavelengths))
+        interp_fluxes = model_grid_full[sorted_rows].reshape(full_vals_shape)
+        self._model_full_interp = _RegularGridInterpolator(index_points, interp_fluxes, "linear")
+
+        # Create a table of interpolators, one per filter, for interpolating filter fluxes
+        # for each filter for give teff, logg and metal values.
+        self._model_interps = None
+        if model_grid_filtered is not None:
+            interp_vals_shape = (len(self._teffs), len(self._loggs), len(self._metals))
+            self._model_interps = _np.empty(shape=(len(filter_names), ),
+                                            dtype=[("filter", "<U50"), ("interp", object)])
+            for filter_ix, filter_name in enumerate(filter_names):
+                interp_vals = model_grid_filtered[sorted_rows, filter_ix].reshape(interp_vals_shape)
+                interp = _RegularGridInterpolator(index_points, interp_vals, "linear")
+                self._model_interps[filter_ix] = (filter_name, interp)
+
+        if isinstance(filter_names, _np.ndarray):
+            self._filter_names_list = filter_names.tolist() # a list so we can use index()
         else:
-            self._filter_names_list = meta["filters"]
+            self._filter_names_list = filter_names
+        self._wavelengths = wavelengths
 
     @property
-    def data_file(self) -> _Path:
-        """ Gets the Path of the data file being used. """
-        return self._data_file
+    def wavelengths(self) -> _np.ndarray:
+        """ Gets the wavelength values for which unfiltered fluxes are published. """
+        return self._wavelengths
 
     @property
-    def wavelength_range(self) -> _u.Quantity["length"]:
-        """ Gets the range of wavelength covered by this model """
-        wavelengths = self._meta["wavelengths"]
-        return (wavelengths.min(), wavelengths.max()) << self.wavelength_unit
+    def wavelength_range(self) -> _Tuple[float]:
+        """ Gets the range of wavelength covered by this model (units of wavelength_unit)"""
+        return (self.wavelengths.min(), self.wavelengths.max())
 
     @property
-    def teff_range(self) -> _u.Quantity["temperature"]:
-        """ Gets the range of effective temperatures covered by this model """
-        teffs = self._meta["index_values"]["teff"]
-        return (teffs.min(), teffs.max()) << self._meta["teff_unit"]
+    def teff_range(self) -> _Tuple[float]:
+        """ Gets the range of effective temperatures covered by this model (units of teff_unit) """
+        return (self._teffs.min(), self._teffs.max())
 
     @property
-    def logg_range(self) -> _u.Quantity:
-        """ Gets the range of logg covered by this model """
-        loggs = self._meta["index_values"]["logg"]
-        return (loggs.min(), loggs.max()) << self._meta["logg_unit"]
+    def logg_range(self) -> _Tuple[float]:
+        """ Gets the range of logg covered by this model (units of logg_unit) """
+        return (self._loggs.min(), self._loggs.max())
 
     @property
-    def metal_range(self) -> _u.Quantity:
+    def metal_range(self) -> _Tuple[float]:
         """ Gets the range of metallicities covered by this model """
-        metals = self._meta["index_values"]["metal"]
-        return (metals.min(), metals.max()) << self._meta["metal_unit"]
+        return (self._metals.min(), self._metals.max())
+
+    @property
+    def teff_unit(self) -> _u.Unit:
+        """ Gets the temperature units """
+        return self._TEFF_UNIT
+
+    @property
+    def logg_unit(self) -> _u.Unit:
+        """ Gets the logg units """
+        return self._LOGG_UNIT
 
     @property
     def wavelength_unit(self) -> _u.Unit:
         """ Gets the unit of the flux wavelengths """
-        return self._meta["wavelength_unit"]
+        return self._LAM_UNIT
 
     @property
     def flux_unit(self) -> _u.Unit:
         """ Gets the unit of the returned fluxes """
-        return self._meta["flux_unit"]
+        return self._FLUX_UNIT
 
     def has_filter(self, filter_name: _Union[str, _Iterable]) -> _np.ndarray[bool]:
         """ Gets whether this model knows of the requested filter(s) """
@@ -104,7 +153,19 @@ class StellarGrid(_AbstractBaseClass):
             filter_names = [filter_names]
         return _np.array([self._filter_names_list.index(n) for n in filter_names], dtype=int)
 
-    @_abstractmethod
+    def get_fluxes(self, teff: float, logg: float, metal: float=0) \
+                                                        -> _Union[_np.ndarray[float], _u.Quantity]:
+        """
+        Will return a full spectrum of fluxes, over this model's wavelength range for the
+        requested teff, logg and metal values.
+
+        :teff: the effective temperature for the fluxes
+        :logg: the logg for the fluxes
+        :metal: the metallicity for the fluxes
+        :returns: the resulting flux values (in the units of the underlying data file)
+        """
+        return self._model_full_interp(xi=(teff, logg, metal))
+
     def get_filter_fluxes(self,
                           filters: _ArrayLike,
                           teff: float,
@@ -115,14 +176,34 @@ class StellarGrid(_AbstractBaseClass):
         Will return a ndarray of flux values calculated for requested filter names at
         the chosen effective temperature, logg and metallicity values.
 
-        :filters: a list of filter identifiers for which we are generating fluxes
+        Will raise a ValueError if a named filter is unknown.
+        Will raise IndexError if an indexed filter is out of range.
+
+        :filters: a list of filter names or indices for which we are generating fluxes
         :teff: the effective temperature for the fluxes
         :logg: the logg for the fluxes
         :metal: the metallicity for the fluxes
-        :as_quantity: whether to return the fluxes as a Quantity (True) in units of flux_unit
-        or a ndarray[float] (False)
+        :as_quantity: whether to return the fluxes as a Quantity (True) or a ndarray[float] (False)
         :returns: the resulting flux values (in the units of the underlying data file)
         """
+        # Find the unique filters and the map onto the request/response (a filter can appear > once)
+        if isinstance(filters, (str|int)):
+            unique_filters, flux_mappings = _np.array([filters]), _np.array([0])
+        else:
+            unique_filters, flux_mappings = _np.unique(filters, return_inverse=True)
+
+        # Get the fluxes once for each of the unique filters
+        if unique_filters.dtype not in (_np.int64, _np.int32):
+            unique_filters = self.get_filter_indices(unique_filters)
+        xi = (teff, logg, metal)
+        fluxes = [self._model_interps[filter]["interp"](xi=xi) for filter in unique_filters]
+
+        # Map these fluxes onto the response, where a filter/flux may appear >1 times
+        values = _np.array([fluxes[m] for m in flux_mappings], dtype=float)
+        if as_quantity:
+            return values << self.flux_unit
+        return values
+
 
     @classmethod
     def get_filter(cls, svo_name: str, lambda_unit: _u.Unit) -> _Table:
@@ -235,11 +316,6 @@ class BtSettlGrid(StellarGrid):
     _LAMBDA_UNIT_RE = _re.compile(r"Wavelength in (?P<unit>[\w\/]*)$", _re.MULTILINE)
     _FLUX_UNIT_RE = _re.compile(r"Flux in (?P<unit>[\w\/]*)$", _re.MULTILINE)
 
-    # Default output units
-    _LAM_UNIT = _u.um
-    _FLUX_DENSITY_UNIT = _u.W / _u.m**2 / _u.Hz
-    _FLUX_UNIT = _u.W / _u.m**2
-
     def __init__(self, data_file: _Union[_Path, str]=None):
         """
         Initializes a new instance of this class.
@@ -250,74 +326,9 @@ class BtSettlGrid(StellarGrid):
             data_file = self._DEF_MODEL_FILE
 
         with _np.load(data_file, allow_pickle=True) as df:
-            # Load the model_grid of individual pre-filtered fluxes. These fluxes are not reddened
-            # and are suitable for quickly fitting to a SED which has been dereddened.
-            model_grid_filtered = df["grid_filtered"]
-            #model_grid = df["grid_full"]
             meta = df["meta"].item()
-
-        super().__init__(data_file, meta)
-
-        # Code to populate pivots below depends on fixing to alpha==0
-        alpha_zero_mask = meta["index_values"]["alpha"] == 0
-        model_grid_filtered = model_grid_filtered[alpha_zero_mask]
-
-        # These effectively make up the dimensions of the grid of interpolators we're making up
-        filter_names = meta["filters"]
-        teffs = _np.unique(meta["index_values"]["teff"])
-        loggs = _np.unique(meta["index_values"]["logg"])
-        metals = _np.unique(meta["index_values"]["metal"])
-        interp_vals_shape = (len(teffs), len(loggs), len(metals))
-
-        # Set up a table of interpolators, one per filter. Each interpolator is based on a
-        # folded table with the teffs, loggs and metals as the axes and filter fluxes as the values.
-        self._model_interps = _np.empty(shape=(len(filter_names), ),
-                                        dtype=[("filter", "<U50"), ("interp", object)])
-        for filter_ix, filter_name in enumerate(filter_names):
-            # Need model_grid_filtered cols of teffs*loggs*metals items long and to be
-            # sorted by [teff, logg, metal] in order to write to the pivot directly like this.
-            interp_vals = model_grid_filtered[..., filter_ix].reshape(interp_vals_shape)
-            interp = _RegularGridInterpolator((teffs, loggs, metals), interp_vals, "linear")
-            self._model_interps[filter_ix] = (filter_name, interp)
-
-    def get_filter_fluxes(self,
-                          filters: _ArrayLike,
-                          teff: float,
-                          logg: float,
-                          metal: float=0.,
-                          as_quantity: bool=False) -> _Union[_np.ndarray[float], _u.Quantity]:
-        """
-        Will return a ndarray of flux values calculated for requested filter names at
-        the chosen effective temperature, logg and metallicity values.
-
-        Will raise a ValueError if a named filter is unknown.
-        Will raise IndexError if an indexed filter is out of range.
-
-        :filters: a list of filter names or indices for which we are generating fluxes
-        :teff: the effective temperature for the fluxes
-        :logg: the logg for the fluxes
-        :metal: the metallicity for the fluxes
-        :as_quantity: whether to return the fluxes as a Quantity (True) or a ndarray[float] (False)
-        :returns: the resulting flux values (in the units of the underlying data file)
-        """
-        # Find the unique filters and the map onto the request/response (a filter can appear > once)
-        if isinstance(filters, (str|int)):
-            unique_filters, flux_mappings = _np.array([filters]), _np.array([0])
-        else:
-            unique_filters, flux_mappings = _np.unique(filters, return_inverse=True)
-
-        # Get the fluxes once for each of the unique filters
-        if unique_filters.dtype not in (_np.int64, _np.int32):
-            unique_filters = self.get_filter_indices(unique_filters)
-        xi = (teff, logg, metal)
-        fluxes = [self._model_interps[filter]["interp"](xi=xi) for filter in unique_filters]
-
-        # Map these fluxes onto the response, where a filter/flux may appear >1 times
-        values = _np.array([fluxes[m] for m in flux_mappings], dtype=float)
-        if as_quantity:
-            return values << self.flux_unit
-        return values
-
+            super().__init__(df["grid_full"], df["grid_filtered"],
+                             meta["index_values"], meta["wavelengths"], meta["filter_names"])
 
     @classmethod
     def make_grid_file(cls,
@@ -405,15 +416,19 @@ class BtSettlGrid(StellarGrid):
                 not_nan = ~_np.isnan(grid[..., col_ix])
                 grid[..., col_ix] = _np.interp(x, x[not_nan], grid[not_nan, col_ix])
 
-        # Complete the metadata; row indices, col indices (filters & wavelengths), units and ranges
+        # For now we're only dealing with alpha==zero
+        alpha_zero_row_mask = index_values["alpha"] == 0
+        index_names = index_names[:3]
+        grid_full = grid_full[alpha_zero_row_mask]
+        grid_filtered = grid_filtered[alpha_zero_row_mask]
+        index_values = index_values[alpha_zero_row_mask][index_names]
+
+        # Complete the metadata; row indices and col indices (filters & wavelengths)
         grid_meta = {
             "index_names": index_names,
             "index_values": index_values,
-            "filters": list(filters.keys()),
-            "wavelengths": grid_full_bin_lams,
-            **{ f"{k}_unit": meta[f"{k}_unit"] for k in index_names },
-            "wavelength_unit": cls._LAM_UNIT,
-            "flux_unit": cls._FLUX_UNIT
+            "filter_names": list(filters.keys()),
+            "wavelengths": grid_full_bin_lams
         }
 
         # Now we write out the model grids and metadata to a compressed npz file
@@ -488,7 +503,8 @@ if __name__ == "__main__":
     bgrid = BtSettlGrid(data_file=new_file)
     print(f"\nLoaded newly created model grid from {new_file}")
     print( "Filters:", ", ".join(bgrid._filter_names_list))
-    print(f"Ranges: teff={bgrid.teff_range}, logg={bgrid.logg_range}, metal = {bgrid.metal_range}")
+    print(f"Ranges: teff={bgrid.teff_range} {bgrid.teff_unit:unicode},",
+          f"logg={bgrid.logg_range} {bgrid.logg_unit:unicode}, metal = {bgrid.metal_range}")
     print("Test flux for 'GAIA/GAIA3:Gbp' filter, teff=2000, logg=4.0, metal=0, alpha=0:",
           ", ".join(f"{f:.3f}" for f in bgrid.get_filter_fluxes(["GAIA/GAIA3:Gbp"], 2000, 4, 0)),
           f"[{bgrid.flux_unit:unicode}]")

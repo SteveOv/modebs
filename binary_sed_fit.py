@@ -135,7 +135,7 @@ if __name__ == "__main__":
                         + [False])              # dist
 
     # For now, hard coded to 2 stars. Same order as theta: teff, radii (, logg, dist are not fitted)
-    teff_limits = model_grid.teff_range.value
+    teff_limits = model_grid.teff_range
     radius_limits = (0.1, 100)
     teff_ratio = (target_data["teff_ratio"].n, max(target_data["teff_ratio"].n * 0.05, target_data["teff_ratio"].s))
     radius_ratio = (target_data["k"].n, max(target_data["k"].n * 0.05, target_data["k"].s))
@@ -188,7 +188,7 @@ if __name__ == "__main__":
 
     # Output a comparison with known values (assuming we've fitted teffs and radii)
     print(f"\nFinal parameters for {TARGET} with nominals & 1-sigma error bars from MCMC fit")
-    theta_labels = [("TeffA", model_grid.teff_range.unit), ("TeffB", model_grid.teff_range.unit),
+    theta_labels = [("TeffA", model_grid.teff_unit), ("TeffB", model_grid.teff_unit),
                     ("RA", u.Rsun), ("RB", u.Rsun)]
     for (param, unit), fit in zip(theta_labels, theta_mcmc[fit_mask]):
         known = ufloat(target_config.get(param, np.NaN), target_config.get(param+"_err", None) or 0)
