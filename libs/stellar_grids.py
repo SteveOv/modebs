@@ -456,6 +456,7 @@ class BtSettlGrid(StellarGrid):
 
         # Now we write out the model grids and metadata to a compressed npz file
         print(f"Saving model grids and metadata to {out_file}, overwriting any existing file.")
+        out_file.parent.mkdir(parents=True, exist_ok=True)
         _np.savez_compressed(out_file, meta=grid_meta,
                              grid_full=grid_full, grid_filtered=grid_filtered)
         return out_file
