@@ -5,7 +5,7 @@ from pathlib import Path
 import unittest
 
 import numpy as np
-import astropy.units as u
+from dust_extinction.parameter_averages import G23
 
 from libs.stellar_grids import BtSettlGrid
 
@@ -115,10 +115,65 @@ class TestBtSettlGrid(unittest.TestCase):
                 model_sed.get_filter_indices(request)
 
     #
+    #   get_fluxes(teff, logg, metal=0, radius=None, distance=None, av=None) -> NDArray[float]
+    #
+    def test_get_fluxes_happy_path_no_reddening(self):
+        """ Tests get_fluxes(teff, logg, metal, radius, dist) happy path tests for combinations of values"""
+        model_sed = BtSettlGrid(self._test_file)
+
+        # Known values from test model file
+        # teff = 5000, logg = 4.0, metal = 0.0: flux[1000] == 582.976330
+        # teff = 5100, logg = 4.0, metal = 0.0: flux[1000] == 1093.662297
+        # teff = 5000, logg = 4.5, metal = 0.0: flux[1000] == 654.940372
+        # teff = 5000, logg = 4.0, metal = 0.3: flux[1000] == 474.171110
+        # 585.976330 * (1.0 * u.R_sun).to(u.m)**2 / (10 * u.pc).to(u.m)**2 == 2.979e-15
+        # (585.976330 + 1093.662297)/2 * (1.0 * u.R_sun).to(u.m)**2 / (10 * u.pc).to(u.m)**2 == 4.269026e-15
+        for teff,       logg,       metal,      radius, dist,   unred_at_1k,    msg in [
+            (5000,      4.0,        0.0,        None,   None,   582.976,        "basic non-interpolated flux"),
+            # Interpolation
+            (5050,      4.0,        0.0,        None,   None,   838.320,        "teff triggers interpolation"),
+            (5000,      4.25,       0.0,        None,   None,   618.960,        "logg triggers interpolation"),
+            (5000,      4.0,        0.15,       None,   None,   528.570,        "metal triggers interpolation"),
+            # radius & distance
+            (5000,      4.0,        0.0,        1.0,    10.0,   2.979e-15,      "exact flux modified by radius & dist"),
+            (5050,      4.0,        0.0,        1.0,    10.0,   4.269e-15,      "interp' flux modified by radius & dist"),
+        ]:
+            with self.subTest(msg=msg):
+                fluxes = model_sed.get_fluxes(teff, logg, metal, radius, dist)
+                self.assertAlmostEqual(unred_at_1k, fluxes[1000], 2)
+
+    def test_get_fluxes_test_reddening(self):
+        """ Tests get_fluxes(teff, logg, metal, radius, dist, av) happy path tests for redenning """
+        ext_model = G23(Rv=3.1)
+        model_sed = BtSettlGrid(self._test_file, extinction_model=ext_model)
+
+        # Known values from test model file
+        # teff = 5000, logg = 4.0, metal = 0.0: flux[1000] == 582.976330
+        # 585.976330 * (1.0 * u.R_sun).to(u.m)**2 / (10 * u.pc).to(u.m)**2 == 2.979e-15
+        for teff,       logg,       metal,      radius, dist,   av,     unred_at_1k,    msg in [
+            (5000,      4.0,        0.0,        None,   None,   None,   582.976,        "basic non-reddened flux"),
+            # With Av specified
+            (5000,      4.0,        0.0,        None,   None,   0.1,    582.976,        "apply reddening"),
+            (5000,      4.0,        0.0,        1.0,    10.0,   0.1,    2.979e-15,      "apply reddening with radius & dist"),
+        ]:
+            with self.subTest(msg=msg):
+                # pylint: disable=protected-access
+                excl_bins = sum(~model_sed._wavelength_mask[:2000]) # How many bins lost @ short wl
+                ix_1k = 1000 - excl_bins
+                if not av:
+                    red_at_1k = unred_at_1k
+                else:
+                    red_at_1k = unred_at_1k * ext_model.extinguish(model_sed.wavenumbers[ix_1k], Av=av)
+
+                fluxes = model_sed.get_fluxes(teff, logg, metal, radius, dist, av=av)
+                self.assertAlmostEqual(red_at_1k, fluxes[ix_1k], 2)
+
+
+    #
     #   get_filter_fluxes(filters, teff, logg, metal=0, radius=None, distance=None) -> np.ndarray[float] or u.Quantity:
     #
-    def test_get_filter_fluxes_happy_path_no_interp(self):
-        """ Tests get_filter_fluxes() with happy path requests with exact row match (no interp fluxes) """
+    def test_get_filter_fluxes_pre_filtered_no_interp(self):
+        """ Tests get_filter_fluxes() with use of pre-filtered grid with exact row match (no interp fluxes) """
         model_sed = BtSettlGrid(self._test_file)
         model_interps = model_sed._model_interps    # pylint: disable=protected-access
 
@@ -141,8 +196,8 @@ class TestBtSettlGrid(unittest.TestCase):
                 self.assertIsInstance(fluxes, np.ndarray)
                 self.assertListEqual(exp_fluxes, fluxes.tolist())
 
-    def test_get_filter_fluxes_happy_path_interp(self):
-        """ Tests get_filter_fluxes() with happy path requests which require linear interpolation """
+    def test_get_filter_fluxes_pre_filtered_interp(self):
+        """ Tests get_filter_fluxes() with use of pre-filtered grid and interpolated values """
         model_sed = BtSettlGrid(self._test_file)
         model_interps = model_sed._model_interps    # pylint: disable=protected-access
 

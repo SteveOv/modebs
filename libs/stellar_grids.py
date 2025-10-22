@@ -21,6 +21,7 @@ import astropy.units as _u
 from astropy.table import Table as _Table
 from astropy.io.votable import parse_single_table as _parse_single_table
 
+from dust_extinction.baseclasses import BaseExtModel as _BaseExtModel
 
 # We parse units as text from votables & text files. Stop us getting swamped format with warnings.
 _filterwarnings("ignore", category=_u.UnitsWarning)
@@ -49,7 +50,8 @@ class StellarGrid(_AbstractBaseClass):
                  logg_range: _Tuple[float, float],
                  metal_range: _Tuple[float, float],
                  wavelengths: _ArrayLike,
-                 filter_names: _ArrayLike):
+                 filter_names: _ArrayLike,
+                 extinction_model: _BaseExtModel=None):
         """
         Initializes a new instance of this class.
 
@@ -58,6 +60,7 @@ class StellarGrid(_AbstractBaseClass):
         :metal_range: the (min, max) range of metallicity values supported
         :wavelengths: the wavelength values of fluxes published
         :filter_names: the VizieR names of the supported filters
+        :extinction_model: optional extinction model to use if applying extinction to model fluxes
         """
         super().__init__()
         self._teff_range = teff_range
@@ -71,10 +74,31 @@ class StellarGrid(_AbstractBaseClass):
         else:
             self._filter_names_list = filter_names
 
+        # For reddening fluxes
+        self._extinction_model = extinction_model
+        self._wavenumbers = 1 / (wavelengths << self.wavelength_unit).to(_u.micron).value
+
+        # An extinction model may restrict the wavelength range we can report on
+        if extinction_model is not None:
+            self._wavelength_mask = self._wavenumbers >= _np.min(extinction_model.x_range)
+            self._wavelength_mask &= self._wavenumbers <= _np.max(extinction_model.x_range)
+        else:
+            self._wavelength_mask = _np.ones((len(wavelengths)), dtype=bool)
+
+    @property
+    def extinction_model(self) -> _BaseExtModel:
+        """ Get the model used to apply extinction to fluxes """
+        return self._extinction_model
+
+    @property
+    def wavenumbers(self) -> _np.ndarray[float]:
+        """ Gets the wavenumbers (1 / micron) of the flux wavelengths. """
+        return self._wavenumbers[self._wavelength_mask]
+
     @property
     def wavelengths(self) -> _np.ndarray:
         """ Gets the wavelength values for which unfiltered fluxes are published. """
-        return self._wavelengths
+        return self._wavelengths[self._wavelength_mask]
 
     @property
     def wavelength_range(self) -> _Tuple[float]:
@@ -140,7 +164,8 @@ class StellarGrid(_AbstractBaseClass):
                    logg: float,
                    metal: float=0,
                    radius: float=None,
-                   distance: float=None) -> _np.ndarray[float]:
+                   distance: float=None,
+                   av: float=None) -> _np.ndarray[float]:
         """
         Will return a full spectrum of fluxes, over this model's wavelength range for the
         requested teff, logg and metal values.
@@ -153,6 +178,7 @@ class StellarGrid(_AbstractBaseClass):
         :metal: the metallicity for the fluxes
         :radius: optional stellar radius value in R_sun
         :distance: optional stellar distance value in pc
+        :av: optional A_v value with which to redden fluxes, if we also have an extinction model
         :returns: the resulting flux values (in implied flux_units)
         """
 
@@ -295,12 +321,14 @@ class BtSettlGrid(StellarGrid):
 
     def __init__(self,
                  data_file: _Path=_DEF_MODEL_FILE,
-                 filter_map_file: _Path=StellarGrid._DEF_FILTER_MAP_FILE):
+                 filter_map_file: _Path=StellarGrid._DEF_FILTER_MAP_FILE,
+                 extinction_model: _BaseExtModel=None):
         """
         Initializes a new instance of this class.
 
         :data_file: the source of the model data, in numpy npz format
         :filter_map_file: json file containing mappings from VizieR to SVO filter names
+        :extinction_model: optional extinction model to use if applying extinction to model fluxes
         """
         with _np.load(data_file, allow_pickle=True) as df:
             meta = df["meta"].item()
@@ -342,7 +370,7 @@ class BtSettlGrid(StellarGrid):
                         fgrid[nanmask, lix, mix, wix] = ip(teffs[nanmask])
 
         # Create the single interpolator over the full grid of flux data. Used for the interpolation
-        # of full spectrum of fluxes (over the wavelength range) for given teff, logg, metal & alpha
+        # of full spectrum of fluxes (over the wavelength range) for given teff, logg & metal.
         self._model_full_interp = _RegularGridInterpolator(index_points, fgrid, "linear")
 
         # The json has names of supported Vizier SED filters & maps to the corresponding SVO name.
@@ -350,7 +378,7 @@ class BtSettlGrid(StellarGrid):
             filter_map = _json_load(j)
         filters = { viz: self.get_filter(svo, self._LAM_UNIT) for viz, svo in filter_map.items() }
 
-        # Populate a grid of pre-filtered fluxes.
+        # Populate a grid of pre-filtered, unreddened fluxes.
         lams = wavelengths << self._LAM_UNIT
         grid_filtered = _np.empty(interp_vals_shape + (len(filters),))
         for teff, logg, metal in index_values:
@@ -381,7 +409,8 @@ class BtSettlGrid(StellarGrid):
                          logg_range=(loggs.min(), loggs.max()),
                          metal_range=(metals.min(), metals.max()),
                          wavelengths=wavelengths,
-                         filter_names=list(filters.keys()))
+                         filter_names=list(filters.keys()),
+                         extinction_model=extinction_model)
 
 
     def get_fluxes(self,
@@ -389,10 +418,13 @@ class BtSettlGrid(StellarGrid):
                    logg: float,
                    metal: float=0,
                    radius: float=None,
-                   distance: float=None) -> _np.ndarray[float]:
-        flux = self._model_full_interp(xi=(teff, logg, metal))
+                   distance: float=None,
+                   av: float=None) -> _np.ndarray[float]:
+        flux = self._model_full_interp(xi=(teff, logg, metal))[self._wavelength_mask]
         if radius is not None and distance is not None:
-            return flux * ((radius * self._R_sun) / (distance * self._pc))**2
+            flux *= ((radius * self._R_sun) / (distance * self._pc))**2
+        if av is not None and self.extinction_model is not None:
+            flux *= self.extinction_model.extinguish(self.wavenumbers, Av=av)
         return flux
 
     def get_filter_fluxes(self,
