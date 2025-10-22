@@ -134,7 +134,7 @@ class TestBtSettlGrid(unittest.TestCase):
             with self.subTest(msg=msg):
                 fluxes = model_sed.get_filter_fluxes(filters, teff, logg, metal)
 
-                xi = (teff, logg, metal, 0)
+                xi = (teff, logg, metal)
                 filter_list = model_sed.get_filter_indices([filters] if isinstance(filters, str) else filters)
                 exp_fluxes = [model_interps[f]["interp"](xi=xi) for f in filter_list]
 
@@ -154,7 +154,7 @@ class TestBtSettlGrid(unittest.TestCase):
             with self.subTest(msg=msg):
                 fluxes = model_sed.get_filter_fluxes(filters, teff, logg, metal)
 
-                xi = (teff, logg, metal, 0)
+                xi = (teff, logg, metal)
                 filter_list = model_sed.get_filter_indices([filters] if isinstance(filters, str) else filters)
                 exp_fluxes = [model_interps[f]["interp"](xi=xi) for f in filter_list]
 

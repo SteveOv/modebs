@@ -308,37 +308,38 @@ class BtSettlGrid(StellarGrid):
             wavelengths = meta["wavelengths"]
             model_grid_full = df["grid_full"]
 
-        # Below we'll be building interpolators over multi-D arrays of fluxes, with
-        # the axes being the teffs, loggs, metals and alphas.
-        # The saved input arrays are currently flat, and for the following code to work they must
-        # be sorted by teff, logg, metal & alpha with each column being teffs*loggs*metals long.
-
-        # Index points common to both types of interpolator.
-        teffs = _np.unique(index_values["teff"])
-        loggs = _np.unique(index_values["logg"])
-        metals = _np.unique(index_values["metal"])
-        alphas = _np.unique(index_values["alpha"])
-        index_points = (teffs, loggs, metals, alphas)
-        interp_vals_shape = (len(teffs), len(loggs), len(metals), len(alphas))
-
         # TODO: following code to reshape grid, interpolate missing values & create filtered grid
         #       to be moved to make_grid_file once the algorithm is stabilized and optimized
 
-        # The (re-)shape of the fluxes as multi-D grid for the interpolators
-        fgrid = model_grid_full.reshape(interp_vals_shape + (len(wavelengths), ))
+        # Below we'll be building interpolators over multi-D arrays of fluxes, with the axes being
+        # the teffs, loggs and metals. Currently we're only interested in fluxes where alpha == 0
+        alpha_zero_mask = index_values["alpha"] == 0
+        index_values = index_values[alpha_zero_mask][["teff", "logg", "metal"]]
+        model_grid_full = model_grid_full[alpha_zero_mask]
+
+        # The saved input arrays are currently flat (teffs*loggs*metals long & wavelength bins wide)
+        teffs = _np.unique(index_values["teff"])
+        loggs = _np.unique(index_values["logg"])
+        metals = _np.unique(index_values["metal"])
+        index_points = (teffs, loggs, metals)
+        interp_vals_shape = (len(teffs), len(loggs), len(metals))
+
+        # The (re-)shape of the fluxes as multi-D grid with axes for teffs, loggs, metals & lambda.
+        # We need make sure the data are sorted by teffs, loggs then metals for this.
+        sorted_ix = _np.argsort(index_values)
+        fgrid = model_grid_full[sorted_ix].reshape(interp_vals_shape + (len(wavelengths), ))
 
         # Interpolate any gaps in the grid along the teff axis (will investigate extending this)
-        for lam in range(len(wavelengths)):
-            for aix in range(len(alphas)):
-                for mix in range(len(metals)):
-                    for lix in range(len(loggs)):
-                        nanmask = _np.isnan(fgrid[..., lix, mix, aix, lam])
-                        if all(nanmask):
-                            fgrid[nanmask, lix, mix, aix, lam] = _np.zeros_like(nanmask, float)
-                        elif any(nanmask):
-                            ip = _interp1d(teffs[~nanmask], fgrid[~nanmask, lix, mix, aix, lam],
-                                           "slinear", bounds_error=False, fill_value="extrapolate")
-                            fgrid[nanmask, lix, mix, aix, lam] = ip(teffs[nanmask])
+        for wix in range(len(wavelengths)):
+            for mix in range(len(metals)):
+                for lix in range(len(loggs)):
+                    nanmask = _np.isnan(fgrid[..., lix, mix, wix])
+                    if all(nanmask):
+                        fgrid[nanmask, lix, mix, wix] = _np.zeros_like(nanmask, float)
+                    elif any(nanmask):
+                        ip = _interp1d(teffs[~nanmask], fgrid[~nanmask, lix, mix, wix],
+                                       kind="slinear", bounds_error=False, fill_value="extrapolate")
+                        fgrid[nanmask, lix, mix, wix] = ip(teffs[nanmask])
 
         # Create the single interpolator over the full grid of flux data. Used for the interpolation
         # of full spectrum of fluxes (over the wavelength range) for given teff, logg, metal & alpha
@@ -352,15 +353,14 @@ class BtSettlGrid(StellarGrid):
         # Populate a grid of pre-filtered fluxes.
         lams = wavelengths << self._LAM_UNIT
         grid_filtered = _np.empty(interp_vals_shape + (len(filters),))
-        for teff, logg, metal, alpha in index_values:
+        for teff, logg, metal in index_values:
             tix = _np.where(teffs == teff)
             lix = _np.where(loggs == logg)
             mix = _np.where(metals == metal)
-            aix = _np.where(alphas == alpha)
-            fluxes = self._model_full_interp(xi=(teff, logg, metal, alpha)) << self._FLUX_UNIT
+            fluxes = self._model_full_interp(xi=(teff, logg, metal)) << self._FLUX_UNIT
             for filter_ix, (filter_name, filter_table) in enumerate(filters.items()):    # pylint: disable=unused-variable
                 filter_flux = self._get_filtered_flux_total(lams, fluxes, filter_table)
-                grid_filtered[tix, lix, mix, aix, filter_ix] = \
+                grid_filtered[tix, lix, mix, filter_ix] = \
                                 filter_flux.to(self._FLUX_UNIT, equivalencies=_u.spectral()).value
 
                 # # For teff=2000.0, logg=3.5, metal=0.0 and GAIA:Gbp ~ 1.7e-14 erg / s / cm^2
@@ -368,16 +368,14 @@ class BtSettlGrid(StellarGrid):
                 #         / (190.91243807532035 * _u.pc).to(_u.cm)**2).to(_u.erg / _u.s / _u.cm**2)
 
         # Create a table of interpolators, one per filter, for interpolating filter fluxes
-        # for each filter for give teff, logg and metal values.
-        self._model_interps = None
-        if grid_filtered is not None:
-            self._model_interps = _np.empty(shape=(len(filters), ),
-                                            dtype=[("filter", "<U50"), ("interp", object)])
-            for filter_ix, filter_name in enumerate(filters):
-                # all teffs, loggs, metals & alphas for this filter only
-                interp_vals = grid_filtered[:, :, :, :, filter_ix]
-                ip = _RegularGridInterpolator(index_points, interp_vals, "linear")
-                self._model_interps[filter_ix] = (filter_name, ip)
+        # for each filter for given teff, logg and metal values.
+        self._model_interps = _np.empty(shape=(len(filters), ), 
+                                        dtype=[("filter", "<U50"), ("interp", object)])
+        for filter_ix, filter_name in enumerate(filters):
+            self._model_interps[filter_ix] = (
+                filter_name,
+                _RegularGridInterpolator(index_points, grid_filtered[:, :, :, filter_ix], "linear")
+            )
 
         super().__init__(teff_range=(teffs.min(), teffs.max()),
                          logg_range=(loggs.min(), loggs.max()),
@@ -392,7 +390,7 @@ class BtSettlGrid(StellarGrid):
                    metal: float=0,
                    radius: float=None,
                    distance: float=None) -> _np.ndarray[float]:
-        flux = self._model_full_interp(xi=(teff, logg, metal, 0))
+        flux = self._model_full_interp(xi=(teff, logg, metal))
         if radius is not None and distance is not None:
             return flux * ((radius * self._R_sun) / (distance * self._pc))**2
         return flux
@@ -413,7 +411,7 @@ class BtSettlGrid(StellarGrid):
         # Get the fluxes once for each of the unique filters
         if unique_filters.dtype not in (_np.int64, _np.int32):
             unique_filters = self.get_filter_indices(unique_filters)
-        xi = (teff, logg, metal, 0)
+        xi = (teff, logg, metal)
         fluxes = [self._model_interps[filter]["interp"](xi=xi) for filter in unique_filters]
 
         # Map these fluxes onto the response, where a filter/flux may appear >1 times
