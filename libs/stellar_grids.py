@@ -599,13 +599,13 @@ if __name__ == "__main__":
 
     bgrid = BtSettlGrid()
 
-    # # pylint: disable=protected-access
-    # in_files = (StellarGrid._CACHE_DIR / ".modelgrids/bt-settl-agss/").glob("lte*.dat.txt")
-    # new_file = BtSettlGrid.make_grid_file(sorted(in_files))
+    # pylint: disable=protected-access
+    in_files = (StellarGrid._CACHE_DIR / ".modelgrids/bt-settl-agss/").glob("lte*.dat.txt")
+    new_file = BtSettlGrid.make_grid_file(sorted(in_files))
 
-    # # Test what has been saved
-    # bgrid = BtSettlGrid(new_file)
-    # print(f"\nLoaded newly created model grid from {new_file}")
+    # Test what has been saved
+    bgrid = BtSettlGrid(new_file)
+    print(f"\nLoaded newly created model grid from {new_file}")
     print("Teffs:", ",".join(f"{t:.2f}" for t in bgrid._model_full_interp.grid[0]))
     print("loggs:", ",".join(f"{l:.2f}" for l in bgrid._model_full_interp.grid[1]))
     print("metals:", ",".join(f"{m:.2f}" for m in bgrid._model_full_interp.grid[2]))
