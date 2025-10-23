@@ -1,5 +1,5 @@
 """ Unit tests for the stellar_grids classes. """
-# pylint: disable=line-too-long
+# pylint: disable=line-too-long, protected-access, no-member, too-many-locals, too-many-arguments
 from inspect import getsourcefile
 from pathlib import Path
 import unittest
@@ -14,23 +14,109 @@ class TestBtSettlGrid(unittest.TestCase):
     """ Unit tests for the BtSettlGrid class. """
     _this_dir = Path(getsourcefile(lambda:0)).parent
     _test_file = _this_dir / "data/stellar_grids/bt-settl-agss-test.npz"
-
-    # pylint: disable=protected-access, no-member, too-many-locals, too-many-arguments
+    _flat_file = _this_dir / "data/stellar_grids/bt-settl-aggs-test-flat-file.npz"
+    _flat_grid: np.ndarray
+    _known_filters: dict
 
     @classmethod
     def setUpClass(cls):
         """
         Initialize the class.
         """
+        # To recreate these files ensure the .cache/.modelgrids/bt-settl-agss-test/ directory
+        # is populated with bt-settl-agss grid files covering the following ranges;
+        #   - teff: 4900 to 5100
+        #   - logg: 3.5 to 5.0
+        #   - metal: -0.5 to 0.5
+        #   - alpha: 0.0 to 0.2
+        in_files = sorted((BtSettlGrid._CACHE_DIR / ".modelgrids/bt-settl-agss-test/").glob("lte*.dat.txt"))
+
+        # This is a BtSettlGrid model file with a limited range of test teff, logg, metal & alpha values
         if not cls._test_file.exists():
-            # Ensure the .cache/.modelgrids/bt-settl-agss-test/ directory is
-            # populated with bt-settl-agss grid files covering the following ranges;
-            #   - teff: 4900 to 5100
-            #   - logg: 3.5 to 5.0
-            #   - metal: -0.5 to 0.5
-            #   - alpha: 0.0 to 0.2
-            in_files = (BtSettlGrid._CACHE_DIR / ".modelgrids/bt-settl-agss-test/").glob("lte*.dat.txt")
+            print(f"{cls.__name__}.setUpClass() test data file '{cls._test_file}' not found so will attempt to create it")
             BtSettlGrid.make_grid_file(in_files, cls._test_file)
+            print("Done")
+
+        # Equivalent to the above data file but the tests' own simple 2d grid. We get expected vals
+        # from this so tests don't depend on, & can detect failures with, the class/file under test.
+        if not cls._flat_file.exists():
+            print(f"{cls.__name__}.setUpClass() test flat file '{cls._flat_file}' not found so will attempt to create it")
+            grid_full_nbins = len(BtSettlGrid( cls._test_file).wavelengths)
+            grid_full_bin_lams = np.geomspace(0.05, 50, num=grid_full_nbins, endpoint=True) << u.um
+            grid_full_bin_freqs = grid_full_bin_lams.to(u.Hz, equivalencies=u.spectral())
+
+            # Create a simple, flat file from the same data for expected values
+            index_names = ["teff", "logg", "metal", "alpha"]
+            index_values = BtSettlGrid._get_list_of_index_values(in_files, index_names, False)
+            print(f"Ingesting {len(index_values)} files and will save fluxes in {grid_full_nbins} bins")
+
+            flat_grid = np.full((len(index_values), len(index_names) + grid_full_nbins), np.nan, float)
+            flat_grid[..., :len(index_names)] = index_values.tolist()
+
+            for in_file in in_files:
+                meta = BtSettlGrid._read_metadata_from_ascii_model_file(in_file)
+
+                row_ix = np.where((index_values["teff"] == meta["teff"])\
+                                & (index_values["logg"] == meta["logg"])\
+                                & (index_values["metal"] == meta["metal"])\
+                                & (index_values["alpha"] == meta["alpha"]))
+
+                lams, flux_densities = np.genfromtxt(in_file, float, comments="#", unpack=True)
+                lams = (lams * meta["lambda_unit"]).to(BtSettlGrid._LAM_UNIT, equivalencies=u.spectral())
+                flux_densities = (flux_densities * meta["flux_unit"]).to(BtSettlGrid._FLUX_DENSITY_UNIT,
+                                                                         equivalencies=u.spectral_density(lams))
+
+                # Write the row of binned fluxes to the full grid.
+                bin_flux_densities = BtSettlGrid._bin_fluxes(lams, flux_densities, grid_full_bin_lams)
+                bin_fluxes = (bin_flux_densities *  grid_full_bin_freqs).value
+                flat_grid[row_ix, len(index_names):] = bin_fluxes
+
+            # Save the subset of the filters in the file too
+            filter_map = { "GAIA/GAIA3:Gbp": "GAIA/GAIA3.Gbp", "GAIA/GAIA3:Grp": "GAIA/GAIA3.Grp", "Gaia:G": "GAIA/GAIA0.G" }
+            filters = { viz: BtSettlGrid.get_filter(svo, BtSettlGrid._LAM_UNIT) for viz, svo in filter_map.items() }
+
+            cls._flat_file.parent.mkdir(parents=True, exist_ok=True)
+            np.savez_compressed(cls._flat_file, flat_grid=flat_grid, lams=grid_full_bin_lams.value, filters=filters)
+            print("Done")
+
+        with np.load(cls._flat_file, allow_pickle=True) as ff:
+            cls._flat_grid = ff["flat_grid"]
+            cls._flat_lams = ff["lams"]
+            cls._known_filters = ff["filters"].item()
+
+    @classmethod
+    def _get_flux_value_from_flat_grid(cls, teff, logg, metal, alpha=0, flux_ix=None):
+        """
+        Gets the requested flux value matching the teff, logg, metal & alpha from the flat copy of
+        the model grid. This only picks up values in the grid; no interpolation. By going direct to
+        a flat table of fluxes we avoid any reshaping & other processing in the class being tested.
+        """
+        row_mask = (cls._flat_grid[..., 0] == teff) \
+                    & (cls._flat_grid[..., 1] == logg) \
+                    & (cls._flat_grid[..., 2] == metal) \
+                    & (cls._flat_grid[..., 3] == alpha)
+        if flux_ix is None:
+            return cls._flat_grid[row_mask, 4:][0]
+        return cls._flat_grid[row_mask, 4 + flux_ix][0]
+
+    @classmethod
+    def _get_filter_flux_values_from_flat_grid(cls, filters, teff, logg, metal, alpha=0):
+        """
+        Gets the total transmitted flux for each filter for the set of fluxes matching requested
+        teff, logg, metal & alpha. Again, only picks up flux values in the grid; no interpolation.
+        Only really works for filters entirely within lambda range as no overlap logic.
+        """
+        # Get the whole row of fluxes and lams
+        fluxes = cls._get_flux_value_from_flat_grid(teff, logg, metal, alpha)
+        lams = cls._flat_lams
+
+        filt_fluxes = []
+        for filt in ([filters] if isinstance(filters, str) else filters):
+            ftable = cls._known_filters[filt]
+            filter_lam = ftable["Wavelength"].value
+            filter_trans = ftable["Norm-Transmission"].value
+            filt_fluxes += [np.sum(np.interp(filter_lam, lams, fluxes) * filter_trans)]
+        return np.array(filt_fluxes)
 
 
     #
@@ -127,10 +213,10 @@ class TestBtSettlGrid(unittest.TestCase):
         model_sed = BtSettlGrid(self._test_file)
 
         # Known values
-        t5000_l40_m00 = self._get_value_from_model_full_interp(model_sed, 5000, 4.0, 0.0, 1000)
-        t5100_l40_m00 = self._get_value_from_model_full_interp(model_sed, 5100, 4.0, 0.0, 1000)
-        t5000_l45_m00 = self._get_value_from_model_full_interp(model_sed, 5000, 4.5, 0.0, 1000)
-        t5000_l40_m03 = self._get_value_from_model_full_interp(model_sed, 5000, 4.0, 0.3, 1000)
+        t5000_l40_m00 = self._get_flux_value_from_flat_grid(5000, 4.0, 0.0, flux_ix=1000)
+        t5100_l40_m00 = self._get_flux_value_from_flat_grid(5100, 4.0, 0.0, flux_ix=1000)
+        t5000_l45_m00 = self._get_flux_value_from_flat_grid(5000, 4.5, 0.0, flux_ix=1000)
+        t5000_l40_m03 = self._get_flux_value_from_flat_grid(5000, 4.0, 0.3, flux_ix=1000)
 
         t5500_l40_m00 = (t5000_l40_m00 + t5100_l40_m00) / 2     # Approx interpolated values
         t5000_l425_m00 = (t5000_l40_m00 + t5000_l45_m00) / 2
@@ -158,7 +244,7 @@ class TestBtSettlGrid(unittest.TestCase):
         model_sed = BtSettlGrid(self._test_file, extinction_model=ext_model)
 
         # Known values
-        t5000_l40_m00 = self._get_value_from_model_full_interp(model_sed, 5000, 4.0, 0.0, 1000)
+        t5000_l40_m00 = self._get_flux_value_from_flat_grid(5000, 4.0, 0.0, flux_ix=1000)
         r1_d10 = (1.0 * u.R_sun).to(u.m)**2 / (10 * u.pc).to(u.m)**2
 
         # Index of 1000th flux after masking due to the ext_model restricting the wavelength range
@@ -201,13 +287,13 @@ class TestBtSettlGrid(unittest.TestCase):
         model_sed = BtSettlGrid(self._test_file)
 
         # Known fluxes
-        t5000_l40_m00 = self._get_values_from_filter_interp(model_sed, "GAIA/GAIA3:Gbp", 5000, 4.0, 0.0)
-        t5100_l40_m00 = self._get_values_from_filter_interp(model_sed, "GAIA/GAIA3:Gbp", 5100, 4.0, 0.0)
-        t5000_l45_m00 = self._get_values_from_filter_interp(model_sed, "GAIA/GAIA3:Gbp", 5000, 4.5, 0.0)
-        t5000_l40_m03 = self._get_values_from_filter_interp(model_sed, "GAIA/GAIA3:Gbp", 5000, 4.0, 0.3)
+        t5000_l40_m00 = self._get_filter_flux_values_from_flat_grid("GAIA/GAIA3:Gbp", 5000, 4.0, 0.0)
+        t5100_l40_m00 = self._get_filter_flux_values_from_flat_grid("GAIA/GAIA3:Gbp", 5100, 4.0, 0.0)
+        t5000_l45_m00 = self._get_filter_flux_values_from_flat_grid("GAIA/GAIA3:Gbp", 5000, 4.5, 0.0)
+        t5000_l40_m03 = self._get_filter_flux_values_from_flat_grid("GAIA/GAIA3:Gbp", 5000, 4.0, 0.3)
 
         multi_gaia_filters = ["Gaia:G", "GAIA/GAIA3:Grp", "GAIA/GAIA3:Gbp"]
-        t5000_l40_m00_x3 = self._get_values_from_filter_interp(model_sed, multi_gaia_filters, 5000, 4.0, 0.0)
+        t5000_l40_m00_x3 = self._get_filter_flux_values_from_flat_grid(multi_gaia_filters, 5000, 4.0, 0.0)
 
         t5050_l40_m00 = (t5000_l40_m00 + t5100_l40_m00) / 2         # Approx interpolated values
         t5000_l425_m00 = (t5000_l40_m00 + t5000_l45_m00) / 2
@@ -273,24 +359,6 @@ class TestBtSettlGrid(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     model_sed.get_filter_fluxes("Gaia:Gbp", teff, logg, metal)
 
-    #
-    #   Helpers
-    #
-    def _get_value_from_model_full_interp(self, model_sed: BtSettlGrid, teff, logg, metal, index=1000):
-        flux_interp = model_sed._model_full_interp
-        return flux_interp.values[flux_interp.grid[0]==teff, flux_interp.grid[1]==logg,
-                                  flux_interp.grid[2]==metal, index]
-
-    def _get_values_from_filter_interp(self, model_sed: BtSettlGrid, filters, teff, logg, metal):
-        # Get the expected value directly from the underlying data
-        model_interps = model_sed._model_interps
-        exp_fluxes = []
-        for filt in ([filters] if isinstance(filters, str) else filters):
-            interp = model_interps[model_interps["filter"] == filt]["interp"][0]
-            exp_fluxes += [interp.values[interp.grid[0]==teff,
-                                         interp.grid[1]==logg,
-                                         interp.grid[2]==metal][0]]
-        return np.array(exp_fluxes)
 
 if __name__ == "__main__":
     unittest.main()
