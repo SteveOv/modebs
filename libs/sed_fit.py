@@ -90,12 +90,13 @@ def model_func(theta: _np.ndarray[float],
         stellar_grid = _stellar_grid
 
     # The teff, rad and logg for each star is interleaved, so if two stars we expect:
-    # [teff0, teff1, rad0, rad1, logg0, logg1, dist]. With 3 params per star + dist the #stars is...
-    nstars = (theta.shape[0] - 1) // 3
-    th_star = theta[:-1].reshape((3, nstars)).transpose()
-    dist = theta[-1]
+    # [teff0, teff1, rad0, rad1, logg0, logg1, dist, av]. With 3 params per star the #stars is...
+    nstars = (theta.shape[0] - 2) // 3
+    tstar = theta[:-2].reshape((3, nstars)).transpose()
+    dist = theta[-2]
+    av = theta[-1]
     y_model = _np.array([
-        stellar_grid.get_filter_fluxes(x, teff, logg, 0, rad, dist) for teff, rad, logg in th_star
+        stellar_grid.get_filter_fluxes(x, teff, logg, 0, rad, dist, av) for teff, rad, logg in tstar
     ])
 
     if combine:
@@ -325,6 +326,7 @@ def create_theta(teffs: Union[List[float], float],
                  radii: Union[List[float], float],
                  loggs: Union[List[float], float],
                  dist: float,
+                 av: float=0,
                  nstars: int=2,
                  verbose: bool=False) -> _np.ndarray[float]:
     """
@@ -345,13 +347,14 @@ def create_theta(teffs: Union[List[float], float],
     :radii: stars' radii [Rsun] as a list of floats nstars long or a single float (same value each)
     :loggs: stars' log(g) as a list of floats nstars long or a single float (same value each)
     :dist: the distance [parsecs] as a single float
-    :nstars: the number of stars we're building for 
+    :av: the Av extinction parameter
+    :nstars: the number of stars we're building for
     :returns: the resulting theta list
     """
-    theta = _np.empty((nstars * 3 + 1), dtype=float)
+    theta = _np.empty((nstars * 3 + 2), dtype=float)
     ix = 0
-    for name, val in [("teffs", teffs), ("radii", radii), ("loggs", loggs), ("dist", dist)]:
-        exp_count = 1 if name == "dist" else nstars
+    for name, val in [("teffs", teffs),("radii", radii),("loggs", loggs),("dist", dist),("av", av)]:
+        exp_count = 1 if name in ("dist", "av") else nstars
 
         # Attempt to interpret the value as a List[Number]
         if isinstance(val, Number):

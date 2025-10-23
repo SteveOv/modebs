@@ -398,7 +398,7 @@ class BtSettlGrid(StellarGrid):
 
         # Create a table of interpolators, one per filter, for interpolating filter fluxes
         # for each filter for given teff, logg and metal values.
-        self._model_interps = _np.empty(shape=(len(self._filters), ), 
+        self._model_interps = _np.empty(shape=(len(self._filters), ),
                                         dtype=[("filter", "<U50"), ("interp", object)])
         for filter_ix, filter_name in enumerate(self._filters):
             self._model_interps[filter_ix] = (
@@ -425,7 +425,7 @@ class BtSettlGrid(StellarGrid):
         if radius is not None and distance is not None:
             flux *= ((radius * self._R_sun) / (distance * self._pc))**2
         if av is not None and self.extinction_model is not None:
-            flux *= self.extinction_model.extinguish(self.wavenumbers, Av=av)
+            flux *= self.extinction_model.extinguish(self.wavenumbers << (1 / _u.um), Av=av)
         return flux
 
     def get_filter_fluxes(self,
@@ -443,7 +443,7 @@ class BtSettlGrid(StellarGrid):
         else:
             unique_filters, flux_mappings = _np.unique(filters, return_inverse=True)
 
-        if av is None:
+        if not av: # so None or 0.0
             # As there's no av we can use the pre-calculated grid of unreddened filter fluxes
             # Get the fluxes once for each of the unique filters
             if unique_filters.dtype not in (_np.int64, _np.int32): # Need the filters' column index

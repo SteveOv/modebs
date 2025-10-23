@@ -60,6 +60,7 @@ if __name__ == "__main__":
                                                         dec=_tbl["dec"][0] * u.deg,
                                                         distance=1000 / _tbl["parallax"][0] * u.pc,
                                                         frame="icrs")
+        target_data["distance_pc"] = 1000 / _tbl["parallax"][0]
         print(f"{TARGET} SkyCoords are {_coords} (or {_coords.to_string('hmsdms')})")
 
     # Lookup the TESS Input Catalog (8.2) for starting "system" Teff and logg values
@@ -93,13 +94,12 @@ if __name__ == "__main__":
         print(f"{p:>12s} = {target_data[p]:.3f} {unit or u.dimensionless_unscaled:unicode}")
     print(f"      teffs0 = [{', '.join(f'{t:.3f}' for t in target_data['teffs0'])}]")
 
-
-    # Read the pre-built bt-settl model file
-    model_grid = BtSettlGrid()
-
     # The G23 (Gordon et al., 2023) Milky Way R(V) filter gives us the broadest coverage
     ext_model = G23(Rv=3.1)
     ext_wl_range = np.reciprocal(ext_model.x_range) * u.um # x_range has implicit units of 1/micron
+
+    # Read the pre-built bt-settl model file
+    model_grid = BtSettlGrid(extinction_model=ext_model)
 
     # Read in the SED for this target and de-duplicate (measurements may appear multiple times).
     sed = get_sed_for_target(TARGET, target_data["search_term"], radius=0.1, remove_duplicates=True)
@@ -125,18 +125,25 @@ if __name__ == "__main__":
 
 
     # Deredden; specific to CM Dra
-    EBV = 0.000515
-    sed["sed_der_flux"] = sed["sed_flux"] / ext_model.extinguish(sed["sed_wl"].to(u.um), Ebv=EBV)
+    fit_av = False
+    if fit_av:
+        sed["sed_der_flux"] = sed["sed_flux"]
+    else:
+        av = 0.000515 / 3.1
+        sed["sed_der_flux"] = sed["sed_flux"] / ext_model.extinguish(sed["sed_wl"].to(u.um), Av=av)
 
     NUM_STARS = 2
     fit_mask = np.array([True] * NUM_STARS      # Teff
                         + [True] * NUM_STARS    # radius
                         + [False] * NUM_STARS   # logg
-                        + [False])              # dist
+                        + [False]               # dist
+                        + [fit_av])             # av
 
     # For now, hard coded to 2 stars. Same order as theta: teff, radii (, logg, dist are not fitted)
     teff_limits = model_grid.teff_range
     radius_limits = (0.1, 100)
+    dist_limits = (target_data["distance_pc"] * 0.95, target_data["distance_pc"] * 1.05)
+    av_limits = (0, 0.9)
     teff_ratio = (target_data["teff_ratio"].n, max(target_data["teff_ratio"].n * 0.05, target_data["teff_ratio"].s))
     radius_ratio = (target_data["k"].n, max(target_data["k"].n * 0.05, target_data["k"].s))
 
@@ -145,11 +152,13 @@ if __name__ == "__main__":
         The fitting prior callback function to evaluate the current set of candidate
         parameters (theta), returning a single ln(value) indicating their "goodness".
         """
-        teffs, radii = theta[0:2], theta[2:4]
+        teffs, radii, loggs, dist, av = theta[0:2], theta[2:4], theta[4:6], theta[6], theta[7]
 
         # Limit criteria checks - hard pass/fail on these
         if not all(teff_limits[0] <= t <= teff_limits[1] for t in teffs) or \
-            not all(radius_limits[0] <= r <= radius_limits[1] for r in radii):
+            not all(radius_limits[0] <= r <= radius_limits[1] for r in radii) or \
+            not dist_limits[0] <= dist <= dist_limits[1] or \
+            not av_limits[0] <= av <= av_limits[1]:
             return np.inf
 
         # Gaussian prior criteria: g(x) = 1/(σ*sqrt(2*pi)) * exp(-1/2 * (x-µ)^2/σ^2)
@@ -164,7 +173,8 @@ if __name__ == "__main__":
     theta0 = sed_fit.create_theta(teffs=target_data["teffs0"],
                                   radii=[1.0] * NUM_STARS,
                                   loggs=[target_data["logg_sys"].n] * NUM_STARS,
-                                  dist=target_data["skycoords"].distance.to(u.pc).value,
+                                  dist=target_data["distance_pc"],
+                                  av=0,
                                   nstars=NUM_STARS,
                                   verbose=True)
 
