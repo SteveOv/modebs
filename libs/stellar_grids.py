@@ -189,7 +189,8 @@ class StellarGrid(_AbstractBaseClass):
                           logg: float,
                           metal: float=0.,
                           radius: float=None,
-                          distance: float=None) -> _np.ndarray[float]:
+                          distance: float=None,
+                          av: float=None) -> _np.ndarray[float]:
         """
         Will return a ndarray of flux values calculated for requested filter names at
         the chosen effective temperature, logg and metallicity values.
@@ -206,6 +207,7 @@ class StellarGrid(_AbstractBaseClass):
         :metal: the metallicity for the fluxes
         :radius: optional stellar radius value in R_sun
         :distance: optional stellar distance value in pc
+        :av: optional A_v value with which to redden fluxes, if we also have an extinction model
         :returns: the resulting flux values (in implied flux_units)
         """
 
@@ -261,14 +263,14 @@ class StellarGrid(_AbstractBaseClass):
         :returns: the summed flux passed through the filter
         """
         # Work out the lambda range where the filter and binned data overlap
-        ol_lam_short = max(lambdas.min(), filter_table.meta["filter_short"])
-        ol_lam_long = min(lambdas.max(), filter_table.meta["filter_long"])
+        ol_lam_short = max(lambdas.min(), filter_table.meta["filter_short"].value)
+        ol_lam_long = min(lambdas.max(), filter_table.meta["filter_long"].value)
 
         if ol_lam_short > ol_lam_long: # No overlap; no flux
-            return 0.0 * fluxes.unit
+            return 0.0
 
         # Get the filter's transmission coeffs in the region it overlaps the fluxes
-        filter_lam = filter_table["Wavelength"].quantity
+        filter_lam = filter_table["Wavelength"].quantity.value
         filter_ol_mask = (ol_lam_short <= filter_lam) & (filter_lam <= ol_lam_long)
         filter_lam = filter_lam[filter_ol_mask]
         filter_trans = filter_table["Norm-Transmission"][filter_ol_mask].value
@@ -376,20 +378,19 @@ class BtSettlGrid(StellarGrid):
         # The json has names of supported Vizier SED filters & maps to the corresponding SVO name.
         with open(filter_map_file, "r", encoding="utf8") as j:
             filter_map = _json_load(j)
-        filters = { viz: self.get_filter(svo, self._LAM_UNIT) for viz, svo in filter_map.items() }
+        self._filters = { vz: self.get_filter(sv, self._LAM_UNIT) for vz,sv in filter_map.items() }
 
         # Populate a grid of pre-filtered, unreddened fluxes.
-        lams = wavelengths << self._LAM_UNIT
-        grid_filtered = _np.empty(interp_vals_shape + (len(filters),))
+        lams = wavelengths
+        grid_filtered = _np.empty(interp_vals_shape + (len(self._filters),))
         for teff, logg, metal in index_values:
             tix = _np.where(teffs == teff)
             lix = _np.where(loggs == logg)
             mix = _np.where(metals == metal)
-            fluxes = self._model_full_interp(xi=(teff, logg, metal)) << self._FLUX_UNIT
-            for filter_ix, (filter_name, filter_table) in enumerate(filters.items()):    # pylint: disable=unused-variable
+            fluxes = self._model_full_interp(xi=(teff, logg, metal))
+            for filter_ix, (filter_name, filter_table) in enumerate(self._filters.items()):    # pylint: disable=unused-variable
                 filter_flux = self._get_filtered_flux_total(lams, fluxes, filter_table)
-                grid_filtered[tix, lix, mix, filter_ix] = \
-                                filter_flux.to(self._FLUX_UNIT, equivalencies=_u.spectral()).value
+                grid_filtered[tix, lix, mix, filter_ix] = filter_flux
 
                 # # For teff=2000.0, logg=3.5, metal=0.0 and GAIA:Gbp ~ 1.7e-14 erg / s / cm^2
                 # test_flux = (( filter_flux * (1.0 * _u.Rsun).to(_u.cm)**2) \
@@ -397,9 +398,9 @@ class BtSettlGrid(StellarGrid):
 
         # Create a table of interpolators, one per filter, for interpolating filter fluxes
         # for each filter for given teff, logg and metal values.
-        self._model_interps = _np.empty(shape=(len(filters), ), 
+        self._model_interps = _np.empty(shape=(len(self._filters), ), 
                                         dtype=[("filter", "<U50"), ("interp", object)])
-        for filter_ix, filter_name in enumerate(filters):
+        for filter_ix, filter_name in enumerate(self._filters):
             self._model_interps[filter_ix] = (
                 filter_name,
                 _RegularGridInterpolator(index_points, grid_filtered[:, :, :, filter_ix], "linear")
@@ -409,7 +410,7 @@ class BtSettlGrid(StellarGrid):
                          logg_range=(loggs.min(), loggs.max()),
                          metal_range=(metals.min(), metals.max()),
                          wavelengths=wavelengths,
-                         filter_names=list(filters.keys()),
+                         filter_names=list(self._filters.keys()),
                          extinction_model=extinction_model)
 
 
@@ -433,25 +434,41 @@ class BtSettlGrid(StellarGrid):
                           logg: float,
                           metal: float=0.,
                           radius: float=None,
-                          distance: float=None) -> _np.ndarray[float]:
+                          distance: float=None,
+                          av: float=None) -> _np.ndarray[float]:
         # Find the unique filters and the map onto the request/response (a filter can appear > once)
+        # filters may be specified as either names or as indices (after call to get_filter_indices).
         if isinstance(filters, (str|int)):
             unique_filters, flux_mappings = _np.array([filters]), _np.array([0])
         else:
             unique_filters, flux_mappings = _np.unique(filters, return_inverse=True)
 
-        # Get the fluxes once for each of the unique filters
-        if unique_filters.dtype not in (_np.int64, _np.int32):
-            unique_filters = self.get_filter_indices(unique_filters)
-        xi = (teff, logg, metal)
-        fluxes = _np.array([self._model_interps[uf]["interp"](xi=xi) for uf in unique_filters])
+        if av is None:
+            # As there's no av we can use the pre-calculated grid of unreddened filter fluxes
+            # Get the fluxes once for each of the unique filters
+            if unique_filters.dtype not in (_np.int64, _np.int32): # Need the filters' column index
+                unique_filters = self.get_filter_indices(unique_filters)
+            filter_flux = _np.array([
+                self._model_interps[f]["interp"]((teff, logg, metal)) for f in unique_filters])
 
-        # Optionally adjust for stellar params
-        if radius is not None and distance is not None:
-            fluxes *= ((radius * self._R_sun) / (distance * self._pc))**2
+            # Optionally adjust for stellar params
+            if radius is not None and distance is not None:
+                filter_flux *= ((radius * self._R_sun) / (distance * self._pc))**2
+        elif self.extinction_model is not None:
+            # Get the full set of reddened fluxes will apply rad/distance as appropriate.
+            lam = self.wavelengths
+            flux = self.get_fluxes(teff, logg, metal, radius, distance, av)
+
+            # Now apply the filters
+            if unique_filters.dtype in (_np.int64, _np.int32):  # Need the names of the filters
+                unique_filters = [self._filter_names_list[i] for i in unique_filters]
+            filter_flux = _np.array([
+                self._get_filtered_flux_total(lam, flux, self._filters[f]) for f in unique_filters])
+        else:
+            raise ValueError("av specified but unable to redden flux without an extinction_model")
 
         # Map these fluxes onto the response, where a filter/flux may appear >1 times
-        return _np.array([fluxes[m] for m in flux_mappings], dtype=float)
+        return _np.array([filter_flux[m] for m in flux_mappings], dtype=float)
 
 
     @classmethod
@@ -580,17 +597,18 @@ if __name__ == "__main__":
     # https://svo2.cab.inta-csic.es/theory/newov2/index.php?models=bt-settl-agss
     # then decompress the tgz contents into the ../.cache/.modelgrids/bt-settl-agss dir
 
-    # pylint: disable=protected-access
-    in_files = (StellarGrid._CACHE_DIR / ".modelgrids/bt-settl-agss/").glob("lte*.dat.txt")
-    new_file = BtSettlGrid.make_grid_file(sorted(in_files))
+    bgrid = BtSettlGrid()
 
-    # Test what has been saved
-    bgrid = BtSettlGrid(new_file)
-    print(f"\nLoaded newly created model grid from {new_file}")
+    # # pylint: disable=protected-access
+    # in_files = (StellarGrid._CACHE_DIR / ".modelgrids/bt-settl-agss/").glob("lte*.dat.txt")
+    # new_file = BtSettlGrid.make_grid_file(sorted(in_files))
+
+    # # Test what has been saved
+    # bgrid = BtSettlGrid(new_file)
+    # print(f"\nLoaded newly created model grid from {new_file}")
     print("Teffs:", ",".join(f"{t:.2f}" for t in bgrid._model_full_interp.grid[0]))
     print("loggs:", ",".join(f"{l:.2f}" for l in bgrid._model_full_interp.grid[1]))
     print("metals:", ",".join(f"{m:.2f}" for m in bgrid._model_full_interp.grid[2]))
-    print("alphas:", ",".join(f"{a:.2f}" for a in bgrid._model_full_interp.grid[3]))
 
     print( "Filters:", ", ".join(bgrid._filter_names_list))
 

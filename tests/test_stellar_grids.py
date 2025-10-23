@@ -100,6 +100,21 @@ class TestBtSettlGrid(unittest.TestCase):
         return cls._flat_grid[row_mask, 4 + flux_ix][0]
 
     @classmethod
+    def _calculate_filtered_flux_values(cls, filters, lams, fluxes):
+        """
+        Calculates the total flux transmitted by the requested filter
+        """
+        if isinstance(filters, str):
+            filters = [filters]
+        filter_fluxes = np.zeros((len(filters)), float)
+        for ix, filter_name in enumerate(filters):
+            ftable = cls._known_filters[filter_name]
+            filter_lam = ftable["Wavelength"].value
+            filter_trans = ftable["Norm-Transmission"].value
+            filter_fluxes[ix] = np.sum(np.interp(filter_lam, lams, fluxes) * filter_trans)
+        return filter_fluxes
+
+    @classmethod
     def _get_filter_flux_values_from_flat_grid(cls, filters, teff, logg, metal, alpha=0):
         """
         Gets the total transmitted flux for each filter for the set of fluxes matching requested
@@ -109,14 +124,7 @@ class TestBtSettlGrid(unittest.TestCase):
         # Get the whole row of fluxes and lams
         fluxes = cls._get_flux_value_from_flat_grid(teff, logg, metal, alpha)
         lams = cls._flat_lams
-
-        filt_fluxes = []
-        for filt in ([filters] if isinstance(filters, str) else filters):
-            ftable = cls._known_filters[filt]
-            filter_lam = ftable["Wavelength"].value
-            filter_trans = ftable["Norm-Transmission"].value
-            filt_fluxes += [np.sum(np.interp(filter_lam, lams, fluxes) * filter_trans)]
-        return np.array(filt_fluxes)
+        return cls._calculate_filtered_flux_values(filters, lams, fluxes)
 
 
     #
@@ -318,6 +326,44 @@ class TestBtSettlGrid(unittest.TestCase):
 
                 self.assertIsInstance(fluxes, np.ndarray)
                 for exp_flux, flux in zip(exp_fluxes, fluxes):
+                    self.assertAlmostEqual(exp_flux, flux, 2)
+
+    def test_get_filter_fluxes_with_reddening(self):
+        """ Tests get_filter_fluxes() with use of pre-filtered grid and interpolated values """
+        ext_model = G23(Rv=3.1)
+        model_sed = BtSettlGrid(self._test_file, extinction_model=ext_model)
+
+        # Known fluxes; a whole row from which we'll calculate the expected filtered values
+        t5000_l40_m00 = self._get_flux_value_from_flat_grid(5000, 4.0, 0.0)
+        multi_gaia_filters = ["Gaia:G", "GAIA/GAIA3:Grp", "GAIA/GAIA3:Gbp"]
+        r1_d10 = (1.0 * u.R_sun).to(u.m)**2 / (10 * u.pc).to(u.m)**2
+
+        for filters,                teff,   logg,   metal,  rad,    dist,   av,     exp_unred_fluxes,       msg in [
+            (["GAIA/GAIA3:Gbp"],    5000,   4.0,    0.0,    None,   None,   None,   t5000_l40_m00,          "unreddened single filter"),
+            (multi_gaia_filters,    5000,   4.0,    0.0,    None,   None,   None,   t5000_l40_m00,          "unreddened multiple filters"),
+            # with av specified
+            (["GAIA/GAIA3:Gbp"],    5000,   4.0,    0.0,    None,   None,   0.1,    t5000_l40_m00,          "reddened single filter no rad/dist"),
+            (multi_gaia_filters,    5000,   4.0,    0.0,    None,   None,   0.1,    t5000_l40_m00,          "reddened multiple filters no rad/dist"),
+            (["GAIA/GAIA3:Gbp"],    5000,   4.0,    0.0,    1.0,    10.0,   0.1,    t5000_l40_m00 * r1_d10, "reddened single filter no rad/dist"),
+            (multi_gaia_filters,    5000,   4.0,    0.0,    1.0,    10.0,   0.1,    t5000_l40_m00 * r1_d10, "reddened multiple filters with rad/dist"),
+        ]:
+            with self.subTest(msg=msg):
+                if not av:
+                    exp_red_flux = exp_unred_fluxes[model_sed._wavelength_mask]
+                    exp_red_flux = self._calculate_filtered_flux_values(filters,
+                                                                        model_sed.wavelengths,
+                                                                        exp_red_flux)
+                else:
+                    wavenumbers = model_sed.wavenumbers
+                    exp_red_flux = exp_unred_fluxes[model_sed._wavelength_mask]
+                    exp_red_flux = exp_red_flux * ext_model.extinguish(wavenumbers, av)
+                    exp_red_flux = self._calculate_filtered_flux_values(filters,
+                                                                        model_sed.wavelengths,
+                                                                        exp_red_flux)
+
+                fluxes = model_sed.get_filter_fluxes(filters, teff, logg, metal, rad, dist, av)
+                self.assertIsInstance(fluxes, np.ndarray)
+                for exp_flux, flux in zip(exp_red_flux, fluxes):
                     self.assertAlmostEqual(exp_flux, flux, 2)
 
     def test_get_filter_fluxes_unknown_filter_name(self):
