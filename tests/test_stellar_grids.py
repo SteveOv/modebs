@@ -6,6 +6,7 @@ import unittest
 
 import numpy as np
 from dust_extinction.parameter_averages import G23
+import astropy.units as u
 
 from libs.stellar_grids import BtSettlGrid
 
@@ -13,6 +14,8 @@ class TestBtSettlGrid(unittest.TestCase):
     """ Unit tests for the BtSettlGrid class. """
     _this_dir = Path(getsourcefile(lambda:0)).parent
     _test_file = _this_dir / "data/stellar_grids/bt-settl-agss-test.npz"
+
+    # pylint: disable=protected-access, no-member, too-many-locals, too-many-arguments
 
     @classmethod
     def setUpClass(cls):
@@ -26,9 +29,9 @@ class TestBtSettlGrid(unittest.TestCase):
             #   - logg: 3.5 to 5.0
             #   - metal: -0.5 to 0.5
             #   - alpha: 0.0 to 0.2
-            # pylint: disable=protected-access
             in_files = (BtSettlGrid._CACHE_DIR / ".modelgrids/bt-settl-agss-test/").glob("lte*.dat.txt")
             BtSettlGrid.make_grid_file(in_files, cls._test_file)
+
 
     #
     #   __init__(data_file):
@@ -52,6 +55,7 @@ class TestBtSettlGrid(unittest.TestCase):
         self.assertEqual(model_grid.logg_range[1], 5.0)
         self.assertEqual(model_grid.metal_range[0], -0.5)
         self.assertEqual(model_grid.metal_range[1], 0.5)
+
 
     #
     #   has_filter(name) -> bool:
@@ -88,7 +92,7 @@ class TestBtSettlGrid(unittest.TestCase):
     #
     #   get_filter_indices(filter_names) -> np.ndarray[int]:
     #
-    def test_get_filter_indices_happy_path(self):
+    def test_get_filter_indices_known_filters(self):
         """ Tests get_filter_indices() with simple happy path requests """
         model_grid = BtSettlGrid(self._test_file)
 
@@ -103,7 +107,7 @@ class TestBtSettlGrid(unittest.TestCase):
                 self.assertIsInstance(response, np.ndarray)
                 self.assertListEqual(exp_response, response.tolist())
 
-    def test_get_filter_indices_unknown_filter(self):
+    def test_get_filter_indices_unknown_filters(self):
         """ Tests get_filter_indices() with unknown filters -> assert KeyError """
         model_sed = BtSettlGrid(self._test_file)
         for request, msg in [
@@ -114,107 +118,121 @@ class TestBtSettlGrid(unittest.TestCase):
             with self.subTest(msg=msg) and self.assertRaises(ValueError):
                 model_sed.get_filter_indices(request)
 
+
     #
     #   get_fluxes(teff, logg, metal=0, radius=None, distance=None, av=None) -> NDArray[float]
     #
-    def test_get_fluxes_happy_path_no_reddening(self):
+    def test_get_fluxes_no_reddening(self):
         """ Tests get_fluxes(teff, logg, metal, radius, dist) happy path tests for combinations of values"""
         model_sed = BtSettlGrid(self._test_file)
 
-        # Known values from test model file
-        # teff = 5000, logg = 4.0, metal = 0.0: flux[1000] == 582.976330
-        # teff = 5100, logg = 4.0, metal = 0.0: flux[1000] == 1093.662297
-        # teff = 5000, logg = 4.5, metal = 0.0: flux[1000] == 654.940372
-        # teff = 5000, logg = 4.0, metal = 0.3: flux[1000] == 474.171110
-        # 585.976330 * (1.0 * u.R_sun).to(u.m)**2 / (10 * u.pc).to(u.m)**2 == 2.979e-15
-        # (585.976330 + 1093.662297)/2 * (1.0 * u.R_sun).to(u.m)**2 / (10 * u.pc).to(u.m)**2 == 4.269026e-15
-        for teff,       logg,       metal,      radius, dist,   unred_at_1k,    msg in [
-            (5000,      4.0,        0.0,        None,   None,   582.976,        "basic non-interpolated flux"),
+        # Known values
+        t5000_l40_m00 = self._get_value_from_model_full_interp(model_sed, 5000, 4.0, 0.0, 1000)
+        t5100_l40_m00 = self._get_value_from_model_full_interp(model_sed, 5100, 4.0, 0.0, 1000)
+        t5000_l45_m00 = self._get_value_from_model_full_interp(model_sed, 5000, 4.5, 0.0, 1000)
+        t5000_l40_m03 = self._get_value_from_model_full_interp(model_sed, 5000, 4.0, 0.3, 1000)
+
+        t5500_l40_m00 = (t5000_l40_m00 + t5100_l40_m00) / 2     # Approx interpolated values
+        t5000_l425_m00 = (t5000_l40_m00 + t5000_l45_m00) / 2
+        t5000_l40_m015 = (t5000_l40_m00 + t5000_l40_m03) / 2
+
+        r1_d10 = (1.0 * u.R_sun).to(u.m)**2 / (10 * u.pc).to(u.m)**2    # radius & distance modifier
+
+        for teff,   logg,   metal,  radius, dist,   exp_flux_ix_1k,         msg in [
+            (5000,  4.0,    0.0,    None,   None,   t5000_l40_m00,          "basic non-interpolated flux"),
             # Interpolation
-            (5050,      4.0,        0.0,        None,   None,   838.320,        "teff triggers interpolation"),
-            (5000,      4.25,       0.0,        None,   None,   618.960,        "logg triggers interpolation"),
-            (5000,      4.0,        0.15,       None,   None,   528.570,        "metal triggers interpolation"),
+            (5050,  4.0,    0.0,    None,   None,   t5500_l40_m00,          "teff triggers interpolation"),
+            (5000,  4.25,   0.0,    None,   None,   t5000_l425_m00,         "logg triggers interpolation"),
+            (5000,  4.0,    0.15,   None,   None,   t5000_l40_m015,         "metal triggers interpolation"),
             # radius & distance
-            (5000,      4.0,        0.0,        1.0,    10.0,   2.979e-15,      "exact flux modified by radius & dist"),
-            (5050,      4.0,        0.0,        1.0,    10.0,   4.269e-15,      "interp' flux modified by radius & dist"),
+            (5000,  4.0,    0.0,    1.0,    10.0,   t5000_l40_m00 * r1_d10, "exact flux modified by radius & dist"),
+            (5050,  4.0,    0.0,    1.0,    10.0,   t5500_l40_m00 * r1_d10, "interp' flux modified by radius & dist"),
         ]:
             with self.subTest(msg=msg):
-                fluxes = model_sed.get_fluxes(teff, logg, metal, radius, dist)
-                self.assertAlmostEqual(unred_at_1k, fluxes[1000], 2)
+                flux = model_sed.get_fluxes(teff, logg, metal, radius, dist)[1000]
+                self.assertAlmostEqual(exp_flux_ix_1k, flux, 2)
 
-    def test_get_fluxes_test_reddening(self):
+    def test_get_fluxes_test_with_reddening(self):
         """ Tests get_fluxes(teff, logg, metal, radius, dist, av) happy path tests for redenning """
         ext_model = G23(Rv=3.1)
         model_sed = BtSettlGrid(self._test_file, extinction_model=ext_model)
 
-        # Known values from test model file
-        # teff = 5000, logg = 4.0, metal = 0.0: flux[1000] == 582.976330
-        # 585.976330 * (1.0 * u.R_sun).to(u.m)**2 / (10 * u.pc).to(u.m)**2 == 2.979e-15
-        for teff,       logg,       metal,      radius, dist,   av,     unred_at_1k,    msg in [
-            (5000,      4.0,        0.0,        None,   None,   None,   582.976,        "basic non-reddened flux"),
+        # Known values
+        t5000_l40_m00 = self._get_value_from_model_full_interp(model_sed, 5000, 4.0, 0.0, 1000)
+        r1_d10 = (1.0 * u.R_sun).to(u.m)**2 / (10 * u.pc).to(u.m)**2
+
+        # Index of 1000th flux after masking due to the ext_model restricting the wavelength range
+        ix_1k = 1000 - sum(~model_sed._wavelength_mask[:1000])
+
+        for teff,   logg,   metal,  radius, dist,   av,     exp_unred_flux_ix_1k,   msg in [
+            (5000,  4.0,    0.0,    None,   None,   None,   t5000_l40_m00,          "basic non-reddened flux"),
             # With Av specified
-            (5000,      4.0,        0.0,        None,   None,   0.1,    582.976,        "apply reddening"),
-            (5000,      4.0,        0.0,        1.0,    10.0,   0.1,    2.979e-15,      "apply reddening with radius & dist"),
+            (5000,  4.0,    0.0,    None,   None,   0.1,    t5000_l40_m00,          "apply reddening"),
+            (5000,  4.0,    0.0,    1.0,    10.0,   0.1,    t5000_l40_m00 * r1_d10, "apply reddening with radius & dist"),
         ]:
             with self.subTest(msg=msg):
-                # pylint: disable=protected-access
-                excl_bins = sum(~model_sed._wavelength_mask[:2000]) # How many bins lost @ short wl
-                ix_1k = 1000 - excl_bins
                 if not av:
-                    red_at_1k = unred_at_1k
+                    exp_red_flux_ix_1k = exp_unred_flux_ix_1k
                 else:
-                    red_at_1k = unred_at_1k * ext_model.extinguish(model_sed.wavenumbers[ix_1k], Av=av)
+                    exp_red_flux_ix_1k = exp_unred_flux_ix_1k * ext_model.extinguish(model_sed.wavenumbers[ix_1k], av)
 
-                fluxes = model_sed.get_fluxes(teff, logg, metal, radius, dist, av=av)
-                self.assertAlmostEqual(red_at_1k, fluxes[ix_1k], 2)
+                flux = model_sed.get_fluxes(teff, logg, metal, radius, dist, av=av)[ix_1k]
+                self.assertAlmostEqual(exp_red_flux_ix_1k, flux, 2)
+
+    def test_get_fluxes_stellar_params_out_of_range(self):
+        """ Tests get_fluxes() with Teff, logg or metal outside the model's range -> ValueError """
+        model_sed = BtSettlGrid(self._test_file)
+
+        for teff, logg, metal, msg in [
+            (1000, 4.0, 0.0, "test Teff out of range"),
+            (5000, 7.0, 0.0, "test logg out of range"),
+            (5000, 4.0, 2.0, "test metal out of range"),
+        ]:
+            with self.subTest(msg=msg):
+                with self.assertRaises(ValueError):
+                    model_sed.get_fluxes(teff, logg, metal)
 
 
     #
     #   get_filter_fluxes(filters, teff, logg, metal=0, radius=None, distance=None) -> np.ndarray[float] or u.Quantity:
     #
-    def test_get_filter_fluxes_pre_filtered_no_interp(self):
-        """ Tests get_filter_fluxes() with use of pre-filtered grid with exact row match (no interp fluxes) """
-        model_sed = BtSettlGrid(self._test_file)
-        model_interps = model_sed._model_interps    # pylint: disable=protected-access
-
-        for filters,                 teff,  logg,   metal,  msg in [
-            ("GAIA/GAIA3:Gbp",      5000,   4.0,    0.0,    "test single str filter"),
-            (["GAIA/GAIA3:Gbp"],    5000,   4.0,    0.0,    "test single list[str] filter"),
-            (["Gaia:G", "GAIA/GAIA3:Grp", "GAIA/GAIA3:Gbp"],
-                                    5000,   4.0,    0.0,    "test filters in different order to file cols"),
-            ("GAIA/GAIA3:Gbp",      5100,   4.0,    0.0,    "test different teff"),
-            ("GAIA/GAIA3:Gbp",      5000,   4.5,    0.0,    "test different logg"),
-            ("GAIA/GAIA3:Gbp",      5000,   4.0,    0.3,    "test different metal"), # not currently in grid
-        ]:
-            with self.subTest(msg=msg):
-                fluxes = model_sed.get_filter_fluxes(filters, teff, logg, metal)
-
-                xi = (teff, logg, metal)
-                filter_list = model_sed.get_filter_indices([filters] if isinstance(filters, str) else filters)
-                exp_fluxes = [model_interps[f]["interp"](xi=xi) for f in filter_list]
-
-                self.assertIsInstance(fluxes, np.ndarray)
-                self.assertListEqual(exp_fluxes, fluxes.tolist())
-
-    def test_get_filter_fluxes_pre_filtered_interp(self):
+    def test_get_filter_fluxes_no_reddening(self):
         """ Tests get_filter_fluxes() with use of pre-filtered grid and interpolated values """
         model_sed = BtSettlGrid(self._test_file)
-        model_interps = model_sed._model_interps    # pylint: disable=protected-access
 
-        for filters,                teff,   logg,   metal,  msg in [
-            ("GAIA/GAIA3:Gbp",      5050,   4.0,    0.0,    "test linear interpolation on teff"),
-            ("GAIA/GAIA3:Gbp",      5000,   4.25,   0.0,    "test linear interpolation on logg"),
-            ("GAIA/GAIA3:Gbp",      5000,   4.0,    0.15,   "test linear interpolation on metal"), # not currently in grid
+        # Known fluxes
+        t5000_l40_m00 = self._get_values_from_filter_interp(model_sed, "GAIA/GAIA3:Gbp", 5000, 4.0, 0.0)
+        t5100_l40_m00 = self._get_values_from_filter_interp(model_sed, "GAIA/GAIA3:Gbp", 5100, 4.0, 0.0)
+        t5000_l45_m00 = self._get_values_from_filter_interp(model_sed, "GAIA/GAIA3:Gbp", 5000, 4.5, 0.0)
+        t5000_l40_m03 = self._get_values_from_filter_interp(model_sed, "GAIA/GAIA3:Gbp", 5000, 4.0, 0.3)
+
+        multi_gaia_filters = ["Gaia:G", "GAIA/GAIA3:Grp", "GAIA/GAIA3:Gbp"]
+        t5000_l40_m00_x3 = self._get_values_from_filter_interp(model_sed, multi_gaia_filters, 5000, 4.0, 0.0)
+
+        t5050_l40_m00 = (t5000_l40_m00 + t5100_l40_m00) / 2         # Approx interpolated values
+        t5000_l425_m00 = (t5000_l40_m00 + t5000_l45_m00) / 2
+        t5000_l40_m015 = (t5000_l40_m00 + t5000_l40_m03) / 2
+
+        r1_d10 = (1.0 * u.R_sun).to(u.m)**2 / (10 * u.pc).to(u.m)**2
+
+        for filters,                teff,   logg,   metal,  rad,    dist,   exp_fluxes,                 msg in [
+            ("GAIA/GAIA3:Gbp",      5000,   4.0,    0.0,    None,   None,   t5000_l40_m00,              "test single str filter"),
+            (["GAIA/GAIA3:Gbp"],    5000,   4.0,    0.0,    None,   None,   t5000_l40_m00,              "test single list[str] filter"),
+            (multi_gaia_filters,    5000,   4.0,    0.0,    None,   None,   t5000_l40_m00_x3,           "multiple filters in different order to file cols"),
+            # Interpolation
+            ("GAIA/GAIA3:Gbp",      5050,   4.0,    0.0,    None,   None,   t5050_l40_m00,              "test interpolation on teff"),
+            ("GAIA/GAIA3:Gbp",      5000,   4.25,   0.0,    None,   None,   t5000_l425_m00,             "test interpolation on logg"),
+            ("GAIA/GAIA3:Gbp",      5000,   4.0,    0.15,   None,   None,   t5000_l40_m015,             "test interpolation on metal"),
+            # radius & distance
+            (["GAIA/GAIA3:Gbp"],    5000,   4.0,    0.0,    1.0,    10.0,   t5000_l40_m00 * r1_d10,     "test single list[str] filter"),
+            (multi_gaia_filters,    5000,   4.0,    0.0,    1.0,    10.0,   t5000_l40_m00_x3 * r1_d10,  "multiple filters in different order to file cols"),
         ]:
             with self.subTest(msg=msg):
-                fluxes = model_sed.get_filter_fluxes(filters, teff, logg, metal)
-
-                xi = (teff, logg, metal)
-                filter_list = model_sed.get_filter_indices([filters] if isinstance(filters, str) else filters)
-                exp_fluxes = [model_interps[f]["interp"](xi=xi) for f in filter_list]
+                fluxes = model_sed.get_filter_fluxes(filters, teff, logg, metal, rad, dist)
 
                 self.assertIsInstance(fluxes, np.ndarray)
-                self.assertListEqual(exp_fluxes, fluxes.tolist())
+                for exp_flux, flux in zip(exp_fluxes, fluxes):
+                    self.assertAlmostEqual(exp_flux, flux, 2)
 
     def test_get_filter_fluxes_unknown_filter_name(self):
         """ Tests get_filter_fluxes() with unknown filter names -> assert KeyError """
@@ -255,6 +273,24 @@ class TestBtSettlGrid(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     model_sed.get_filter_fluxes("Gaia:Gbp", teff, logg, metal)
 
+    #
+    #   Helpers
+    #
+    def _get_value_from_model_full_interp(self, model_sed: BtSettlGrid, teff, logg, metal, index=1000):
+        flux_interp = model_sed._model_full_interp
+        return flux_interp.values[flux_interp.grid[0]==teff, flux_interp.grid[1]==logg,
+                                  flux_interp.grid[2]==metal, index]
+
+    def _get_values_from_filter_interp(self, model_sed: BtSettlGrid, filters, teff, logg, metal):
+        # Get the expected value directly from the underlying data
+        model_interps = model_sed._model_interps
+        exp_fluxes = []
+        for filt in ([filters] if isinstance(filters, str) else filters):
+            interp = model_interps[model_interps["filter"] == filt]["interp"][0]
+            exp_fluxes += [interp.values[interp.grid[0]==teff,
+                                         interp.grid[1]==logg,
+                                         interp.grid[2]==metal][0]]
+        return np.array(exp_fluxes)
 
 if __name__ == "__main__":
     unittest.main()
