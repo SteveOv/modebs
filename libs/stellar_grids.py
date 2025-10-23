@@ -444,15 +444,14 @@ class BtSettlGrid(StellarGrid):
         if unique_filters.dtype not in (_np.int64, _np.int32):
             unique_filters = self.get_filter_indices(unique_filters)
         xi = (teff, logg, metal)
-        fluxes = [self._model_interps[filter]["interp"](xi=xi) for filter in unique_filters]
-
-        # Map these fluxes onto the response, where a filter/flux may appear >1 times
-        values = _np.array([fluxes[m] for m in flux_mappings], dtype=float)
+        fluxes = _np.array([self._model_interps[uf]["interp"](xi=xi) for uf in unique_filters])
 
         # Optionally adjust for stellar params
         if radius is not None and distance is not None:
-            values *= ((radius * self._R_sun) / (distance * self._pc))**2
-        return values
+            fluxes *= ((radius * self._R_sun) / (distance * self._pc))**2
+
+        # Map these fluxes onto the response, where a filter/flux may appear >1 times
+        return _np.array([fluxes[m] for m in flux_mappings], dtype=float)
 
 
     @classmethod
