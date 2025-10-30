@@ -15,7 +15,7 @@ from numpy.typing import ArrayLike as _ArrayLike
 
 from scipy.stats import binned_statistic as _binned_statistic
 from scipy.interpolate import RegularGridInterpolator as _RegularGridInterpolator
-from scipy.interpolate import interp1d as _interp1d
+from scipy.interpolate import RBFInterpolator as _RBFInterpolator
 
 import astropy.units as _u
 from astropy.table import Table as _Table
@@ -359,17 +359,20 @@ class BtSettlGrid(StellarGrid):
         sorted_ix = _np.argsort(index_values)
         fgrid = model_grid_full[sorted_ix].reshape(interp_vals_shape + (len(wavelengths), ))
 
-        # Interpolate any gaps in the grid along the teff axis (will investigate extending this)
+        # Interpolate any gaps in the grid. We can't interpolate on dimensions with only one choice.
+        findex = index_values[sorted_ix].reshape(interp_vals_shape)
+        findex_dims_with_choices = _np.array([d for d, size in enumerate(findex.shape) if size > 1])
         for wix in range(len(wavelengths)):
-            for mix in range(len(metals)):
-                for lix in range(len(loggs)):
-                    nanmask = _np.isnan(fgrid[..., lix, mix, wix])
-                    if all(nanmask):
-                        fgrid[nanmask, lix, mix, wix] = _np.zeros_like(nanmask, float)
-                    elif any(nanmask):
-                        ip = _interp1d(teffs[~nanmask], fgrid[~nanmask, lix, mix, wix],
-                                       kind="slinear", bounds_error=False, fill_value="extrapolate")
-                        fgrid[nanmask, lix, mix, wix] = ip(teffs[nanmask])
+            nans = _np.isnan(fgrid[:, :, :, wix])    # This lam across all other dims
+            if _np.all(nans):
+                raise ValueError("Ooops! Nothing to interp from")
+            if _np.any(nans):
+                # Awkward; each findex is a tuple of vals & we can't mask or use index lists on them
+                pts = _np.array([[ix[d] for d in findex_dims_with_choices] for ix in findex[~nans]])
+                xi = _np.array([[ix[d] for d in findex_dims_with_choices] for ix in findex[nans]])
+
+                # Set neighors to limit memory usage (scales ~quadratically with points otherwise)
+                fgrid[nans, wix] = _RBFInterpolator(pts, fgrid[~nans, wix], neighbors=100)(xi)
 
         # Create the single interpolator over the full grid of flux data. Used for the interpolation
         # of full spectrum of fluxes (over the wavelength range) for given teff, logg & metal.
@@ -597,7 +600,6 @@ if __name__ == "__main__":
     # https://svo2.cab.inta-csic.es/theory/newov2/index.php?models=bt-settl-agss
     # then decompress the tgz contents into the ../.cache/.modelgrids/bt-settl-agss dir
 
-    bgrid = BtSettlGrid()
 
     # pylint: disable=protected-access
     in_files = (StellarGrid._CACHE_DIR / ".modelgrids/bt-settl-agss/").glob("lte*.dat.txt")
