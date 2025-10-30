@@ -43,3 +43,6 @@ git+https://github.com/SteveOv/deblib
 
 # dEB jktebop parameter estimator
 git+https://github.com/SteveOv/ebop_maven
+
+# SED modelling and fitting library
+git+https://github.com/SteveOv/sed_fit
