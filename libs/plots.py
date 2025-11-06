@@ -1,7 +1,7 @@
 """ Training and testing specific plots. """
 # pylint: disable=too-many-arguments, too-many-locals, too-many-branches, too-many-statements
 from typing import Union, Tuple, Iterable, Generator, Callable, List
-from itertools import zip_longest
+from itertools import zip_longest, cycle
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -19,7 +19,7 @@ from uncertainties.unumpy import nominal_values
 from lightkurve import LightCurve as _LC, FoldedLightCurve as _FLC, LightCurveCollection as _LCC
 
 from sed_fit.stellar_grids import StellarGrid
-from sed_fit.sed_fit import model_func
+from sed_fit.fitter import model_func, iterate_theta
 
 def plot_sed(x: u.Quantity,
              fluxes: List[u.Quantity],
@@ -113,25 +113,29 @@ def plot_fitted_model(sed: Table,
     """
     # Generate model SED fluxes at points x for each set of component star params in theta
     x = model_grid.get_filter_indices(sed[sed_filter_colname])
-    th = nominal_values(theta)
-    comp_fluxes = model_func(th, x, model_grid, combine=False) * model_grid.flux_unit
-    sys_flux = np.sum(comp_fluxes, axis=0)
+    theta_noms = nominal_values(theta)
+    comp_fluxes = model_func(theta_noms, x, model_grid, combine=False) * model_grid.flux_unit
+
+    # Need a set of plot formats/colours to cover reasonable number of components
+    comp_fmts = ["*m", "+c", "xy", "2r"]
+    comp_colors = ["m", "c", "y", "r"]
 
     # Plot the fitted model against the derredened SED + show each star's contribution
-    fluxes = [sed[sed_flux_colname].quantity, sys_flux, comp_fluxes[0], comp_fluxes[1]]
-    flux_errs = [sed[sed_flux_err_colname].quantity, None, None, None]
-    fig = plot_sed(x=sed[sed_lambda_colname].to(u.um), fluxes=fluxes, flux_errs=flux_errs,
-                   fmts=["ob", ".k", "*g", "xr"],
-                   labels=["dereddened SED", "fitted pair", "fitted star A", "fitted star B"],
+    nstars = comp_fluxes.shape[0]
+    fig = plot_sed(sed[sed_lambda_colname].to(u.um),
+                   [sed[sed_flux_colname].quantity, np.sum(comp_fluxes, axis=0)] +list(comp_fluxes),
+                   [sed[sed_flux_err_colname].quantity, None] + [None]*nstars,
+                   ["ob", ".k"] + list(_cycle_for(comp_fmts, nstars)),
+                   ["dereddened SED", "fitted pair"] +[f"fitted star {i+1}" for i in range(nstars)],
                    **format_kwargs)
 
     # Plot the raw spectra for each component as a background
     spec_lams = model_grid.wavelengths * model_grid.wavelength_unit
     mask = spec_lams >= sed[sed_lambda_colname].quantity.min()
     mask &= spec_lams <= sed[sed_lambda_colname].quantity.max()
-    dist = th[-2]
-    for teff, rad, logg, c in [(th[0], th[2], th[4], "g"), (th[1], th[3], th[5], "r")]:
-        spec_flux = model_grid.get_fluxes(teff, logg, 0, rad, dist) * model_grid.flux_unit
+    for (teff, logg, rad, dist, av), c in zip(iterate_theta(theta_noms),
+                                              _cycle_for(comp_colors, nstars)):
+        spec_flux = model_grid.get_fluxes(teff, logg, 0, rad, dist, av) * model_grid.flux_unit
         fig.gca().plot(spec_lams[mask], spec_flux[mask], c=c, alpha=0.15, zorder=-100)
     return fig
 
@@ -263,3 +267,12 @@ def format_axes(ax: _Axes, title: str=None,
         legend = ax.get_legend()
         if legend:
             legend.remove()
+
+def _cycle_for(init_list: List, num_items: int):
+    """
+    Util func to cycle over the passed list and stop after yielding the required number of items
+    """
+    for i, v in enumerate(cycle(init_list)):
+        if i == num_items:
+            break
+        yield v

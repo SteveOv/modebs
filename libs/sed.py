@@ -180,7 +180,8 @@ def group_and_average_fluxes(sed: Table,
 
 
 def create_outliers_mask(sed: Table,
-                         temps0: Union[Tuple[float], List[float]]=(5000., 5000.),
+                         temps0: Union[Tuple[float], List[float], float]=(5000., 5000.),
+                         temp_ratios: Union[Tuple[float], List[float]]=None,
                          min_unmasked: float=15,
                          min_improvement_ratio: float=0.10,
                          test_stat_cutoff: float=10.,
@@ -192,8 +193,12 @@ def create_outliers_mask(sed: Table,
     out the farthest/worst outliers. This continues until the fits no longer improve or further
     masking would drop the number of remaining observations below a defined threshold.
 
+    The temp_ratios are optional as they can be inferred from temps0. However, also supported is
+    supplying the primary temp0 with the initial values of the companions inferred from the ratios.
+
     :sed: the source observations to evaluate
-    :temps0: the initial temperatures to use for the test fit
+    :temps0: the initial temperatures to use for the test fit or a single value if ratios also given
+    :temp_ratios: the ratios of the temps of the companion stars to the primary
     :min_unmasked: the minimum number of observations to leave unmasked, either as an explicit
     count (if > 1) or as a ratio of the initial number (if within (0, 1])
     :min_improvement_ratio: minimum ratio of test stat improvement required to add to outlier_mask
@@ -208,13 +213,22 @@ def create_outliers_mask(sed: Table,
     if sed_count <= min_unmasked:
         if verbose: print(f"No outliers masked as already {min_unmasked} or fewer SED rows")
         return outlier_mask
-    if verbose: print(f"Looking for outliers with BB fits initialized at Teff(s) {temps0}")
 
     # Initial temps & associated priors
-    temps0 = [temps0] if isinstance(temps0, Number) else temps0
-    temp_ratio = temps0[-1] / temps0[0]
-    temp_ratio_flex = temp_ratio * 0.05
+    if not isinstance(temps0, Number) and len(temps0) > 0:
+        if temp_ratios is None: # Infer the ratios from the starting temps
+            temp_ratios = [temp_comp / temps0[0] for temp_comp in temps0[1:]]
+    elif temp_ratios is not None:
+        if isinstance(temps0, Number): # Infer starting temps from ratios
+            temps0 = [temps0] + [temps0*ratio for ratio in temp_ratios]
+    if not len(temps0) == len(temp_ratios) + 1:
+        raise ValueError("Expecting one more temps0 value than temp_ratios")
+    temp_ratios_flex = [tr * 0.05 for tr in temp_ratios]
     temp_limits = (min(temps0) * 0.75, max(temps0) * 1.25)
+    if verbose:
+        print("Will find outliers by based on quick BB fits with initial Teff(s) = ["
+              + ", ".join(f"{t:.3f}" for t in temps0) + "] & Teff ratio priors = ["
+              + ", ".join(f"{r:.3f}" for r in temp_ratios) + "]+/-5%")
 
     # Prepare the x, y & y_err data for the model & objective funcs which access these data directly
     x = sed["sed_freq"].to(u.Hz, equivalencies=u.spectral()).value
@@ -229,10 +243,12 @@ def create_outliers_mask(sed: Table,
 
     # The minimize target func; checks temps against priors, calls the model func and evals the fit
     def objective_func(temps, mask) -> float:
-        if all(temp_limits[0] < t < temp_limits[1] for t in temps) \
-                and abs(temps[-1] / temps[0] - temp_ratio) < temp_ratio_flex:
-            return simple_like_func(scaled_bb_model(temps, mask), y[mask], y_err[mask])
-        return np.inf
+        if not all(temp_limits[0] <= t <= temp_limits[1] for t in temps):
+            return np.inf
+        if any(abs(temps[i+1] / temps[0] - temp_ratios[i]) > temp_ratios_flex[i]
+                                                                for i in range(len(temp_ratios))):
+            return np.inf
+        return simple_like_func(scaled_bb_model(temps, mask), y[mask], y_err[mask])
 
     # Iteratively fit the observations, remove the worst fitted points until fit no longer improves
     retain_mask = ~outlier_mask.copy()   # for initial/baseline fit nothing is excluded
