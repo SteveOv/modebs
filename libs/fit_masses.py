@@ -13,8 +13,12 @@ from emcee import EnsembleSampler
 
 from .mistisochrones import MistIsochrones, Phase
 
+min_phase = Phase.MS
+max_phase = Phase.EAGB
+
 mist_isos = MistIsochrones(metallicities=[0])
-log_ages = mist_isos.list_ages(feh=0, max_phase=Phase.RGB)
+log_ages = mist_isos.list_ages(feh=0, min_phase=min_phase, max_phase=max_phase)
+age_limits = (min(log_ages), max(log_ages))
 
 def _objective_func(theta: np.ndarray[float],
                     sys_mass: UFloat,
@@ -30,7 +34,8 @@ def _objective_func(theta: np.ndarray[float],
     masses, log_age = theta[:-1], theta[-1]
 
     # The "prior func"
-    if not 5.0 <= log_age <= 1.03e1 or not all(1e-1 <= mass <= 100 for mass in masses):
+    if not age_limits[0] <= log_age <= age_limits[1] \
+        or not all(0.1 <= mass <= 100 for mass in masses):
         retval = np.inf
     else:
         # Gaussian prior on the total masses
@@ -40,17 +45,17 @@ def _objective_func(theta: np.ndarray[float],
     model_radii = np.zeros_like(masses, float)
     model_teffs = np.zeros_like(masses, float)
     if np.isfinite(retval):
-        # TODO: find nearest log_age (need to replace with proper interpolation)
-        log_age = log_ages[(np.abs(log_ages - log_age)).argmin()]
-
-        for ix, mass in enumerate(masses):
-            try:
-                model_vals = mist_isos.stellar_params_for_mass(feh=0, log_age=log_age, mass=mass,
-                                                               params=["R", "Teff"])
-                model_radii[ix] = model_vals[0]
-                model_teffs[ix] = model_vals[1]
-            except ValueError:
-                retval = np.inf
+        try:
+            # TODO: find nearest log_age (need to replace with proper interpolation)
+            log_age = log_ages[(np.abs(log_ages - log_age)).argmin()]
+            for ix, mass in enumerate(masses):
+                vals = mist_isos.stellar_params_for_mass(feh=0, log_age=log_age, mass=mass,
+                                                        params=["R", "Teff"],
+                                                        min_phase=min_phase, max_phase=max_phase)
+                model_radii[ix] = vals[0]
+                model_teffs[ix] = vals[1]
+        except ValueError:
+            retval = np.inf
 
     # The "likelihood func"
     if np.isfinite(retval):
@@ -173,7 +178,7 @@ def mcmc_fit(theta0: np.ndarray[float],
                     tau = sampler.get_autocorr_time(c=5, tol=autocor_tol, quiet=True) * thin_by
                     if not any(np.isnan(tau)) \
                             and all(tau < step / 100) \
-                            and all(abs(prev_tau - tau) / prev_tau < 0.01):
+                            and all(abs(prev_tau - tau) / prev_tau < 0.03):
                         break
 
         if early_stopping and 0 < step < nsteps:
