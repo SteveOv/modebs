@@ -186,6 +186,7 @@ cython_debug/
 # MIST isochrones which should be downloaded from source
 libs/data/mist/*.txz
 libs/data/mist/MIST*/*.iso
+libs/data/mist/MIST*/*.eep
 libs/data/newera/PHOENIX*.*
 
 # Output and "in flight" files
