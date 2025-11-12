@@ -10,7 +10,7 @@ import numpy as np
 from uncertainties import UFloat
 from uncertainties.unumpy import uarray, nominal_values, std_devs
 
-from scipy.interpolate import RegularGridInterpolator, make_interp_spline
+from scipy.interpolate import RBFInterpolator
 from scipy.optimize import minimize, OptimizeResult, OptimizeWarning
 from emcee import EnsembleSampler
 
@@ -23,38 +23,37 @@ _this_dir = Path(getsourcefile(lambda:0)).parent
 ISO_FILE = _this_dir / "data/mist/MIST_v1.2_vvcrit0.4_basic_isos" \
                                                 / "MIST_v1.2_feh_p0.00_afe_p0.0_vvcrit0.4_basic.iso"
 iso = ISO(f"{ISO_FILE}", verbose=True)
-log_ages = np.array([ab["log10_isochrone_age_yr"][0] for ab in iso.isos \
-                        if ab["phase"][0] >= MIN_PHASE or ab["phase"][-1] <= MAX_PHASE])
 
-grid_ages = 10**log_ages
-age_limits = (min(grid_ages), max(grid_ages))
-
-grid_masses = np.geomspace(0.1, 20, 100, endpoint=True)
-mass_limits = (min(grid_masses), max(grid_masses))
-rad_grid = np.zeros((len(grid_ages), len(grid_masses)), dtype=float)
-teff_grid = np.zeros((len(grid_ages), len(grid_masses)), dtype=float)
-
-
-for age_ix, log_age in enumerate(sorted(log_ages)):
+# Build up the known datapoints and corresponding radius & teff values.
+# Get the linear values for these so that we can perform interpolation in linear space.
+ages_list = []
+masses_list = []
+radii_list = []
+teffs_list = []
+for log_age in sorted(iso.ages):
     iso_block = iso.isos[iso.age_index(log_age)]
-    mass_order = np.argsort(iso_block["star_mass"])
-    x = iso_block[mass_order]["star_mass"]
+    iso_block = iso_block[(iso_block["phase"] >= MIN_PHASE) & (iso_block["phase"] <= MAX_PHASE)]
+    if (new_rows := len(iso_block)) > 0:
+        mass_sort = np.argsort(iso_block["star_mass"])
 
-    # Populate grids with interpolated values for radius and teff at the grid masses
-    interp_rads = make_interp_spline(x, y=10**iso_block[mass_order]["log_R"], k=1)(grid_masses)
-    rad_grid[age_ix] = interp_rads
-    # if any(interp_rads < 0):
-    #     print(f"NEG RAD for age {log_age} and masses:",
-    #           ",".join(f"{m:.3f}" for m in grid_masses[interp_rads < 0]))
+        # Points
+        ages_list += [10**log_age] * new_rows
+        masses_list += list(iso_block[mass_sort]["star_mass"])
 
-    interp_teffs = make_interp_spline(x, y=10**iso_block[mass_order]["log_Teff"], k=1)(grid_masses)
-    teff_grid[age_ix] = interp_teffs
+        # Values
+        radii_list += list(10**iso_block[mass_sort]["log_R"])
+        teffs_list += list(10**iso_block[mass_sort]["log_Teff"])
 
-points = (grid_ages, grid_masses)
-radius_interp = RegularGridInterpolator(points=points, values=rad_grid, method="slinear")
-teff_interp = RegularGridInterpolator(points=points, values=teff_grid, method="slinear")
-del iso, rad_grid, teff_grid
+# Create the interpolators for radius and teff. Using RBF interpolation as we have irregular data.
+x = np.array(list(zip(ages_list, masses_list)), dtype=float)
+radius_interp = RBFInterpolator(x, radii_list, neighbors=2**x.ndim, smoothing=5, kernel="linear")
+teff_interp = RBFInterpolator(x, teffs_list, neighbors=2**x.ndim, smoothing=5, kernel="linear")
 
+# Priors based on the data
+age_limits = (min(ages_list), max(ages_list))
+mass_limits = (min(masses_list), max(masses_list))
+
+del x, ages_list, masses_list, radii_list, teffs_list, iso
 
 def _objective_func(theta: np.ndarray[float],
                     sys_mass: UFloat,
@@ -70,26 +69,19 @@ def _objective_func(theta: np.ndarray[float],
     masses, age = theta[:-1], 10**theta[-1]
 
     # The "prior func"
-    if not grid_ages[0] <= age <= age_limits[1] \
+    if not age_limits[0] <= age <= age_limits[1] \
         or not all(mass_limits[0] <= mass <= mass_limits[1] for mass in masses):
         retval = np.inf
     else:
         # Gaussian prior on the total masses
-        retval = ((sys_mass.n - np.sum(masses)) / sys_mass.s)**2
-        retval *= 0.5
+        retval = 0.5 * ((sys_mass.n - np.sum(masses)) / sys_mass.s)**2
 
     # The "model func"
-    model_radii = np.zeros_like(masses, float)
-    model_teffs = np.zeros_like(masses, float)
     if np.isfinite(retval):
-        try:
-            for ix, mass in enumerate(masses):
-                model_radii[ix] = radius_interp(xi=(age, mass))
-                model_teffs[ix] = teff_interp(xi=(age, mass))
-            if any(model_radii <= 0) or any(model_teffs <= 0):
-                # Out of range
-                retval = np.inf
-        except ValueError:
+        xi = np.array([(age, m) for m in masses])
+        model_radii = radius_interp(xi)
+        model_teffs = teff_interp(xi)
+        if any(model_radii <= 0) or any(model_teffs <= 0): # Out of range
             retval = np.inf
 
     # The "likelihood func"
@@ -167,6 +159,7 @@ def mcmc_fit(theta0: np.ndarray[float],
              seed: int=42,
              processes: int=1,
              early_stopping: bool=True,
+             early_stopping_threshold: float=0.01,
              progress: Union[bool, str]=False,
              verbose: bool=False) -> Tuple[np.ndarray[UFloat], EnsembleSampler]:
     """
@@ -182,6 +175,7 @@ def mcmc_fit(theta0: np.ndarray[float],
     :seed: optional seed for random behaviour
     :processes: optional number of parallel processes to use, or None to let code choose
     :early_stopping: stop fitting if solution has converged & further improvements are negligible
+    :early_stopping_threshold: the delta(tau) threshold below which to consider early stopping
     :progress: whether to show a progress bar (see emcee documentation for other values)
     :returns: fitted set of parameters as UFloats and an EnsembleSampler with details of the outcome
     """
@@ -215,7 +209,7 @@ def mcmc_fit(theta0: np.ndarray[float],
                     tau = sampler.get_autocorr_time(c=5, tol=0, quiet=True) * thin_by
                     if not any(np.isnan(tau)) \
                             and all(tau < step / 100) \
-                            and all(abs(prev_tau - tau) / prev_tau < 0.03):
+                            and all(abs(prev_tau - tau) / prev_tau < early_stopping_threshold):
                         break
 
         if early_stopping and 0 < step < nsteps:

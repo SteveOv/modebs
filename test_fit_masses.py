@@ -49,8 +49,9 @@ print_mass_theta(theta0, f"theta0 ({target})")
 theta_min_fit, _ = minimize_fit(theta0, sys_mass, obs_radii, obs_teffs, verbose=True)
 print_mass_theta(theta_min_fit, f"theta_min_fit ({target})")
 
-thin_by = 1
-theta_mcmc_fit, _ = mcmc_fit(theta0, sys_mass, obs_radii, obs_teffs,
+thin_by = 10
+theta_mcmc_fit, _ = mcmc_fit(theta_min_fit, sys_mass, obs_radii, obs_teffs,
                              nwalkers=100, nsteps=100000, thin_by=thin_by, seed=42,
-                             early_stopping=True, processes=8, progress=True, verbose=True)
+                             early_stopping=True, early_stopping_threshold=0.05, processes=8,
+                             progress=True, verbose=True)
 print_mass_theta(theta_mcmc_fit, f"theta_mcmc_fit ({target})")
