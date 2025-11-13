@@ -36,15 +36,15 @@ for log_age in sorted(iso.ages):
     if (new_rows := len(iso_block)) > 0:
         mass_sort = np.argsort(iso_block["star_mass"])
 
-        # Points
+        # Points/axes
         ages_list += [10**log_age] * new_rows
         masses_list += list(iso_block[mass_sort]["star_mass"])
 
-        # Values
+        # corresponding values
         radii_list += list(10**iso_block[mass_sort]["log_R"])
         teffs_list += list(10**iso_block[mass_sort]["log_Teff"])
 
-# Create the interpolators for radius and teff. Using RBF interpolation as we have irregular data.
+# Create the interpolators for radius and teff; using RBF interpolation as we have irregular data.
 x = np.array(list(zip(ages_list, masses_list)), dtype=float)
 radius_interp = RBFInterpolator(x, radii_list, neighbors=2**x.ndim, smoothing=5, kernel="linear")
 teff_interp = RBFInterpolator(x, teffs_list, neighbors=2**x.ndim, smoothing=5, kernel="linear")
@@ -62,21 +62,20 @@ def _objective_func(theta: np.ndarray[float],
                     minimizable: bool=False) -> float:
     """
     Optimizable objective function combining a _ln_prior_func, model_func and _ln_likelihood_func
-    to evaluates theta values consisting of stellar masses and age via MIST models to observed
-    stellar radii and teffs.
+    to evaluate theta values consisting of stellar masses and age by obtaining the corresponding
+    stellar radii & teffs from MIST models and fitting these to the observed values.
     """
     retval = 0
     masses, age = theta[:-1], 10**theta[-1]
 
-    # The "prior func"
+    # The "prior func": absolute yes/no handling of limits & Gaussian prior on total mass
     if not age_limits[0] <= age <= age_limits[1] \
         or not all(mass_limits[0] <= mass <= mass_limits[1] for mass in masses):
         retval = np.inf
     else:
-        # Gaussian prior on the total masses
         retval = 0.5 * ((sys_mass.n - np.sum(masses)) / sys_mass.s)**2
 
-    # The "model func"
+    # The "model func": gets the radii & teffs from stars' masses from MIST model via interpolators
     if np.isfinite(retval):
         xi = np.array([(age, m) for m in masses])
         model_radii = radius_interp(xi)
@@ -84,7 +83,7 @@ def _objective_func(theta: np.ndarray[float],
         if any(model_radii <= 0) or any(model_teffs <= 0): # Out of range
             retval = np.inf
 
-    # The "likelihood func"
+    # The "likelihood func": evaluates the "goodness" of radii & teffs match with the observations
     if np.isfinite(retval):
         degr_free = len(theta)
         chisq = 0
@@ -105,14 +104,16 @@ def minimize_fit(theta0: np.ndarray[float],
                  methods: List[str]=None,
                  verbose: bool=False) -> Tuple[np.ndarray[float], OptimizeResult]:
     """
-    Quick fit model masses via MIST models to the supplied sys_mass, radii and teffs.
+    A quick 'minimize' fit to find stars' mass and shared log10(age) values
+    by fitting corresponding radii & teffs from MIST models to observed values.
 
-    :theta0: the initial set of candidate parameters for the model SED
-    :sys_mass: the observed total mass of the systems
-    :radii: the observed stellar radii
-    :teffs: the observed stellar effective temperatures    
+    :theta0: the initial set of candidate mass (M_sun) and log10(age/yr) values
+    :sys_mass: the total mass of the system for use as a prior constraint (M_sun)
+    :radii: the observed stellar radii to fit against (R_sun)
+    :teffs: the observed stellar effective temperatures to fit against (K)
     :methods: scipy optimize fitting algorithms to try, defaults to [Nelder-Mead, SLSQP, None]
-    :returns: the final set of parameters & a scipy OptimizeResult with the details of the outcome
+    :returns: the fitted set of mass & log10(age) values and
+    a scipy OptimizeResult with the full details of the fitting outcome
     """
     if methods is None:
         methods = ["Nelder-Mead", "SLSQP", None]
@@ -163,12 +164,13 @@ def mcmc_fit(theta0: np.ndarray[float],
              progress: Union[bool, str]=False,
              verbose: bool=False) -> Tuple[np.ndarray[UFloat], EnsembleSampler]:
     """
-    Full fit model masses via MIST models to the supplied sys_mass, radii and teffs.
+    A full MCMC fit to find stars' mass and shared log10(age) values
+    by fitting corresponding radii & teffs from MIST models to observed values.
 
-    :theta0: the initial set of candidate parameters for the model SED
-    :sys_mass: the observed total mass of the systems
-    :radii: the observed stellar radii
-    :teffs: the observed stellar effective temperatures
+    :theta0: the initial set of candidate mass (M_sun) and log10(age/yr) values
+    :sys_mass: the total mass of the system for use as a prior constraint (M_sun)
+    :radii: the observed stellar radii to fit against (R_sun)
+    :teffs: the observed stellar effective temperatures to fit against (K)
     :nwalkers: the number of mcmc walkers to employ
     :nsteps: the maximium number of mcmc steps to make for each walker
     :thin_by: step interval to inspect fit progress
@@ -177,7 +179,8 @@ def mcmc_fit(theta0: np.ndarray[float],
     :early_stopping: stop fitting if solution has converged & further improvements are negligible
     :early_stopping_threshold: the delta(tau) threshold below which to consider early stopping
     :progress: whether to show a progress bar (see emcee documentation for other values)
-    :returns: fitted set of parameters as UFloats and an EnsembleSampler with details of the outcome
+    :returns: the fitted set of mass and log(age) values as UFloats with 1-sigma uncertainties
+    and an EnsembleSampler with the full details of the fitting outcome
     """
     rng = np.random.default_rng(seed)
     ndim = len(theta0)
@@ -214,7 +217,7 @@ def mcmc_fit(theta0: np.ndarray[float],
 
         if early_stopping and 0 < step < nsteps:
             print(f"Halting MCMC after {step:d} steps as the walkers are past",
-                    "100 times the autocorrelation time & the fit has converged.")
+                   "100 times the autocorrelation time & the fit has converged.")
 
         tau = sampler.get_autocorr_time(c=5, tol=autocor_tol, quiet=True) * thin_by
         burn_in_steps = int(max(np.nan_to_num(tau, copy=True, nan=1000)) * 2)
