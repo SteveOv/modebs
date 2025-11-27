@@ -1,87 +1,38 @@
 {
-    "exclude_default": false,
+    "exclude_default": true,
     "target_configs": {
         "0007695666": {
-            "notes": "2 sectors @ 120 s (4 & 5); tess-ebs period ~17.5 d & morph 0.093; clear & deep eclipses with secondary nr phase 0.17 (high ecc); PDCSAP flatter than SAP;",
-            "flux_column": "pdcsap_flux",
+            "details": "2 fast sectors (4 & 5); tess-ebs morph 0.093 & period ~17.554 d; Gaia DR3 ruwe 1.717; eclipses of ~0.5 & ~0.4 mag with secondary nr phase 0.17 (high ecc);",
+            "notes": "need to clip LC regions w/o eclipses for good fit",
+            "flux_column": "sap_flux",
             "combine_sectors": true,
             "quality_masks": [[1420.0, 1424.0], [1451.0, 1465.0]],
             "phiS": 0.17
         },
-        "0013957444": {
-            "notes": "2 sectors @ 120 s (5 & 32); tess-ebs period ~3.74 d & morph 0.257; SpT F6V; clear eclipses - primary ~8% & secondary ~1.5%; secondary shallower than ideal but quick-fit indicates may be usable;"
-        },
         "0022538139": {
-            "notes": "2 sectors @ 120 s (8 & 61); tess-ebs period ~4.6 d morph 0.321; SpT A2Vs; clear deep primary (>10%) and shallow secondary (<1%) transit; well detached & dissimilar components; SAP flux generally better; despite shallow secondary may be worth trying",
-            "quality_masks": [[1533.0, 1537.0]]
+            "details": "2 fast sectors (8 & 61); tess-ebs morph 0.321 & period ~4.633 d; not showing in Gaia DR3; aka V362 Pup; SpT A2Vs; eclipses of ~0.12 & ~0.01 mag with secondary likely total; shallow secondary eclipses mitigated by their totallity;",
+            "notes": "need to clip distorted LC region in S8 for good fit",
+            "quality_masks": [[1530.0, 1537.5]]
         },
         "0024433067": {
-            "notes": "1 sectors @ 120 s (5); tess-ebs period ~6.2 d & morph 0.466; SpT K0V+K2V; clear deep eclipses (>50% & 40%); SAP & PDCSAP similar; may need flattening/detrending;",
+            "details": "1 fast sector (5); tess-ebs morph 0.466 & period ~6.186 d; Gaia DR3 ruwe~1.007; SpT K0V+K2V; eclipses of ~0.9 & ~0.6 mag;",
+            "notes": "difficult LC fit - work to do (LD coeffs?)",
             "quality_masks": [[1437.0, 1440.0]]
         },
+        "0030034081": {
+            "details": "38 fast sectors; tess-ebs morph 0.506 & period ~2.345 d; Gaia DR3 ruwe 0.744; Aka AT Men; Spt G0; eclipses of >0.6 mag;",
+            "notes": "no secondary if using tess-ebs period - need to double it; may need to flatten LCs too;",
+            "double_period": true
+        },
         "0030313682": {
-            "notes": "~20 sectors @ 120 s; tess-ebs period ~5.7 d morph 0.422; clear eclipses at <15% and 10%; lots of variability; SAP & PDCSAP similar; may need flattening/detrending;",
-            "quality_masks": [[1337.0, 1339.0], [1366.5, 1367.5], [1449.5, 1450.5], [1420.0, 1424.0], [1581.0, 1582.0], [1667.0, 1668.0], [3165.0, 3170.0], [3689.0, 3691.0], [3703.0, 3706.0]]
-        },
-        "0031810287": {
-            "notes": "6 sectors @ 120 s (8, 9, 35, 36, 62 & 63); tess-ebs period ~4.8 d morph 0.233; deep primary ~25% and shallower secondary ~5%; lots of variability; SAP & PDCSAP similar; may need flattening/detrending;",
-            "quality_masks": [[1535.0, 1538.0], [2266.0, 2268.0]]
-        },
-        "0032759110": {
-            "notes": "1 sector @ 120 s (6); tess-ebs period ~4.1 d morph 0.128; SpT M4.5Ve; clear eclipses at <14% and 12%; some of variability; SAP & PDCSAP similar; may need flattening/detrending; very interesting!;"
-        },
-        "0037606218": {
-            "notes": "2 sectors @ 120 s (6 & 87); tess-ebs period ~7.8 d morph 0.210; clear eclipses at 10% and ~1%; PDCSAP fixes discontinuity in SAP on S87; secondary shallower than ideal but quick-fit indicates may be usable;",
-            "flux_column": "pdcsap_flux",
-            "quality_masks": [[3676.5, 3685.0]],
-            "detrend_poly_degree": 2,
-            "phiS": 0.55
-        },
-        "0048658291": {
-            "notes": "1 sector @ 120 s (6); tess-ebs period ~3.2 d morph 0.400; clear eclipses of ~9% & 8%; some of variability between eclipses (& potentially ellipsoidal effect); SAP & PDCSAP similar;",
-            "quality_masks": [[1476.5, 1477.5]]
-        },
-        "0055404385": {
-            "notes": ">30 sectors @ 120 s; tess-ebs period ~2.95 d morph 0.324; SpT F5V; clear primary & secondary of ~10% & ~4%; some variability between eclipses beyound ellipsoidal effect;SAP & PDCSAP similar; potentially use a subset of quiet sectors (s2?)",
-            "quality_masks": [[1410.0, 1411.5], [1420.0, 1424.0], [1528.5, 1529.5], [1628.0, 1630.0], [2266.0, 2268.0], [2976.5, 2977.5]]
-        },
-        "0055497281": {
-            "notes": ">30 sectors @ 120 s; tess-ebs period ~14.9 d morph 0.070; SpT F8V; very clear primary & secondary of ~35% & ~30%; little variability between eclipses; SAP & PDCSAP similar; usually 2 to 3 eclipses per sector so maybe combine subset",
-            "quality_masks": [[1337.0, 1342.0], [1366.0, 1372.0], [1420.0, 1423.0], [1449.0, 1451.0], [2094.5, 2100.0], [2291.0, 2297.0]]
-        },
-        "0063579446": {
-            "notes": "2 sectors @ 120 s (7 & 87); tess-ebs period ~5.6 d morph 0.382; clear eclipses of ~30% & 28%; sector 87 highly distorted however sector 7 is fine; SAP & PDCSAP similar;",
-            "exclude_sectors": [87]
-        },
-        "0064783257": {
-            "notes": "1 sector @ 120 s (7); tess-ebs period ~3.86 d morph 0.263; both eclipses ~10% although quite noisy as a faint target; PDCSAP better/flatter than SAP;"
-        },
-        "0066509654": {
-            "notes": "2 sectors @ 120 s (7 & 61); tess-ebs period ~5.3 d morph 0.224; both eclipses ~20% although quite noisy as a faint target; some variability & flares between eclipses with PDCSAP better/flatter than SAP;"
-        },
-        "0066602813": {
-            "notes": "6 sectors @ 120 s; tess-ebs period ~2.8 d morph 0.352; clear eclipses of ~40% and ~20%; some variability between eclipses; SAP & PDCSAP similar;",
-            "quality_masks": [[2228.0, 2230.0], [2974.0, 2976.0], [3663.0, 3665.5], [3678.0, 3680.0]]
-        },
-        "0077158150": {
-            "notes": "2 sectors @ 120 s (4 & 5); tess-ebs period ~2.5 d morph 0.466; SpT A4V; aka V* RZ Cae; not in Gaia DR3 so parallax from Hipparcos; clear eclipses of ~20% and ~13%; ellipsoidal variation; SAP & PDCSAP similar",
+            "details": "27 fast sectors; tess-ebs morph 0.422 & period ~5.727 d; Gaia DR3 ruwe 0.920; lots of variability - starspots?; eclipses of ~0.17 & ~0.12 mag; secondary eclipse is total;",
+            "notes": "lots of sectors - may just need to choose the cleanest/least variable;",
             "quality_masks": [[1420.0, 1423.0]]
         },
-        "0078568736": {
-            "notes": "3 sectors @ 120 s (6, 7 & 87); tess-ebs period ~8.2 d morph 0.159; SpT G; clear eclipses of ~40% and 10%; slow variability - may require flattening; ephemeris shifted between S6/7 and S87; SAP & PDCSAP similar;",
-            "quality_masks": [[3676.0, 3678.0]]
-        },
-        "0080556181": {
-            "notes": "2 sectors @ 120 s (7 & 87); tess-ebs period ~2.8 d morph 0.481; clear eclipses of ~34% and 24%; slow variability & ellipsoidal effect; ephemeris shifted between S7 and S87; SAP & PDCSAP similar;"
-        },
-        "0118313102": {
-            "notes": "8 sectors @ 120 s (8/9/10, 35/36 & 61/62/63); tess-ebs period ~9.3 d morph 0.180; SpT B6V(n); aka V* NT Vel; very deep and sharp eclipses of >40% with secondary near phase 0.4; evidence of pulsations between eclipses; PDCSAP distorts SAP;",
-            "quality_masks": [[1534.0, 1538.0], [1554.5, 1556.0], [2266.0, 2273.0]],
-            "phiS": 0.4
-        },
-        "0141685465": {
-            "notes": "22 sectors @ 120 s (4 ... 89); tess-ebs period ~7.8 d morph 0.220; clear eclipses of ~25% & ~6%; PDCSAP introduces distortions so stick with SAP and clip;",
-            "quality_masks": [[1420.0, 1423.0], [1594.0, 1596.0], [1534.0, 1536.0], [3702.5, 3705.0], [3717.0, 3720.0], [3760.5, 3761.5]]
+        "0031054255": {
+            "details": "3 fast sectors (5,6,32); tess-ebs morph 0.295 & period ~0.874 d; Gaia DR3 ruwe 1.164; SpT M4-5+M4-5; flat LCs (despite short period) with eclipses of ~0.3 mag; some flares;",
+            "notes": "no secondary if using tess-ebs period - need to double it; too cool for Kurucz grid;",
+            "double_period": true
         }
     }
 }
