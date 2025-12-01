@@ -214,15 +214,15 @@ def create_outliers_mask(sed: Table,
         if verbose: print(f"No outliers masked as already {min_unmasked} or fewer SED rows")
         return outlier_mask
 
-    # Initial temps & associated priors
-    if not isinstance(temps0, Number) and len(temps0) > 0:
-        if temp_ratios is None: # Infer the ratios from the starting temps
-            temp_ratios = [temp_comp / temps0[0] for temp_comp in temps0[1:]]
-    elif temp_ratios is not None:
-        if isinstance(temps0, Number): # Infer starting temps from ratios
-            temps0 = [temps0] + [temps0*ratio for ratio in temp_ratios]
-    if not len(temps0) == len(temp_ratios) + 1:
+    if isinstance(temps0, Number|UFloat): # Always expect at least one temps0 value
+        temps0 = [temps0]
+    if temp_ratios is None or len(temp_ratios) == 0: # Infer temp_ratios from temps0
+        temp_ratios = [] if len(temps0) == 1 else [tcomp / temps0[0] for tcomp in temps0[1:]]
+    if len(temp_ratios) > 0 and len(temps0) == 1: # Expand temps0 from single value based on ratios
+        temps0 = [temps0[0]] + [temps0[0]*ratio for ratio in temp_ratios]
+    if len(temps0) != len(temp_ratios) + 1:
         raise ValueError("Expecting one more temps0 value than temp_ratios")
+
     temps0 = unumpy.nominal_values(temps0)
     temp_ratios = unumpy.nominal_values(temp_ratios)
     temp_ratios_flex = [tr * 0.05 for tr in temp_ratios]

@@ -242,7 +242,7 @@ class Testsed(unittest.TestCase):
                 sed = get_sed_for_target(target, remove_duplicates= True)
                 print(f"\n{target} / '{msg}': Number of fluxes to start: {len(sed)}")
 
-                mask = create_outliers_mask(sed, temps0, min_unmasked, verbose=True)
+                mask = create_outliers_mask(sed, temps0, min_unmasked=min_unmasked, verbose=True)
                 self.assertTrue(isinstance(mask, np.ndarray))
                 self.assertTrue(mask.dtype == np.dtype(bool))
                 self.assertEqual(len(sed), len(mask))
