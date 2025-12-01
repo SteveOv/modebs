@@ -223,6 +223,8 @@ def create_outliers_mask(sed: Table,
             temps0 = [temps0] + [temps0*ratio for ratio in temp_ratios]
     if not len(temps0) == len(temp_ratios) + 1:
         raise ValueError("Expecting one more temps0 value than temp_ratios")
+    temps0 = unumpy.nominal_values(temps0)
+    temp_ratios = unumpy.nominal_values(temp_ratios)
     temp_ratios_flex = [tr * 0.05 for tr in temp_ratios]
     temp_limits = (min(temps0) * 0.75, max(temps0) * 1.25)
     if verbose:
