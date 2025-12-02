@@ -117,6 +117,73 @@
         "0078568736": {
             "details": "3 fast sectors (6, 7 & 33); tess-ebs morph 0.159 & period ~8.220 d; Gaia DR3 ruwe 1.738; SpT G; eclipses of ~0.55 & ~0.11 mag; slow variability;",
             "notes": "test fits & ebop maven fit different values for each sector - may need to flatten for the variability;"
+        },
+        "0080556181": {
+            "details": "2 fast sectors (7 & 87); tess-ebs morph 0.481 & period ~2.820 d; Gaia DR3 ruwe 1.705; eclipses of ~0.40 & ~0.26 mag; secondary eclipse may be total; eclipses show a phase shift of approximately -0.04 between the sectors;",
+            "notes": "S7 is an easy fit & no MC errors"
+        },
+        "0080650858": {
+            "details": "4 fast sectors (7, 8, 61 & 62); tess-ebs morph 0.517 & period ~1.916 d; Gaia DR3 ruwe 0.963; aka BH Pup; SpT B3/5III; eclipses of ~0.32 & ~0.10 mag; some variability; S8 heavily distorted after mid-sector break; secondary eclipse may be total;",
+            "notes": "",
+            "quality_masks": [[1534.0, 1544.0]]
+        },
+        "0118313102": {
+            "details": "8 fast sectors (8-10, 35, 36, 61-63); tess-ebs morph 0.180 & period ~9.256 d; Gaia DR3 ruwe 0.962; aka NT Vel; SpT B6V(n); deep eclipses of ~0.69 & ~0.66 mag; clear pulsations; S8 distorted after mid-sector break;",
+            "notes": "",
+            "quality_masks": [[1534.0, 1544.0]],
+            "phiS": 0.4
+        },
+        "0140209204": {
+            "details": "1 fast sector (5); tess-ebs morph 0.528 & period ~2.752 d; Gaia DR3 ruwe 0.868; aka SV Col; deep eclipses of ~0.46 & ~0.44 mag; ellipsoidal effect;",
+            "notes": ""
+        },
+        "0140659978": {
+            "details": "33 fast sectors (5-8,27-33,35-39,61-69,87-90,93-96); tess-ebs morph 0.090 & period ~9.440 d; Gaia DR3 ruwe 0.830; eclipses of ~0.15 & ~0.08 mag; variability (starspots?);",
+            "notes": "likely need flattening to deal with out of eclipse variability",
+            "phiS": 0.46
+        },
+        "0141685465": {
+            "details": "26 fast sectors (4-13, 61-65, 67-69, 87-90, 93-96); tess-ebs morph 0.220 & period ~7.807 d; Gaia DR3 ruwe 1.882; flat LCs with eclipses of ~0.28 & ~0.06 mag;",
+            "notes": ""
+        },
+        "0147975720": {
+            "details": "2 fast sectors (6 & 7); tess-ebs morph 0.179 & period ~2.850 d; Gaia DR3 ruwe 19.278; eclipses of ~0.3 mag; slow variability; flares;",
+            "notes": "no secondary visible with tess-ebs period;",
+            "double_period": true
+        },
+        "0149629043": {
+            "details": "15 fast sectors (9-13, 61, 62, 64, 65, 67, 69, 87-89, 94, 96); tess-ebs morph 0.455 & period ~2.188 d; Gaia DR3 ruwe 1.177; eclipses of ~0.35 & ~0.33 mag;",
+            "notes": "noticable variation in eclipse depths between sectors - L3?"
+        },
+        "0150361911": {
+            "details": "16 fast sectors (9-13, 62-68, 87, 89, 90, 94, 95); tess-ebs morph 0.461 & period ~2.494 d; Gaia DR3 ruwe 1.937;eclipses of ~0.25 & ~0. mag;",
+            "notes": "some variation in eclipse depths between sectors - L3?;eclipses shift phase by ~0.03 between early & late sectors"
+        },
+        "0153709888": {
+            "details": "2 fast sectors (4 & 5); tess-ebs morph 0.391 & period ~2.166 d; Gaia DR3 ruwe 0.938; eclipses of ~0.08 mag; slight variation between sectors;",
+            "notes": "double tess-ebs period; better fit found by combining the sectors; standard fit finds L3 approx -0.3;",
+            "combine_sectors": true,
+            "quality_masks": [[1420.0, 1424.0]],
+            "double_period": true
+        },
+        "0160328766": {
+            "details": "4 fast sectors (6, 32, 33 & 87); tess-ebs morph 0.199 & period ~10.318 d; Gaia DR3 ruwe 1.148; aka AW Col; SpT A3(m)A7-A7; eclipses of ~0.50 & ~0.15 mag; all sectors have at least 1 of each eclipse type;",
+            "notes": "well detached and highly eccentric; fix reflA/B to avoid warnings;",
+            "phiS": 0.77
+        },
+        "0167304040": {
+            "details": "20 fast sectors (9-13, 61-67, 69, 87-89, 93-96); tess-ebs morph 0.346 & period ~5.819 d; Gaia DR3 ruwe 1.123; eclipses of ~0.24 & ~0.22 mag;",
+            "notes": "eccentric with some negatic phase shift on later sectors; trouble fitting S61, however S9, 10, 62 & 63 are consistent;",
+            "phiS": 0.42
+        },
+        "0167747439": {
+            "details": "4 fast sectors (5, 6, 32, 33); tess-ebs morph 0.462 & period ~6.131 d; Gaia DR3 ruwe 1.052; eclipses of ~0.06 & ~0.01 mag; slight ellipsoidal effect; shallow eclipses mitigated by the secondary being total;",
+            "notes": "uncrowded field so consider fixing L3 at zero;"
+        },
+        "0167756615": {
+            "details": "1 fast sectors (5); tess-ebs morph 0.159 & period ~19.430 d; Gaia DR3 ruwe 2.227; SpT F5V; eclipses of ~0.18 & ~0.13 mag; despite longer period, one of each eclipse type;",
+            "notes": "slightly eccentric; test fits hint at evolved secondary;",
+            "phiS": 0.48
         }
     }
 }
