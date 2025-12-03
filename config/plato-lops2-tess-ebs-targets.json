@@ -1,8 +1,7 @@
 {
-    "source_vizier_table": "J/ApJS/258/16",
-    "morphology_filter": [0, 0.6],
-    "exclude_unlisted": false,
-    "exclude_default": false,
+    "target_config_defaults": {
+        "quality_bitmask": "hardest"
+    },
     "target_configs": {
     }
 }
