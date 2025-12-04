@@ -196,6 +196,45 @@ def fit_polynomial(times: Time,
     return (fit_ydata, coeffs) if include_coeffs else fit_ydata
 
 
+@u.quantity_input(period=u.d)
+def flatten_lightcurve(lc: LightCurve,
+                       mask_time_ranges: List[Union[Tuple[Time, Time], Tuple[float, float]]]=None,
+                       period: u.Quantity=None,
+                       verbose: bool=False,
+                       **kwargs) -> LightCurve:
+    """
+    Will return a flattened copy of the passed Lightcurve. This uses the LightCurve.flatten()
+    function and you can pass in a set of kwargs to be passed on to flatten(). As a convenience,
+    rather than setting the flatten() function's mask argument directly, you can specify the
+    mask_time_ranges List[(from, to)] and period arguments from which the mask is generated.
+    You must supply either mask_time_ranges & period values or a mask kwarg.
+
+    :lc: the LightCurve to flatten
+    :mask_time_ranges: optional List of time ranges for which a mask is generated
+    :period: the orbital period to use with the above time ranges
+    :verbose: whether or not to generate progress messages
+    :kwargs: to be passed directly to the LightCurve.flatten() function
+    :returns: the flattened LightCurve
+    """
+    if mask_time_ranges and period is not None:
+        # This will be used to set the mask kwargs item, so will override it if already present.
+        if verbose:
+            print(f"Creating a flatten eclipse mask from {len(mask_time_ranges)}",
+                  f"eclipse time range(s) and the orbital period of {period}.")
+        eclipse_times = [to_lc_time(np.mean(t), lc) for t in mask_time_ranges]
+        durations = [max(t)-min(t) for t in mask_time_ranges]
+        period = [period] * len(eclipse_times)
+        kwargs["mask"] = lc.create_transit_mask(period, eclipse_times, durations)
+    if "mask" in kwargs:
+        pass
+    else:
+        raise ValueError("Must specify mask_time_ranges and period, or give a mask kwarg")
+
+    if verbose:
+        print("Flattening the light curve")
+    return lc.flatten(**kwargs)
+
+
 def to_lc_time(value: Union[Time, np.double, Tuple[np.double], List[np.double,]], lc: LightCurve) \
                 -> Time:
     """
