@@ -84,7 +84,8 @@ def get_teff_from_spt(target_spt):
 
 def pop_and_complete_ld_config(source_cfg: dict[str, any],
                                teffa: float, teffb: float,
-                               logga: float, loggb: float) -> dict[str, any]:
+                               logga: float, loggb: float,
+                               verbose: bool=False) -> dict[str, any]:
     """
     Will set up the limb darkening algo and coeffs, first by popping them from the source_cfg
     dictionary then completing the config with missing values. Where missing, the algo defaults
@@ -98,16 +99,17 @@ def pop_and_complete_ld_config(source_cfg: dict[str, any],
     :teffb: effective temp of star B
     :logga: log(g) of star A
     :loggb: log(g) of star B
+    :verbose: whether or not to output details of the params chosen to stdout
     :return: the LD params only dict
     """
-    ld_params = {}
+    params = {}
     for ld in [k for k in source_cfg if k.startswith("LD") and not k.endswith("_fit")]:
-        ld_params[ld] = source_cfg.pop(ld)
+        params[ld] = source_cfg.pop(ld)
 
     for star, teff, logg in [("A", teffa, logga), ("B", teffb, loggb)]:
-        algo = ld_params.get(f"LD{star}", "quad") # Only quad, pow2 or h1h2 supported
-        if f"LD{star}" not in ld_params \
-                or f"LD{star}1" not in ld_params or f"LD{star}2" not in ld_params:
+        algo = params.get(f"LD{star}", "quad") # Only quad, pow2 or h1h2 supported
+        if f"LD{star}" not in params \
+                or f"LD{star}1" not in params or f"LD{star}2" not in params:
             # If we've not been given overrides for both the algo and coeffs we can look them up
             if algo.lower() == "same":
                 coeffs = (0, 0) # JKTEBOP uses the A star params for both
@@ -117,13 +119,16 @@ def pop_and_complete_ld_config(source_cfg: dict[str, any],
                 coeffs = limb_darkening.lookup_pow2_coefficients(logg, teff)
 
             # Add any missing algo/coeffs tags to the overrides
-            ld_params.setdefault(f"LD{star}", algo)
+            params.setdefault(f"LD{star}", algo)
             if algo.lower() == "h1h2":
                 # The h1h2 reparameterisation of the pow2 law addreeses correlation between the
                 # coeffs; see Maxted (2018A&A...616A..39M) and Southworth (2023Obs...143...71S)
-                ld_params.setdefault(f"LD{star}1", 1 - coeffs[0]*(1 - 2**(-coeffs[1])))
-                ld_params.setdefault(f"LD{star}2", coeffs[0] * 2**(-coeffs[1]))
+                params.setdefault(f"LD{star}1", 1 - coeffs[0]*(1 - 2**(-coeffs[1])))
+                params.setdefault(f"LD{star}2", coeffs[0] * 2**(-coeffs[1]))
             else:
-                ld_params.setdefault(f"LD{star}1", coeffs[0])
-                ld_params.setdefault(f"LD{star}2", coeffs[1])
-    return ld_params
+                params.setdefault(f"LD{star}1", coeffs[0])
+                params.setdefault(f"LD{star}2", coeffs[1])
+    if verbose:
+        print(f"Limb darkening params: StarA={params['LDA']}({params['LDA1']}, {params['LDA2']}),",
+              f"StarB={params['LDB']}({params['LDB1']}, {params['LDB2']})")
+    return params
