@@ -84,15 +84,6 @@
         },
 
 
-
-        "0149629043": {
-            "details": "15 short cadence sectors (9-13, 61, 62, 64, 65, 67, 69, 87-89, 94, 96); tess-ebs morph 0.455 & period ~2.188 d; Gaia DR3 ruwe 1.177; eclipses of ~0.35 & ~0.33 mag;",
-            "notes": "noticable variation in eclipse depths between sectors - L3?"
-        },
-        "0150361911": {
-            "details": "16 short cadence sectors (9-13, 62-68, 87, 89, 90, 94, 95); tess-ebs morph 0.461 & period ~2.494 d; Gaia DR3 ruwe 1.937;eclipses of ~0.25 & ~0. mag;",
-            "notes": "some variation in eclipse depths between sectors - L3?;eclipses shift phase by ~0.03 between early & late sectors"
-        },
         "0153709888": {
             "details": "2 short cadence sectors (4 & 5); tess-ebs morph 0.391 & period ~2.166 d; Gaia DR3 ruwe 0.938; eclipses of ~0.08 mag; slight variation between sectors;",
             "notes": "double tess-ebs period; better fit found by combining the sectors; standard fit finds L3 approx -0.3;",
@@ -100,6 +91,9 @@
             "quality_masks": [[1420.0, 1424.0]],
             "double_period": true
         },
+
+
+
         "0160328766": {
             "details": "4 short cadence sectors (6, 32, 33 & 87); tess-ebs morph 0.199 & period ~10.318 d; Gaia DR3 ruwe 1.148; aka AW Col; SpT A3(m)A7-A7; eclipses of ~0.50 & ~0.15 mag; all sectors have at least 1 of each eclipse type;",
             "notes": "well detached and highly eccentric; fix reflA/B to avoid warnings;",
