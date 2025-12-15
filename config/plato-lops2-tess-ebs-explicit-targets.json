@@ -96,6 +96,37 @@
             "quality_masks": [[3664.0, 3666.0]],
             "flatten": { "mask_time_ranges": [[1480.10, 1480.60], [1488.25, 1488.55]] },
             "phiS": 0.77
+        },
+
+
+
+        "0198011271": {
+            "details": "5 short cadence sectors (3-5, 69 & 97); tess-ebs morph 0.429 & period ~1.934 d; Gaia DR3 ruwe 0.852; high snr; eclipses of ~0.60 & ~0.35 mag; slow and random variability;",
+            "notes": "combining sectors 3 to 5 may be best way of handling variability; flattening may loose some ellipsoidal variation;",
+            "sectors": [[3, 4, 5]],
+            "quality_masks": [[1420.0, 1423.0]]
+        },
+        "0219421171": {
+            "details": "3 short cadence sectors (3-4 & 67); tess-ebs morph 0.165 & period ~8.303 d; Gaia DR3 ruwe 0.812; high snr; eclipses of ~0.20 & ~0.07 mag; slight eccentricity;",
+            "notes": "may benefit further from flattening;",
+            "quality_masks": [[1420.0, 1423.0]],
+            "phiS": 0.53
+        },
+        "0238896417": {
+            "details": "9 short cadence sectors (5-7, 61, 65, 68, 87-88 & 95); tess-ebs morph 0.153 & period ~16.244 d; Gaia DR3 ruwe 6.978; good snr; eclipses of ~0.28 & ~0.24 mag; some discontinuities in LCs; slight eccentricity; nearby bright sources of potential L3;",
+            "notes": "may benefit further from flattening; initially S5 is the cleanest;",
+            "phiS": 0.55
+        },
+        "0259543079": {
+            "details": "10 short cadence sectors (3-8, 30-32, 66, 90, 93 & 97); tess-ebs morph 0.010 & period ~40.304 d; Gaia DR3 ruwe 0.901; good snr; eclipses of ~0.24 & ~0.10 mag; highly eccentricity;",
+            "notes": "joining sectors 3 to 5 give best coverage; warnings from jktebop but fit looks plausible; may benefit from flattening;",
+            "sectors": [[3, 4, 5]],
+            "quality_masks": [[1410.0, 1423.0]],
+            "phiS": 0.24
+        },
+        "0260269456": {
+            "details": "26 short cadence sectors (27-39, 61-62, 65-69, 87-89 & 93-96); tess-ebs morph 0.169 & period ~10.796 d; Gaia DR3 ruwe 0.893; good snr; eclipses of ~0.55 & ~0.40 mag; bright source of potential L3 just over 2 arcmin away;",
+            "notes": "test fit of S28-29 gets a fit but resids not good on eclipses; may benefit from flattening;"
         }
     }
 }
