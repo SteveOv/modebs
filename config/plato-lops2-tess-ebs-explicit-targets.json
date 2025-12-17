@@ -127,6 +127,52 @@
         "0260269456": {
             "details": "26 short cadence sectors (27-39, 61-62, 65-69, 87-89 & 93-96); tess-ebs morph 0.169 & period ~10.796 d; Gaia DR3 ruwe 0.893; good snr; eclipses of ~0.55 & ~0.40 mag; bright source of potential L3 just over 2 arcmin away;",
             "notes": "test fit of S28-29 gets a fit but resids not good on eclipses; may benefit from flattening;"
+        },
+
+
+
+        "0260502102": {
+            "details": "41 short cadence sectors (1-13, 28-36, 38-39, 61-69 & 93-96); tess-ebs morph 0.125 & period ~7.315 d; Gaia DR3 ruwe 1.316; ok snr; eclipses of ~0.22 & ~0.18 mag; highly eccentric; sparse field so may be able to fix L3=0;",
+            "notes": "test fit of S1, 2 & 3 give consistent fit if L3=0; in JustensenAlbrecht21apj table 3;",
+            "quality_masks": [[1410.0, 1423.0]],
+            "phiS": 0.68
+        },
+        "0260504147": {
+            "details": "38 short cadence sectors (1-9, 11-13, 27-39, 61-62, 65-66, 87-89 & 93-96); tess-ebs morph 0.179 & period ~8.418 d; not in Gaia DR3; SpT F6V; good snr; eclipses of ~0.20 & ~0.18 mag; slightly eccentric; potential sources of L3 nearby;",
+            "notes": "will likely need flattening for consistent & durable fit;",
+            "quality_masks": [[1410.0, 1423.0]],
+            "phiS": 0.48
+        },
+        "0278826516": {
+            "details": "9 short cadence sectors (7, 9, 12, 61-62 & 66-69); tess-ebs morph 0.082 & period ~14.084 d; Gaia DR3 ruwe 0.899; ok snr; eclipses of ~0.12 mag; discontinuities in S61, 62, 67 & 68; S9, 62 & 66 likely insufficient coverage for solo fit; potential sources of L3 nearby;",
+            "notes": "test fit of S69 (flattest) finds suspect fit with warning; will likely need flattening for consistent & durable fit;"
+        },
+        "0278826996": {
+            "details": "14 short cadence sectors (6-7, 61, 66-69, 87-89 & 93-96); tess-ebs morph 0.088 & period ~19.169 d; Gaia DR3 ruwe 1.016; good snr; highly eccentric; eclipses of ~0.45 & ~0.30 mag; S67, 69, 87 & 94 likely insufficient coverage for solo fit; sparce field so may be able to fix L3=0;",
+            "notes": "will likely need flattening for consistent & durable fit; in JustensenAlbrecht21apj table 3;",
+            "phiS": 0.23
+        },
+        "0279741942": {
+            "details": "10 short cadence sectors (2-4, 28-30, 68-69 & 95-96); tess-ebs morph 0.091 & period ~14.216 d; Gaia DR3 ruwe 1.025; aka VY Ret; SpT F5V; excellent snr; highly eccentric; eclipses of ~0.58 & ~0.55 mag; potential sources of L3 nearby;",
+            "notes": "will likely require flattening to get durable fit;",
+            "quality_masks": [[1410.0, 1423.0]],
+            "phiS": 0.72
+        },
+        "0299903137": {
+            "details": "2 short cadence sectors (6 & 87); tess-ebs morph 0.139 & period ~18.3 d; Gaia DR3 ruwe 0.858; excellent snr; differing eclipse widths suggest eccentricity; eclipses of ~0.6 & ~0.5 mag; potential sources of L3 nearby;",
+            "notes": "TESS-ebs period doesn't work for S87 - so details are from S6 which gives a good, durable fit;",
+            "phiS": 0.55
+        },
+        "0307488184": {
+            "details": "14 short cadence sectors (5, 8-12, 62-65, 69, 89-90 & 96); tess-ebs morph 0.142 & period ~10.067 d; Gaia DR3 ruwe 1.307; OK SNR; eclipses of ~0.17 & ~0.02 mag; secondary is total eclipse; potential sources of L3 nearby;",
+            "notes": "in JustesenAlbrecht21apj; shallowness of the secondary mitigated by totality; tests fits on S5 & S90 (best fit with L3 fixed at zero) in good agreement with JA21;",
+            "phiS": 0.53
+        },
+        "0319558164": {
+            "details": "5 short cadence sectors (7, 61-62, 66 & 69); tess-ebs morph 0.115 & period ~8.980 d; Gaia DR3 ruwe 1.107; good SNR; discontuities all sectors except 7; eclipses of ~0.29 & ~0.23 mag; source of L3 nearby;",
+            "notes": "TESS-ebs period incorrect, at least for S7; adopted 16.596535; setting logg_sys to 4.0 helps fit (LD params); will require flattening or high-order detrending to deal with variability;",
+            "phiS": 0.56,
+            "logg_sys": 4.0
         }
     }
 }
