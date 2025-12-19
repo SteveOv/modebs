@@ -173,6 +173,35 @@
             "notes": "TESS-ebs period incorrect, at least for S7; adopted 16.596535; setting logg_sys to 4.0 helps fit (LD params); will require flattening or high-order detrending to deal with variability;",
             "phiS": 0.56,
             "logg_sys": 4.0
+        },
+
+
+
+        "0319863494": {
+            "details": "6 short cadence sectors (7, 33-34, 61 & 87-88); tess-ebs morph 0.124 & period ~5.135 d; Gaia DR3 ruwe 1.153; SpT A1V; good SNR; eclipses of ~0.25 & ~0.15 mag although they differ across sectors (L3?); crowded field so L3 likely significant; significant eccentricity and phase shift in later sectors;",
+            "notes": "TESS-ebs period incorrect - adopted t0=2206.68905, per=17.644114 & phiS=0.3 in test on S33+34; ideally, need pairs of sectors for good coverage; will require flattening to deal with variability;",
+            "sectors": [[33, 34]],
+            "t0": 2206.68905,
+            "period": 17.644114,
+            "phiS": 0.30
+        },
+        "0350298314": {
+            "details": "30 short cadence sectors (1-4, 6-13, 61-69, 87-90, 93-97); tess-ebs morph 0.002 & period ~47.719 d; Gaia DR3 ruwe 0.893; good SNR; slow variability; eclipses of ~0.30 & ~0.20 mag; possible source of significant L3 nearby; eccentric with very early secondary;",
+            "notes": "have yet to achieve a usable fit - will likely require flattening;",
+            "phiS": 0.27
+        },
+        "0382067804": {
+            "details": "15 short cadence sectors (3-10, 13, 64-67, 87 & 93-95); tess-ebs morph 0.164 & period ~26.131 d; Gaia DR3 ruwe 1.137; good SNR; flat LCs with eclipses of ~0.40 & ~0.35 mag; potential sources of L3 nearby; eccentric with late secondary;",
+            "notes": "will need to join sectors for good coverage; test fits of S5+6 & S62+63 work well with no errors and consistent params;",
+            "phiS": 0.70
+        },
+        "0384031569": {
+            "details": "7 short cadence sectors (8-10, 62-63 & 89-90); tess-ebs morph 0.135 & period ~20.822 d; Gaia DR3 ruwe 2.932; excellent SNR; generally flat LCs with eclipses of ~0.62 & ~0.55 mag; S8 distorted after mid-sector break (1534, 1543); potential sources of L3 nearby; slightly eccentric with some phase shift in later sectors;",
+            "notes": "will need to join sectors for good coverage; test fits of S9+10, S62+63 & S89-90 work well with no errors and consistent params;",
+            "sectors":[[9, 10], [62, 63], [89, 90]],
+            "quality_masks": [[1534.0, 1543.0]],
+            "detrend_gap_threshold": 0.2,
+            "phiS": 0.51
         }
     }
 }
