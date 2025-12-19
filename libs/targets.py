@@ -89,15 +89,23 @@ class Targets():
         with open(target_file, mode="r", encoding="utf8") as cf:
             targets_config = _json.load(cf)
 
+        self._explicit = targets_config.get("explicit", False)
         self._target_configs = targets_config.get("target_configs", {})
         self._target_config_defaults = {
             **_default_target_config_defaults,
             **targets_config.get("target_config_defaults", {})
         }
 
+    @property
+    def explicit(self) -> bool:
+        """ Whether these targets are an explicit list of targets, or a set of filter criteria """
+        return self._explicit
+
     def iterate_known_targets(self, omit_excluded: bool=True) -> Generator[TargetConfig, any, any]:
         """
-        TODO
+        Iterates over the known TargetConfigs.
+
+        :omit_excluded: if true, will omit targets with the excluded flag set to True
         """
         exclude_default = self._target_config_defaults["exclude"]
         for target_id, target_config in self._target_configs.items():
@@ -108,11 +116,20 @@ class Targets():
 
     def get_known_target_ids(self, omit_excluded: bool=True) -> List[any]:
         """
-        TODO
+        Gets a list of configured target_ids.
+
+        :omit_excluded: if true, will omit targets with the excluded flag set to True
         """
         return [cfg.target_id for cfg in self.iterate_known_targets(omit_excluded)]
 
     def get(self, target_id, fallback_to_default: bool=False) -> TargetConfig:
+        """
+        Get the target_config for a specific target
+        
+        :target_id: unique id of the target
+        :fallback_to_default: return a default config if no config exists for target_id
+        :return: the requested TargetConfig
+        """
         if target_id in self._target_configs:
             return TargetConfig(target_id,
                                 self._target_configs[target_id],

@@ -1,5 +1,6 @@
 {
-    "target_config_defaults": {
+   "explicit": true,
+   "target_config_defaults": {
         "quality_bitmask": "hardest"
     },
     "target_configs": {
