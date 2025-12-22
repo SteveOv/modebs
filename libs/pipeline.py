@@ -85,12 +85,14 @@ def get_teff_from_spt(target_spt):
 def pop_and_complete_ld_config(source_cfg: dict[str, any],
                                teffa: float, teffb: float,
                                logga: float, loggb: float,
+                               default_algo: str="quad",
                                verbose: bool=False) -> dict[str, any]:
     """
     Will set up the limb darkening algo and coeffs, first by popping them from the source_cfg
     dictionary then completing the config with missing values. Where missing, the algo defaults
-    to quad unless pow2, h1h2 or same has been specified. Coefficient lookups are performed,
-    based on the supplied teff and logg values, to populate any missing values.
+    to the value of the default_algo arg. For the quad, pow2 or h1h1 algos coefficient lookups
+    are performed, based on the supplied teff and logg values, to populate any missing values.
+    For any other algos, all coefficients must to be given in config.
 
     NOTE: pops the LD* items from source_cfg (except those ending _fit) into the returned config
 
@@ -99,6 +101,7 @@ def pop_and_complete_ld_config(source_cfg: dict[str, any],
     :teffb: effective temp of star B
     :logga: log(g) of star A
     :loggb: log(g) of star B
+    :default_algo: the LD algo to use if not specified in source_cfg; either quad, pow2 or h1h2
     :verbose: whether or not to output details of the params chosen to stdout
     :return: the LD params only dict
     """
@@ -107,7 +110,7 @@ def pop_and_complete_ld_config(source_cfg: dict[str, any],
         params[ld] = source_cfg.pop(ld)
 
     for star, teff, logg in [("A", teffa, logga), ("B", teffb, loggb)]:
-        algo = params.get(f"LD{star}", "quad") # Only quad, pow2 or h1h2 supported
+        algo = params.get(f"LD{star}", default_algo)
         if f"LD{star}" not in params \
                 or f"LD{star}1" not in params or f"LD{star}2" not in params:
             # If we've not been given overrides for both the algo and coeffs we can look them up
@@ -115,8 +118,10 @@ def pop_and_complete_ld_config(source_cfg: dict[str, any],
                 coeffs = (0, 0) # JKTEBOP uses the A star params for both
             elif algo.lower() == "quad":
                 coeffs = limb_darkening.lookup_quad_coefficients(logg, teff)
-            else:
+            elif algo.lower() in ["pow2", "h1h2"]:
                 coeffs = limb_darkening.lookup_pow2_coefficients(logg, teff)
+            else:
+                raise ValueError(f"Lookup of coeffs not supported for the {algo} LD algorithm")
 
             # Add any missing algo/coeffs tags to the overrides
             params.setdefault(f"LD{star}", algo)
