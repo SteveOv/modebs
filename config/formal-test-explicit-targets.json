@@ -126,21 +126,20 @@
                 "TeffB": 7670,          "TeffB_err": 85
             }
         },
-
-
-
         "V889 Aql": {
             "source": "DEBCAT and Baroch et al. (2022) Tables 9 and 10. Used SAP flux extracted from TESS sectors 14 and 40 FFIs analysed with JKTEBOP and all params published. TESS sector 40 & 54 600 s timeseries data now available.",
             "reference": "BarochGimenez+22aa",
             "aka": "TIC 300000680, HD 181166",
             "SpT": "B9.5 V",
-            "details": "A highly eccentric orbit with the secondary eclipse before phase 0.4. The eclipse depths differ despite the stars having similar radii and brightness, making k and J difficult to predict and fit. We use sector 40 timeseries data and the published spectroscopic light-ratio for fitting. Sector 40 shows some long term trends which our detrending is not removing however this does not appear to be overly detrimental to the predictions or fitting.",
-            "notes": "*** Having issues resolving this target in MAST ***",
-            "mission": "HLSP",
-            "author": "TESS-SPOC",
-            "exptime": 600,
-            "sectors": [[54]],
-            "jktebop_overrides": { "lrat": ["2774.10 0.98 0.06"] },
+            "details": "sectors 40 & 54 @ 600 s cadence and sector 80 @ 200 s; a highly eccentric orbit with the secondary eclipse at phase ~0.35; eclipse depths differ despite the stars having similar radii and brightness;",
+            "notes": "not in Tess-ebs so ephemeris & morph defined here; nothing at short/120 s cadence so chosing available sector(s) with highest cadence;",
+            "t0": 2772.124954368,
+            "period": 11.120757,
+            "morph": 0.2,
+            "exptime": [200, 600],
+            "sectors": [[80]],
+            "quality_masks": [[3505.0, 3507.0]],
+            "phiS": 0.35,
             "labels": {
                 "MA": 2.17,             "MA_err": 0.02,
                 "MB": 2.13,             "MB_err": 0.01,
@@ -150,8 +149,6 @@
                 "TeffB": 9075,          "TeffB_err": 110
             }
         },
-
-
         "V596 Pup": {
             "source": "DEBCAT and Southworth (2025) Tables II and III. Used SAP flux from TESS sectors 34 and 61 separately characterized with JKTEBOP v43.",
             "reference": "Southworth25obsR24",
@@ -406,19 +403,14 @@
                 "TeffB": 6740,          "TeffB_err": 105
             }
         },
-
-
-        
         "V455 Aur": {
             "source": "DEBCat and Rediscussion V, Table II. TESS sector 20 SAP photometry analysed with JKTEBOP version 41. TESS sectors 60 and 73 released subsequent to publication.",
             "reference": "Southworth21obsR5",
             "aka": "TIC 470966839, HD 45191",
             "SpT": "F5 V + F6 V",
-            "details": "A slightly eccentric, inclined orbit with eclipse depths of approximately 0.33 and 0.3 mag and a third non-eclipsing component in 4200 d orbit. While the eclipsing components are of similar radius their luminosities differ, with the source article publishing a light ratio of 0.859±0.031.",
+            "details": "3 short cadence sectors (20, 60 & 73); a slightly eccentric, inclined orbit with eclipses of ~0.33 & ~0.30; a third non-eclipsing component in 4200 d orbit;",
             "notes": "",
-            "sectors": [[20]],
-            "quality_masks": [],
-            "jktebop_overrides": { },
+            "quality_masks": [[2936.0, 2938.0], [3285.0, 3287.0]],
             "labels": {
                 "MA": 1.289,            "MA_err": 0.006,
                 "MB": 1.232,            "MB_err": 0.005,
@@ -433,12 +425,11 @@
             "reference": "Southworth21obsR6",
             "aka": "TIC 348517784, HD 14384",
             "SpT": "F5 V + F5 V",
-            "details": "An incloned circular orbit with similar primary and secondary eclipses of approximately 0.5 mag. The similarity of the components' radii will likely make predicting and fitting k and J challenging. There is some distortion of the light curve near BTJD 1791 which we treat with lightkurve flatten.",
-            "notes": "",
+            "details": "3 short cadence sectors (18, 58 & 85); an incloned circular orbit with eclipses of ~0.5 mag; some phase shift on later sectors;",
+            "notes": "TESS-ebs period is half actual value; distortion of the light curve near BTJD 1791; for now omitting S58 & 85 as cannot get consistent fit;",
             "sectors": [[18]],
-            "quality_masks": [],
-            "flatten": { "mask_time_ranges": [[1806.8, 1807.1], [1808.9, 1809.2]] },
-            "jktebop_overrides": { },
+            "double_period": true,
+            "quality_masks": [[1790.0, 1792.0], [3610.0, 3612.0]],
             "labels": {
                 "MA": 1.275,            "MA_err": 0.004,
                 "MB": 1.258,            "MB_err": 0.003,
@@ -453,12 +444,14 @@
             "reference": "Maxted+20mnras, Kirkby-KentMaxted+16aa",
             "aka": "TIC 102069549, HD 6980",
             "SpT": "G3 V",
-            "details": "An eccentric orbit with the secondary occuring before phase 0.5. Star B is significantly larger and evolved with k~1.6. Only sector 2 shows both eclipses with sectors 29 and 69 having incomplete eclipses. The primary eclipses are total and the secondary eclipses are partial. We use the parameters from Maxted et al. (2020) run K as our labels and effective temperatures and luminosities from Kirby et al. (2016).",
-            "notes": "",
+            "details": "4 short cadence sectors (2, 29, 69 & 96); only S2 has complete instances of both eclipse types; an eccentric orbit with early secondary eclipses; star B is significantly larger and evolved with k~1.6; primary eclipses are total and the secondary eclipses are partial;",
+            "notes": "not in TESS-ebs so ephemeris & morph defined here; only S2 is usable/has both eclipses; from ebop maven testing it's known that this target has a tendancy to (jktebop) fit incorrectly;",
+            "t0": 1362.828326117,
+            "period": 24.59240,
+            "morph": 0.1,
             "sectors": [[2]],
-            "quality_masks": [],
+            "phiS": 0.45,
             "flatten": { "mask_time_ranges": [[1362.5, 1363.2], [1373.6, 1374.6]] },
-            "jktebop_overrides": { },
             "labels": {
                 "MA": 1.1938,           "MA_err": 0.0008,
                 "MB": 1.2438,           "MB_err": 0.0008,
@@ -473,18 +466,18 @@
             "reference": "Southworth22obsR11",
             "aka": "TIC 138505004",
             "SpT": "G0 V + G8 V",
-            "details": "A circular orbit with total eclipses of approximately 0.65 and 0.35 mag and significant variability due to starspot activity.",
-            "notes": "",
-            "sectors": [[2]],
-            "quality_masks": [[1870.0, 1886.5]],
-            "jktebop_overrides": { },
+            "details": "7 short sectors (14, 21, 41, 47-78 & 74-75); circular orbit with total eclipses of ~0.65 and ~0.35 mag; significant variability due to starspot activity;",
+            "notes": "very sparse field so can fix L3=0; omitting S74 & 75 as poor quality with lower pdc_tot than others;",
+            "sectors": [[14], [21], [41], [47], [48]],
+            "quality_masks": [[1884.5, 1886.5], [3312.0, 3314.0], [3339.0, 3342.0]],
+            "jktebop_overrides": { "L3_fit": 0 },
             "labels": {
-                "MA": 1.1938,           "MA_err": 0.0008,
-                "MB": 1.2438,           "MB_err": 0.0008,
-                "RA": 1.8050,           "RA_err": 0.0022,
-                "RB": 2.9332,           "RB_err": 0.0023,
-                "TeffA": 6257,          "TeffA_err": 0,
-                "TeffB": 5100,          "TeffB_err": 0
+                "MA": 1.135,            "MA_err": 0.009,
+                "MB": 0.965,            "MB_err": 0.005,
+                "RA": 1.437,            "RA_err": 0.007,
+                "RB": 1.075,            "RB_err": 0.005,
+                "TeffA": 5960,          "TeffA_err": 70,
+                "TeffB": 5270,          "TeffB_err": 90
             }
         },
         "QR Hya": {
@@ -492,13 +485,11 @@
             "reference": "GraczykPietrzynski+22aa",
             "aka": "TIC 49003142, HD 94853",
             "SpT": "G1 V",
-            "details": "An inclined orbit with partial eclipses of approximately 0.30 and 0.28 mag.",
-            "notes": "",
-            "flux_column": "pdcsap_flux",
-            "sectors": [[9]],
-            "quality_masks": [[1543.0, 1548.75], [1555.25, 1570.0]],
-            "flatten": { "mask_time_ranges": [[1551.8, 1552.1], [1554.3, 1554.6]] },
-            "jktebop_overrides": { },
+            "details": "3 short cadence sectors (9, 36 & 63); an inclined orbit with partial eclipses of ~0.30 & ~0.28 mag; startspot activity;",
+            "notes": "tess-ebs ephemeris has incorrect (half) period; omitting sector 63 for low pdc_tot relative to others; sparse field so replicating maven test by fixing L3=0;",
+            "double_period": true,
+            "sectors": [[9], [36]],
+            "jktebop_overrides": { "L3_fit": 0 },
             "labels": {
                 "MA": 1.1002,           "MA_err": 0.0018,
                 "MB": 1.0673,           "MB_err": 0.0019,
@@ -513,12 +504,14 @@
             "reference": "TorresSandbergLacy+14apj",
             "aka": "TIC 11961096, HD 294598",
             "SpT": "G1 V + M1 V",
-            "details": "A G+M pair in an eccentric 6.1 d orbit showing partial primary partial eclipses of ~0.5 mag and shallow secondary total eclipses of ~0.06 mag. Some variability detected, potentially from star spots.",
-            "notes": "",
-            "sectors": [[33]],
-            "quality_masks": [],
-            "flatten": { "mask_time_ranges": [[2210.37, 2210.62], [2213.19, 2213.46]] },
-            "jktebop_overrides": { },
+            "details": "1 short cadence sector (33); a G+M pair in an eccentric 6.1 d orbit; partial primary partial eclipses of ~0.5 mag and shallow secondary total eclipses of ~0.06 mag; some variability, potentially from star spots;",
+            "notes": "not in TESS-ebs so ephemeris & morph defined here; maven tests used flattening & fixing L3=0 to get control fit; as field is sparse we fix L3=0; keeping flattening for now as otherwise we cannot fit secondary;",
+            "t0": 2210.491034996,
+            "period": 6.110760760,
+            "morph": 0.3,
+            "flatten": { "mask_time_ranges": [[2210.3, 2210.7], [2213.1, 2213.5]] },
+            "phiS": 0.45,
+            "jktebop_overrides": { "L3_fit": 0 },
             "labels": {
                 "MA": 1.0038,           "MA_err": 0.0066,
                 "MB": 0.5955,           "MB_err": 0.0022,
@@ -533,15 +526,9 @@
             "reference": "MartinSethi+24mnras, MoralesRibas+09apj",
             "aka": "TIC 199574208",
             "SpT": "M4.5",
-            "details": "Two M-dwarfs in a nearly circular, slightly inclined 1.27 d orbit. Eclipses are approximately 0.76 and 0.73 mag deep. Lightcurves show frequent flares however these should have little affect on the fit.",
-            "notes": "",
-            "author": "TESS-SPOC",
-            "flux_column": "pdcsap_flux",
-            "exptime": 200,
-            "sectors": [[57]],
-            "quality_masks": [],
-            "flatten": { "mask_time_ranges": [[2872.5, 2872.65], [2873.2, 2873.3]] },
-            "jktebop_overrides": { },
+            "details": "25 short cadence sectors (16, 19, 22-26, 49-52, 56-59, 76-80 & 82-86); many sectors at slower cadences; a pair of M-dwarfs in a nearly circular, slightly inclined 1.27 d orbit; eclipses are ~0.76 and ~0.73 mag deep; frequent flares however these appear to have little affect on the fit;",
+            "notes": "many sectors and short cadence - we pick the subset with highest pdc_tot (>=0.950);",
+            "sectors": [[16], [19], [24], [25], [26]],
             "labels": {
                 "MA": 0.2310,           "MA_err": 0.0009,
                 "MB": 0.2141,           "MB_err": 0.0010,
