@@ -13,6 +13,7 @@ _default_target_config_defaults = {
     "flux_column": "sap_flux",
     "quality_bitmask": "default",
     "sectors": None,
+    "exclude_sectors": None,
     "quality_masks": [],
     "detrend_gap_threshold": 0.5,
     "detrend_poly_degree": 1,
