@@ -4,6 +4,7 @@ Low level utility functions for light curve ingest, pre-processing, estimation a
 #pylint: disable=no-member
 from typing import Tuple, List, Callable, Generator
 import inspect
+from functools import lru_cache
 
 from requests.exceptions import HTTPError
 import numpy as np
@@ -13,8 +14,6 @@ from astroquery.vizier import Vizier
 
 from dustmaps import config, bayestar           # Bayestar dustmaps/dereddening map
 from pyvo import registry, DALServiceError      # Vergeley at al. extinction catalogue
-
-# TODO: remove the extinction funcs from pipeline and update quick_fit
 
 
 def get_ebv(target_coords: SkyCoord,
@@ -101,7 +100,7 @@ def get_bayestar_ebv(target_coords: SkyCoord,
                      version: str="bayestar2019",
                      conversion_factor: float=0.996) -> Tuple[float, dict]:
     """
-    Queries the Bayestar 2019 dereddening map for the E(B-V) value for the target coordinates.
+    Queries the Bayestar dereddening map for the E(B-V) value for the target coordinates.
 
     Conversion from Bayestar 17 or 19 to E(B-V) documented at http://argonaut.skymaps.info/usage
     as E(B-V) = 0.884 x bayestar or E(B-V) = 0.996 x bayestar
@@ -111,6 +110,16 @@ def get_bayestar_ebv(target_coords: SkyCoord,
     :conversion_factor: the factor to apply to bayestar extinction for E(B-V)
     :returns: tuple of the E(B-V) value and a dict of the diagnostic flags associated with the query
     """
+    print(f"Querying the Green+ (2019ApJ...887...93G) {version} map for extinction data.")
+    query = _get_bayestar_query(version)
+    val, flags =  query(target_coords, mode='median', return_flags=True)
+    flags_dict = { n: flags[n] for n in flags.dtype.names }
+    flags_dict["type"] = "E(B-V)"
+    return conversion_factor * val, flags_dict
+
+@lru_cache
+def _get_bayestar_query(version: str):
+    """ Gets a Bayestar query object. This function is cached as it's an expensive setup. """
     try:
         # Creates/confirms local cache of Bayestar data within the .cache directory
         config.config['data_dir'] = '.cache/.dustmapsrc'
@@ -120,37 +129,34 @@ def get_bayestar_ebv(target_coords: SkyCoord,
     except ValueError as exc:
         print(f"Unable to parse response for {version}. Caught error '{exc}'")
 
-    # Now we can use the local cache for the lookup
-    query = bayestar.BayestarQuery(version=version)
-    val, flags =  query(target_coords, mode='median', return_flags=True)
-    flags_dict = { n: flags[n] for n in flags.dtype.names }
-    flags_dict["type"] = "E(B-V)"
-    return conversion_factor * val, flags_dict
+    # Now we can use the local cache for the lookup - this takes some time to set up
+    return bayestar.BayestarQuery(version=version)
 
 
 def get_gontcharov_ebv(target_coords: SkyCoord,
                        conversion_factor: float=1.7033):
     """
-    Queries the Gontcharov (2017) [2017AstL...43..472G] 3-d extinction map for the Ebv value of the
-    target coordinates.
+    Queries the Gontcharov (2017) [2017AstL...43..472G] 3-d extinction service
+    for the Ebv value of the target coordinates.
 
     Extends radially to at least 700 pc, in galactic coords at 20 pc distance intervals
-    Conversion: E(B-V) = 1.7033 E(J-K)
+    Documented conversion factor for E(B-V) = 1.7033 E(J-K)
 
     :target_coords: the astropy SkyCoords to query for   
     :conversion_factor: the factor to apply to E(J-Ks) for E(B-V)
     :returns: tuple of the E(B-V) value and a dict of the diagnostic flags associated with the query
     """
+    print("Querying the Gontcharov (2017AstL...43..472G) 2MASS photometry map for extinction data.")
     ebv = 0
-    flags = { "converged": False } # mimics Bayestar - will set try if we get a good match
-    vizier = Vizier(catalog='J/PAZh/43/521/rlbejk', columns=["**"])
+    flags = { "converged": False } # mimics Bayestar - will set true if we get a good match
+    vizier = Vizier(catalog="J/PAZh/43/521/rlbejk", columns=["**"], row_limit=-1)
 
     # Round up the galactic coords (to nearest deg) and distance (to nearest 20 pc)
     glon, glat = np.ceil(target_coords.galactic.l.deg), np.ceil(target_coords.galactic.b.deg)
     dist = np.ceil(target_coords.distance.to(u.pc).value / 20) * 20
 
     for r, dflag in [(dist, True), (700, False), (600, False)]:
-        if _tbl := vizier.query_constraints(R=r, GLON=glon, GLAT=glat):
+        if _tbl := vizier.query_constraints(R=r, GLON=glon, GLAT=glat, cache=True):
             if len(_tbl):
                 ebv = _tbl[0]["E(J-Ks)"][0] * conversion_factor
                 flags["converged"] = dflag
@@ -171,13 +177,13 @@ def get_vergely_av(target_coords: SkyCoord):
     :returns: the Av value
     """
     av = None
-    flags = { "converged": False } # mimics Bayestar - will set try if we get a good match
+    flags = { "converged": False } # mimics Bayestar - will set true if we get a good match
     try:
         # Extinction map of Vergely, Lallement & Cox (2022)
         ivoid = 'ivo://CDS.VizieR/J/A+A/664/A174'
         table = 'J/A+A/664/A174/cube_ext'
         vo_res = registry.search(ivoid=ivoid)[0]
-        print(f"Querying {vo_res.res_title} ({vo_res.source_value}) for extinction data.")
+        print(f"Querying Vergely+ ({vo_res.source_value}) {vo_res.res_title} for extinction data.")
 
         for res in [10, 50]: # central regions at 10 pc resolution and outer at 50 pc
             cart = np.ceil(target_coords.cartesian.xyz.to(u.pc) / res) * res
