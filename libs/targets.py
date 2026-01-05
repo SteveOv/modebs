@@ -90,17 +90,11 @@ class Targets():
         with open(target_file, mode="r", encoding="utf8") as cf:
             targets_config = _json.load(cf)
 
-        self._explicit = targets_config.get("explicit", False)
         self._target_configs = targets_config.get("target_configs", {})
         self._target_config_defaults = {
             **_default_target_config_defaults,
             **targets_config.get("target_config_defaults", {})
         }
-
-    @property
-    def explicit(self) -> bool:
-        """ Whether these targets are an explicit list of targets, or a set of filter criteria """
-        return self._explicit
 
     def iterate_known_targets(self, omit_excluded: bool=True) -> Generator[TargetConfig, any, any]:
         """
