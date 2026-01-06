@@ -13,6 +13,8 @@ from uncertainties.unumpy import uarray, nominal_values, std_devs
 from scipy.interpolate import RBFInterpolator
 from scipy.optimize import minimize, OptimizeResult, OptimizeWarning
 from emcee import EnsembleSampler
+from emcee.autocorr import AutocorrError
+from sed_fit.fitter import samples_from_sampler
 
 from .data.mist.read_mist_models import ISO
 
@@ -159,6 +161,7 @@ def mcmc_fit(theta0: np.ndarray[float],
              thin_by: int=1,
              seed: int=42,
              processes: int=1,
+             autocor_tol: int=50,
              early_stopping: bool=True,
              early_stopping_threshold: float=0.01,
              progress: Union[bool, str]=False,
@@ -173,19 +176,26 @@ def mcmc_fit(theta0: np.ndarray[float],
     :teffs: the observed stellar effective temperatures to fit against (K)
     :nwalkers: the number of mcmc walkers to employ
     :nsteps: the maximium number of mcmc steps to make for each walker
-    :thin_by: step interval to inspect fit progress
+    :thin_by: step interval to inspect fit progress and yield samples
     :seed: optional seed for random behaviour
     :processes: optional number of parallel processes to use, or None to let code choose
+    :autocor_tol: the autocorrelation tolerance
     :early_stopping: stop fitting if solution has converged & further improvements are negligible
     :early_stopping_threshold: the delta(tau) threshold below which to consider early stopping
     :progress: whether to show a progress bar (see emcee documentation for other values)
     :returns: the fitted set of mass and log(age) values as UFloats with 1-sigma uncertainties
     and an EnsembleSampler with the full details of the fitting outcome
     """
+
+    # Using thin_by is fiddly; the sampler will execute iterations*thin_by steps, so to process the
+    # requested nsteps we need to set iterations=(nsteps // thin_by) when creating the sampler and
+    # subsequently account for this factor on other calls to the same sampler.
     rng = np.random.default_rng(seed)
     ndim = len(theta0)
-    autocor_tol = 50 / thin_by
     tau = [np.inf] * ndim
+
+    # Min steps before the Autocorr algo becomes useful & unlikely to give a chain too short error
+    min_steps_before_es = int(50 * ndim * autocor_tol)
 
     # Starting positions for the walkers clustered around theta0
     p0 = [theta0 + (theta0 * rng.normal(0, 0.05, ndim)) for _ in np.arange(int(nwalkers))]
@@ -194,44 +204,33 @@ def mcmc_fit(theta0: np.ndarray[float],
         filterwarnings("ignore", message="invalid value encountered in ")
         filterwarnings("ignore", message="Using UFloat objects with std_dev==0")
 
-        # Min steps required by Autocorr algo to avoid a warn msg (not a warning so can't filter)
-        min_steps_es = int(50 * ndim * autocor_tol * thin_by)
-
         sampler = EnsembleSampler(int(nwalkers), ndim,
                                   _objective_func, args=(sys_mass, radii, teffs), pool=pool)
         step = 0
         for _ in sampler.sample(initial_state=p0, iterations=nsteps // thin_by,
                                 thin_by=thin_by, tune=True, progress=progress):
-            if early_stopping:
-                step = sampler.iteration * thin_by
-                if step > min_steps_es and step % 1000 == 0:
-                    # The autocor time (tau) is the steps to effectively forget start position.
-                    # As the fit converges the change in tau will tend towards zero. We set tol=0
-                    # to prevent chain-too-short warning while we're expliciting testing the fit.
-                    prev_tau = tau
-                    tau = sampler.get_autocorr_time(c=5, tol=0, quiet=True) * thin_by
-                    if not any(np.isnan(tau)) \
+            step = sampler.iteration * thin_by
+            if early_stopping & step % 1000 == 0:
+                try:
+                    # The autocor time (tau) is the #steps to effectively forget start position.
+                    # As the fit converges the change in tau will tend towards zero.
+                    prev_tau, tau = tau, sampler.get_autocorr_time(c=5, tol=autocor_tol) * thin_by
+                    if step >= min_steps_before_es \
+                            and not any(np.isnan(tau)) \
                             and all(tau < step / 100) \
                             and all(abs(prev_tau - tau) / prev_tau < early_stopping_threshold):
                         break
+                except AutocorrError:
+                    # The chain is too short. Can set the quiet arg to True in which case a warning
+                    # message is output (but not a Python warning). Cleaner to consume the error.
+                    pass
 
-        if early_stopping and 0 < step < nsteps:
+        if verbose and early_stopping and 0 < step < nsteps:
             print(f"Halting MCMC after {step:d} steps as the walkers are past",
                    "100 times the autocorrelation time & the fit has converged.")
 
-        tau = sampler.get_autocorr_time(c=5, tol=autocor_tol, quiet=True) * thin_by
-        burn_in_steps = int(max(np.nan_to_num(tau, copy=True, nan=1000)) * 2)
-        samples = sampler.get_chain(discard=burn_in_steps, thin=thin_by, flat=True)
-
-        if verbose:
-            print( "Autocorrelation steps (tau):", ", ".join(f"{t:.3f}" for t in tau))
-            print(f"Estimated burn-in steps:     {int(max(np.nan_to_num(tau, nan=1000)) * 2):,}")
-            print(f"Mean Acceptance fraction:    {np.mean(sampler.acceptance_fraction):.3f}")
-
-        # Get theta into ufloats with std_dev based on the mean +/- 1-sigma values (where fitted)
-        fit_nom = np.median(samples[burn_in_steps:], axis=0)
-        fit_err_high = np.quantile(samples[burn_in_steps:], 0.84, axis=0) - fit_nom
-        fit_err_low = fit_nom - np.quantile(samples[burn_in_steps:], 0.16, axis=0)
-        theta_fit = uarray(fit_nom, np.mean([fit_err_high, fit_err_low], axis=0))
-
-    return theta_fit, sampler
+    samples = samples_from_sampler(sampler, autocor_tol, thin_by, flat=True, verbose=verbose)
+    fit_nom = np.median(samples, axis=0)
+    fit_err_high = np.quantile(samples, 0.84, axis=0) - fit_nom
+    fit_err_low = fit_nom - np.quantile(samples, 0.16, axis=0)
+    return uarray(fit_nom, np.mean([fit_err_high, fit_err_low], axis=0)), sampler
