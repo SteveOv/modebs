@@ -18,7 +18,8 @@ from pyvo import registry, DALServiceError      # Vergeley at al. extinction cat
 
 def get_ebv(target_coords: SkyCoord,
             funcs: List[str]=None,
-            rv: float=3.1) -> Generator[Tuple[float, dict], any, any]:
+            rv: float=3.1,
+            verbose: bool=False) -> Generator[Tuple[float, dict], any, any]:
     """
     A convenience function which iterates through the requested extinction lookup functions,
     published on this module, yielding the E(B-V) extinction value and flags returned by each.
@@ -30,35 +31,39 @@ def get_ebv(target_coords: SkyCoord,
     :funcs: optional list of functions to iterate over, either by name of function object.
     These must be callable as func(coords: SkyCoord) -> (value: float, flags: Dict)
     :rv: the R_V value to use if it is necessary to convert Av values to E(B-V)
+    :verbose: whether or not to print progress/diagnostics to stdout
     """
     if funcs is None:
         funcs = [get_bayestar_ebv, get_vergely_av, get_gontcharov_ebv]
     if isinstance(funcs, str | Callable):
         funcs = [funcs]
 
-    for ext_func in funcs:
-        if isinstance(ext_func, str):
+    for func in funcs:
+        if isinstance(func, str):
             # Find the matching function in this module
             # TODO: can this be more efficient? Also perhaps better validation of func signature
-            for name, func in inspect.getmembers(inspect.getmodule(get_ebv),
-                                                 lambda m: isinstance(m, Callable)):
-                if ext_func in name:
-                    ext_func = func
+            for name, member_func in inspect.getmembers(inspect.getmodule(get_ebv),
+                                                        lambda m: isinstance(m, Callable)):
+                if func in name:
+                    func = member_func
                     break
 
-        if isinstance(ext_func, Callable):
-            val, flags = ext_func(target_coords)
+        if isinstance(func, Callable):
+            val, flags = func(target_coords)
             if val is not None and not np.isnan(val):
+                if verbose:
+                    print(f"{func.__name__}={val:.3f} [converged={flags.get('converged',False)}]")
                 if flags.get("type", "").lower() == "av" \
-                    or ext_func.__name__.lower().endswith("_av"):
+                    or func.__name__.lower().endswith("_av"):
                     val /= rv
-                flags["source"] = ext_func.__name__
+                flags["source"] = func.__name__
                 yield val, flags
 
 
 def get_av(target_coords: SkyCoord,
            funcs: List[str]=None,
-           rv: float=3.1) -> Generator[Tuple[float, dict], any, any]:
+           rv: float=3.1,
+           verbose: bool=False) -> Generator[Tuple[float, dict], any, any]:
     """
     A convenience function which iterates through the requested extinction lookup functions,
     published on this module, yielding the A_V extinction value and flags returned by each.
@@ -70,29 +75,32 @@ def get_av(target_coords: SkyCoord,
     :funcs: optional list of functions to iterate over, either by name of function object.
     These must be callable as func(coords: SkyCoord) -> (value: float, flags: Dict)
     :rv: the R_V value to use if it is necessary to convert E(B-V) values to A_V
+    :verbose: whether or not to print progress/diagnostics to stdout
     """
     if funcs is None:
         funcs = [get_bayestar_ebv, get_vergely_av, get_gontcharov_ebv]
     if isinstance(funcs, str | Callable):
         funcs = [funcs]
 
-    for ext_func in funcs:
-        if isinstance(ext_func, str):
+    for func in funcs:
+        if isinstance(func, str):
             # Find the matching function in this module
             # TODO: can this be more efficient? Also perhaps better validation of func signature
-            for name, func in inspect.getmembers(inspect.getmodule(get_av),
-                                                 lambda m: isinstance(m, Callable)):
-                if ext_func in name:
-                    ext_func = func
+            for name, member_func in inspect.getmembers(inspect.getmodule(get_av),
+                                                        lambda m: isinstance(m, Callable)):
+                if func in name:
+                    func = member_func
                     break
 
-        if isinstance(ext_func, Callable):
-            val, flags = ext_func(target_coords)
+        if isinstance(func, Callable):
+            val, flags = func(target_coords)
             if val is not None and not np.isnan(val):
+                if verbose:
+                    print(f"{func.__name__}={val:.3f} [converged={flags.get('converged',False)}]")
                 if flags.get("type", "").lower() == "E(B-V)" \
-                    or ext_func.__name__.lower().endswith("_ebv"):
+                    or func.__name__.lower().endswith("_ebv"):
                     val *= rv
-                flags["source"] = ext_func.__name__
+                flags["source"] = func.__name__
                 yield val, flags
 
 
@@ -110,7 +118,6 @@ def get_bayestar_ebv(target_coords: SkyCoord,
     :conversion_factor: the factor to apply to bayestar extinction for E(B-V)
     :returns: tuple of the E(B-V) value and a dict of the diagnostic flags associated with the query
     """
-    print(f"Querying the Green+ (2019ApJ...887...93G) {version} map for extinction data.")
     query = _get_bayestar_query(version)
     val, flags =  query(target_coords, mode='median', return_flags=True)
     flags_dict = { n: flags[n] for n in flags.dtype.names }
@@ -146,7 +153,6 @@ def get_gontcharov_ebv(target_coords: SkyCoord,
     :conversion_factor: the factor to apply to E(J-Ks) for E(B-V)
     :returns: tuple of the E(B-V) value and a dict of the diagnostic flags associated with the query
     """
-    print("Querying the Gontcharov (2017AstL...43..472G) 2MASS photometry map for extinction data.")
     ebv = 0
     flags = { "converged": False } # mimics Bayestar - will set true if we get a good match
     vizier = Vizier(catalog="J/PAZh/43/521/rlbejk", columns=["**"], row_limit=-1)
@@ -183,7 +189,6 @@ def get_vergely_av(target_coords: SkyCoord):
         ivoid = 'ivo://CDS.VizieR/J/A+A/664/A174'
         table = 'J/A+A/664/A174/cube_ext'
         vo_res = registry.search(ivoid=ivoid)[0]
-        print(f"Querying Vergely+ ({vo_res.source_value}) {vo_res.res_title} for extinction data.")
 
         for res in [10, 50]: # central regions at 10 pc resolution and outer at 50 pc
             cart = np.ceil(target_coords.cartesian.xyz.to(u.pc) / res) * res
