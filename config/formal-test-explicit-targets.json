@@ -15,7 +15,6 @@
             "period": 25.935953,
             "morph": 0.1,
             "sectors": [[18]],
-            "xquality_masks": [[1790.0, 1792.0]],
             "teff_sys": 20000,
             "flatten": { "mask_time_ranges": [[1797.5, 1798.4], [1812.9, 1813.5]] },
             "phiS": 0.44,
@@ -63,7 +62,7 @@
             "details": "9 short cadence sectors (17-18, 24, 57-58, 77-78 & 84-85); a pair of B5 V stars in a 9.65 d elliptical orbit; eclipses are approximately 0.45 and 0.44 mag deep with the secondary at phase ~0.62;",
             "notes": "distorted sections of S18 & 78 - both have low(est) pdc_tot so may be easily omitted; S77 has highest pdc_tot = 0.891; override teff_sys to more appropriate value for SpT; Southworth25obsR22 uses E(B-V)=0.44+/-0.05 mag and gives dist=1814+/-37 pc;",
             "sectors": [[17], [24], [57], [58], [77], [84], [85]],
-            "quality_masks": [[1955.0, 1957.0], [3417.0, 3418.0], [3610.0, 3612.0]],
+            "quality_masks": [[1790.0, 1794.0], [3417.0, 3418.0]],
             "phiS": 0.62,
             "teff_sys": 12000,
             "labels": {
@@ -84,7 +83,7 @@
             "SpT": "B8 V + A6 V",
             "details": "3 short cadence sectors (19, 59 & 86); totally eclipsing system with an eccentric orbit and apsidal motion; eclipses are ~0.45 and ~0.15 mag deep with the secondary appearing before phase 0.5; an additional challange is presented by the primary B-type star which is pulsating;",
             "notes": "early part of S86 requires clipping to remove distortions; Southworth24obsR21 uses E(B-V)=0.12+/-0.03 mag and gives dist=278.1+/-3.8 pc;",
-            "quality_masks": [[3635.0, 3638.0], [3640.0, 3643.0]],
+            "quality_masks": [[3635.0, 3643.0]],
             "phiS": 0.47,
             "labels": {
                 "MA": 3.516,            "MA_err": 0.050,
@@ -104,7 +103,6 @@
             "SpT": "B9 V + B9.5 V",
             "details": "8 short cadence sectors (19, 43-45, 59, 71, 73 & 86); a pair of late-B stars in a circular 4.135 day orbit; primary and secondary partial eclipses of depth ~0.6 and ~0.55 mag;",
             "notes": "sections of S73 and 86 require clipping; works well by taking the mean of the fits of each sector; Southworth25obsR25 uses E(B-V)=0.01+/-0.01 mag and gives dist=136.4+/-1.7 pc;",
-            "quality_masks": [[3285.0,  3287.0], [3635.0, 3638.0], [3642.0, 3643.0]],
             "labels": {
                 "MA": 2.5444,           "MA_err": 0.0086,
                 "MB": 2.3581,           "MB_err": 0.0085,
@@ -149,8 +147,7 @@
             "period": 11.120757,
             "morph": 0.2,
             "exptime": [200, 600],
-            "sectors": [[80]],
-            "quality_masks": [[3505.0, 3507.0]],
+            "detrend_poly_degree": 2,
             "phiS": 0.35,
             "labels": {
                 "MA": 2.17,             "MA_err": 0.02,
@@ -192,7 +189,6 @@
             "SpT": "A4 m + A5 m",
             "details": "8 short cadence sectors (20, 43-45, 60 & 71-73); an inclined circular orbit showing partial eclipses of approximately 0.64 and 0.55 mag; secondary nr phase 0.5 yet noticable phase shift on later sectors; published work based on legacy photometry whereas we have used TESS data;",
             "notes": "benefits from fixing L3=0 (esp S73);",
-            "quality_masks": [[2936.0, 2938.0], [3285.0, 3287.0]],
             "jktebop_overrides": { "L3_fit": 0 },
             "labels": {
                 "MA": 1.964,            "MA_err": 0.007,
@@ -231,7 +227,6 @@
             "details": "3 short cadence sectors (20, 60 & 73); an eccentric orbit with eclipses of approximately 0.35 and 0.25 mag and the secondary near phase 0.45; significant phase shift on later sectors; evidence of delta-Scuti & gamma-Dor pulsations;",
             "notes": "ebop maven testing uses flatten for best fit of S20; sticking with S20 until we can extend flattening; will challenge an 'auto-flatten' algo as the phase shift is significant - a test with the params from the ebop maven data shows it doesn't transfer to S60 & 73 well; Southworth21obsR7 uses E(B-V)=0.002+/-0.002 mag and gives dist=76.7+/-1.0 pc;",
             "sectors": [[20]],
-            "quality_masks": [[3285.0, 3287.0]],
             "phiS": 0.45,
             "labels": {
                 "MA": 1.939,            "MA_err": 0.007,
@@ -309,7 +304,6 @@
             "t0": 2813.984145622,
             "period": 2.9846559,
             "morph": 0.5,
-            "quality_masks": [[2808.5, 2810.5]],
             "labels": {
                 "MA": 1.689,            "MA_err": 0.088,
                 "MB": 1.744,            "MB_err": 0.058,
@@ -328,7 +322,6 @@
             "SpT": "F2 V",
             "details": "2 short cadence sectors (4 & 31); a slightly eccentric orbit with eclipses of ~0.46 and ~0.40 mag; evidence of ellipsoidal variation;",
             "notes": "mask out section of isolated & distorted LC in sector 4; OverallSouthworth24obsR17 uses E(B-V)=0.013+/-0.015 mag and gives dist=191.7+/-3.8 pc;",
-            "quality_masks": [[1421.0, 1423.0]],
             "labels": {
                 "MA": 1.568,            "MA_err": 0.016,
                 "MB": 1.314,            "MB_err": 0.010,
@@ -348,7 +341,6 @@
             "details": "2 short cadence sectors (23 & 50); a circular orbit with similar eclipses of ~0.65 mag each; the stars are of similar size and luminosity;",
             "notes": "tess-ebs period is half the actual value; mask isolated section of S50; Southworth23obsR12 uses E(B-V)=0.00+/-0.01 mag and gives dist=106.5+/-1.4 pc;",
             "double_period": true, 
-            "quality_masks": [[2665.0, 2666.0]],
             "labels": {
                 "MA": 1.558,            "MA_err": 0.008,
                 "MB": 1.599,            "MB_err": 0.012,
@@ -411,7 +403,6 @@
             "period": 20.999146855,
             "morph": 0.1,
             "sectors": [[52, 53]],
-            "quality_masks": [[2743.0, 2745.0]],
             "phiS": 0.78,
             "labels": {
                 "MA": 1.380,            "MA_err": 0.021,
@@ -431,7 +422,6 @@
             "SpT": "F3 V + F3 V",
             "details": "3 short cadence sectors (17, 24 & 57); an eccentric orbit with low inclination; similar eclipse depths of ~0.7 mag; the two components are similar;",
             "notes": "maven tests use flattening but we get a good fit with or without; Southworth23obsR13 uses E(B-V)=0.083+/-0.056 mag and gives dist=505.5+/-8.3 pc;",
-            "quality_masks": [[1955.0, 1958.0], [1969.0, 1972.0]],
             "phiS": 0.55,
             "labels": {
                 "MA": 1.324,            "MA_err": 0.009,
@@ -450,7 +440,7 @@
             "aka": "TIC 48356677",
             "SpT": "F6 + F8",
             "details": "41 short cadence sectors (14-16, 18-26, 40-41, 47-60, 73-78 & 80-86); a pair of late-F stars in a circular 3.26 d orbit; total primary and secondary eclipses with depths of ~0.70 and ~0.55 mag;",
-            "notes": "many sectors available and relatively short period - selecting individual sectors from each group with highest pdc_tot (& pdc_tot > 0.9); Southworth25obsR27 uses E(B-V)=0.02+/-0.01 and gives dist=185.7+/-2.4 pc;",
+            "notes": "many sectors available and relatively short period which can all fit pretty well;  selecting individual sectors from each group with highest pdc_tot (& pdc_tot > 0.9); Southworth25obsR27 uses E(B-V)=0.02+/-0.01 and gives dist=185.7+/-2.4 pc;",
             "sectors": [[16], [19], [41], [52], [76]],
             "labels": {
                 "MA": 1.291,            "MA_err": 0.012,
@@ -470,7 +460,6 @@
             "SpT": "F5 V + F6 V",
             "details": "3 short cadence sectors (20, 60 & 73); a slightly eccentric, inclined orbit with eclipses of ~0.33 & ~0.30; a third non-eclipsing component in 4200 d orbit;",
             "notes": "Southworth21obsR5 uses E(B-V)=0.002+/-0.002 mag and dist=77.68+/-0.31 pc from the Gaia DR3 parallax;",
-            "quality_masks": [[2936.0, 2938.0], [3285.0, 3287.0]],
             "labels": {
                 "MA": 1.289,            "MA_err": 0.006,
                 "MB": 1.232,            "MB_err": 0.005,
@@ -487,11 +476,10 @@
             "reference": "Southworth21obsR6",
             "aka": "TIC 348517784, HD 14384",
             "SpT": "F5 V + F5 V",
-            "details": "3 short cadence sectors (18, 58 & 85); an incloned circular orbit with eclipses of ~0.5 mag; some phase shift on later sectors;",
+            "details": "3 short cadence sectors (18, 58 & 85); an inclined circular orbit with eclipses of ~0.5 mag; some phase shift on later sectors;",
             "notes": "TESS-ebs period is half actual value; distortion of the light curve near BTJD 1791; for now omitting S58 & 85 as cannot get consistent fit; Southworth21obsR6 uses E(B-V)=0.002+/-0.002 mag and gives dist=61.19+/-0.62 pc;",
             "sectors": [[18]],
             "double_period": true,
-            "quality_masks": [[1790.0, 1792.0], [3610.0, 3612.0]],
             "labels": {
                 "MA": 1.275,            "MA_err": 0.004,
                 "MB": 1.258,            "MB_err": 0.003,
@@ -535,7 +523,6 @@
             "details": "14 short cadence sectors (14-15, 26, 40-41, 53-55, 59, 74-75, 80, 82 & 86); a pair of late-F stars in a 10.76 d orbit; primary and secondary eclipses of ~0.28 and 0.24 mag; eccentric with slightly late secondary; slow variability in the light curves is likely instrumental in origin;",
             "notes": "taking best sector from each group by pdc_tot (treating 0 as 1) & excluding < 0.5; using flattening as morph < 0.2; Southworth25obsR26 uses E(B-V)=0.00+/-0.01 mag and gives dist=77.9+/-1.2 pc;",
             "sectors": [[15], [41], [55], [59], [75]],
-            "quality_masks": [[1695, 1697], [1709, 1711], [3312, 3314], [3339, 3342], [3505, 3507], [3635, 3638]],
             "flatten": { "mask_time_ranges": [[1714.25, 1714.65], [1719.85, 1720.2]] },
             "phiS": 0.52,
             "labels": {
@@ -557,7 +544,6 @@
             "details": "7 short sectors (14, 21, 41, 47-78 & 74-75); circular orbit with total eclipses of ~0.65 and ~0.35 mag; significant variability due to starspot activity;",
             "notes": "very sparse field so can fix L3=0; omitting S74 & 75 as poor quality with lower pdc_tot than others; Southworth22obsR11 uses E(B-V)=0.00+/-0.01 mag and gives dist=180.8+/-1.9 pc;",
             "sectors": [[14], [21], [41], [47], [48]],
-            "quality_masks": [[1884.5, 1886.5], [3312.0, 3314.0], [3339.0, 3342.0]],
             "jktebop_overrides": { "L3_fit": 0 },
             "labels": {
                 "MA": 1.135,            "MA_err": 0.009,
@@ -621,7 +607,7 @@
             "aka": "TIC 199574208",
             "SpT": "M4.5",
             "details": "25 short cadence sectors (16, 19, 22-26, 49-52, 56-59, 76-80 & 82-86); many sectors at slower cadences; a pair of M-dwarfs in a nearly circular, slightly inclined 1.27 d orbit; eclipses are ~0.76 and ~0.73 mag deep; frequent flares however these appear to have little affect on the fit;",
-            "notes": "many sectors and short cadence - we pick the subset with highest pdc_tot (>=0.950);",
+            "notes": "many sectors and short cadence with a good fit possible on most; we pick the subset with highest pdc_tot (>=0.950);",
             "sectors": [[16], [19], [24], [25], [26]],
             "labels": {
                 "MA": 0.2310,           "MA_err": 0.0009,
