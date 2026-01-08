@@ -33,6 +33,8 @@ def load_lightcurves(results: SearchResult,
     :cache_dir: Path to directory where we want the assets to be locally cached. If None then
     any caching will be under the control of the lightkurve config (see
     https://lightkurve.github.io/lightkurve/reference/config.html)
+
+    :returns: a LightCurveCollection of the downloaded lightcurves, ordered by sector
     """
     # Make sure the results & flags have same dimensions so we can iterate on them
     rcount = len(results)
@@ -51,10 +53,9 @@ def load_lightcurves(results: SearchResult,
     download_dir = f"{cache_dir}" if cache_dir else None
 
     # Now, load them all individually so we support varying quality_bitmask & flux_column values
-    return LightCurveCollection(
-        res.download(quality_bitmask=qbm, download_dir=download_dir, flux_column=fcol)
-            for res, qbm, fcol in zip(results, quality_bitmask, flux_column)
-    )
+    lcs = [res.download(quality_bitmask=qbm, download_dir=download_dir, flux_column=fcol)
+            for res, qbm, fcol in zip(results, quality_bitmask, flux_column)]
+    return LightCurveCollection(sorted(lcs, key=lambda lc: lc.sector))
 
 
 def create_invalid_flux_mask(lc: LightCurve) -> np.ndarray:
