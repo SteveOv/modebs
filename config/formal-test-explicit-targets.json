@@ -10,15 +10,14 @@
             "aka": "TIC 403625251, HD 11241",
             "SpT": "B1.5 V",
             "details": "2 short cadence sectors (18 & 85); eccentric orbit with eclipse depths of ~0.4 and ~0.15 mag; long period means only one of each eclipse is observed; Star B is both larger (k~1.1) and more luminous (J~1.04) than Star A; Southworth & Bowman found LC solutions where k=0.69(3), 0.84(2) and 1.10(3), with that last adopted;",
-            "notes": "not in TESS-ebs so ephemeris (from SouthworthBowman22mnras) & morph defined here; jktebop_overrides and ephemeris from source work; sector 89 to be omiited as there is only one eclipse;",
+            "notes": "not in TESS-ebs so ephemeris (from SouthworthBowman22mnras) & morph defined here; jktebop_overrides of LD params are from source work & and are key to getting comperable fit; despite the long period using flattening loads to a worse fit; sector 85 is omiited as there is only one eclipse;",
             "t0": 1813.2011,
             "period": 25.935953,
-            "morph": 0.1,
-            "sectors": [[18]],
+            "morph": 0.3,
+            "exclude_sectors": [85],
             "teff_sys": 20000,
-            "flatten": { "mask_time_ranges": [[1797.5, 1798.4], [1812.9, 1813.5]] },
             "phiS": 0.44,
-            "jktebop_overrides": { 
+            "jktebop_overrides": {
                 "LDA": "quad", "LDA1": 0.046, "LDA2": 0.22, "LDA1_fit": 0,
                 "LDB": "quad", "LDB1": 0.046, "LDB2": 0.22, "LDB1_fit": 0
             },
