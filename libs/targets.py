@@ -17,7 +17,7 @@ _default_target_config_defaults = {
     "quality_masks": [],
     "detrend_gap_threshold": 0.5,
     "detrend_poly_degree": 1,
-    "detrend_iterations": 2,
+    "detrend_iterations": 3,
     "phiS": 0.5,
     "t0": None,
     "period": None,
