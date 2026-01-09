@@ -382,12 +382,12 @@
             "notes": "unable to get the sector fits to agree - going to limit to S58 which has significantly higher pdc_tot (0.871 vs 0.591); Southworth23obsR14 uses E(B-V)=0.05+/-0.02 mag and gives a dist=117.2+/-2.3 pc;",
             "sectors":[[58]],
             "labels": {
-                "MA": 1.488,            "MA_err": 0.011,
-                "MB": 1.482,            "MB_err": 0.011,
-                "RA": 2.1499,           "RA_err": 0.0058,
-                "RB": 2.2708,           "RB_err": 0.0058,
-                "TeffA": 6596,          "TeffA_err": 150,
-                "TeffB": 6564,          "TeffB_err": 150,
+                "MA": 1.4489,           "MA_err": 0.0063,
+                "MB": 1.3495,           "MB_err": 0.0062,
+                "RA": 1.538,            "RA_err": 0.035,
+                "RB": 1.349,            "RB_err": 0.032,
+                "TeffA": 6842,          "TeffA_err": 50,
+                "TeffB": 6562,          "TeffB_err": 50,
                 "loggA": 4.225,         "loggA_err": 0.020,
                 "loggB": 4.308,         "loggB_err": 0.021
             }
