@@ -1,7 +1,8 @@
 {
    "explicit": true,
    "target_config_defaults": {
-        "quality_bitmask": "hardest"
+        "quality_bitmask": "hardest",
+        "quality_masks": [[1534.0, 1544.0]]
     },
     "target_configs": {
         "0032759110": {
@@ -25,7 +26,6 @@
             "details": "26 short cadence sectors (1-2, 4-12, 61-65, 67-69, 87-90, 94-96); tess-ebs morph 0.049 & period ~31.113 d; Gaia DR3 ruwe -- with no parallax given; dist from Gaia DR2 ~500 pc; eclipses of ~0.25 & ~0.24 mag;",
             "notes": "analysis on best contiguous sectors from across the range of obs; quit a fussy fit, with some warnings - needs more  work",
             "sectors": [[1, 2], [5, 6], [64, 65], [88, 89], [95, 96]],
-            "quality_masks": [[3096.0, 3097.0], [3689.0, 3691.0]],
             "flatten": { "mask_time_ranges": [[1347.3, 1347.9], [1332.9, 1333.6]] },
             "teff_sys": 6800,
             "phiS": 0.55
@@ -42,13 +42,11 @@
         },
         "0066602813": {
             "details": "6 short cadence sectors (7, 33-34, 61, 87-88); tess-ebs morph 0.352 & period ~2.764 d; Gaia DR3 ruwe 0.985; eclipses of ~0.6 & ~0.2 mag; slow variability - starspot?;",
-            "notes": "consistent results from fitting all sectors independently;",
-            "quality_masks": [[3660.0, 3665.0]]
+            "notes": "consistent results from fitting all sectors independently;"
         },
         "0077158150": {
             "details": "2 short cadence sectors (4 & 5); tess-ebs morph 0.466 & period ~2.487 d; not found in Gaia DR3; aka RZ Cae; eclipses of ~0.25 & ~0.15 mag; slight ellipsoidal effect; distorted region in S4;",
-            "notes": "not found in DR3 so need to source distance elsewhere;",
-            "quality_masks": [[1420.0, 1423.0]]
+            "notes": "not found in DR3 so need to source distance elsewhere;"
         },
         "0078568736": {
             "details": "3 short cadence sectors (6-7 & 33); tess-ebs morph 0.159 & period ~8.220 d; Gaia DR3 ruwe 1.738; SpT G; eclipses of ~0.60 & ~0.12 mag; slow variability;",
@@ -62,14 +60,12 @@
         "0080650858": {
             "details": "4 short cadence sectors (7, 8, 61 & 62); tess-ebs morph 0.517 & period ~1.916 d; Gaia DR3 ruwe 0.963; aka BH Pup; SpT B3/5III; eclipses of ~0.32 & ~0.10 mag; some variability; S8 heavily distorted after mid-sector break (clip region used); secondary eclipse may be total;",
             "notes": "tough target - close B-Type - but LCs fit well so worth including; override teff_sys with starting value appropriate for B-type;",
-            "quality_masks": [[1534.0, 1544.0]],
             "teff_sys": 20000
         },
         "0118313102": {
             "details": "8 short cadence sectors (8-10, 35-36, 61-63); tess-ebs morph 0.180 & period ~9.256 d; Gaia DR3 ruwe 0.962; aka NT Vel; SpT B6V(n); deep eclipses of ~0.69 & ~0.66 mag; clear pulsations; S8 distorted after mid-sector break; eccentric with phiS nr 0.4;",
             "notes": "warnings on most if fitted individually; fitting combined 8-10 and 61-63 work w/o warnings and are consistent;",
             "sectors": [[8, 9, 10], [61, 62, 63]],
-            "quality_masks": [[1534.0, 1544.0]],
             "phiS": 0.4
         },
         "0140209204": {
@@ -87,14 +83,12 @@
             "details": "2 short cadence sectors (4 & 5); tess-ebs morph 0.391 & period ~2.166 d; Gaia DR3 ruwe 0.938; eclipses of ~0.08 mag; slight variation between sectors;",
             "notes": "double tess-ebs period; better fit found by combining the sectors; no apparent sources of L3 & fit finds L3 approx -0.23; fit without L3 similar but LR higher;",
             "sectors": [[4, 5]],
-            "quality_masks": [[1420.0, 1424.0]],
             "double_period": true,
             "jktebop_override": { "L3_fit": 0 }
         },
         "0160328766": {
             "details": "4 short cadence sectors (6, 32-33 & 87); tess-ebs morph 0.199 & period ~10.318 d; Gaia DR3 ruwe 1.148; aka AW Col; SpT A3(m)A7-A7; eclipses of ~0.50 & ~0.15 mag; all sectors have at least 1 of each eclipse type;",
             "notes": "well detached and highly eccentric; some crowding in field so leave L3 to fit; fits generates warnings but are consistent and should respond well to retries;",
-            "quality_masks": [[3664.0, 3666.0]],
             "flatten": { "mask_time_ranges": [[1480.10, 1480.60], [1488.25, 1488.55]] },
             "phiS": 0.77
         },
@@ -104,13 +98,11 @@
         "0198011271": {
             "details": "5 short cadence sectors (3-5, 69 & 97); tess-ebs morph 0.429 & period ~1.934 d; Gaia DR3 ruwe 0.852; high snr; eclipses of ~0.60 & ~0.35 mag; slow and random variability;",
             "notes": "combining sectors 3 to 5 may be best way of handling variability; flattening may loose some ellipsoidal variation;",
-            "sectors": [[3, 4, 5]],
-            "quality_masks": [[1420.0, 1423.0]]
+            "sectors": [[3, 4, 5]]
         },
         "0219421171": {
             "details": "3 short cadence sectors (3-4 & 67); tess-ebs morph 0.165 & period ~8.303 d; Gaia DR3 ruwe 0.812; high snr; eclipses of ~0.20 & ~0.07 mag; slight eccentricity;",
             "notes": "may benefit further from flattening;",
-            "quality_masks": [[1420.0, 1423.0]],
             "phiS": 0.53
         },
         "0238896417": {
@@ -122,7 +114,6 @@
             "details": "10 short cadence sectors (3-8, 30-32, 66, 90, 93 & 97); tess-ebs morph 0.010 & period ~40.304 d; Gaia DR3 ruwe 0.901; good snr; eclipses of ~0.24 & ~0.10 mag; highly eccentricity;",
             "notes": "joining sectors 3 to 5 give best coverage; warnings from jktebop but fit looks plausible; may benefit from flattening;",
             "sectors": [[3, 4, 5]],
-            "quality_masks": [[1410.0, 1423.0]],
             "phiS": 0.24
         },
         "0260269456": {
@@ -135,13 +126,11 @@
         "0260502102": {
             "details": "41 short cadence sectors (1-13, 28-36, 38-39, 61-69 & 93-96); tess-ebs morph 0.125 & period ~7.315 d; Gaia DR3 ruwe 1.316; ok snr; eclipses of ~0.22 & ~0.18 mag; highly eccentric; sparse field so may be able to fix L3=0;",
             "notes": "test fit of S1, 2 & 3 give consistent fit if L3=0; in JustensenAlbrecht21apj table 3;",
-            "quality_masks": [[1410.0, 1423.0]],
             "phiS": 0.68
         },
         "0260504147": {
             "details": "38 short cadence sectors (1-9, 11-13, 27-39, 61-62, 65-66, 87-89 & 93-96); tess-ebs morph 0.179 & period ~8.418 d; not in Gaia DR3; SpT F6V; good snr; eclipses of ~0.20 & ~0.18 mag; slightly eccentric; potential sources of L3 nearby;",
             "notes": "will likely need flattening for consistent & durable fit;",
-            "quality_masks": [[1410.0, 1423.0]],
             "phiS": 0.48
         },
         "0278826516": {
@@ -156,7 +145,6 @@
         "0279741942": {
             "details": "10 short cadence sectors (2-4, 28-30, 68-69 & 95-96); tess-ebs morph 0.091 & period ~14.216 d; Gaia DR3 ruwe 1.025; aka VY Ret; SpT F5V; excellent snr; highly eccentric; eclipses of ~0.58 & ~0.55 mag; potential sources of L3 nearby;",
             "notes": "will likely require flattening to get durable fit;",
-            "quality_masks": [[1410.0, 1423.0]],
             "phiS": 0.72
         },
         "0299903137": {
@@ -199,8 +187,7 @@
         "0384031569": {
             "details": "7 short cadence sectors (8-10, 62-63 & 89-90); tess-ebs morph 0.135 & period ~20.822 d; Gaia DR3 ruwe 2.932; excellent SNR; generally flat LCs with eclipses of ~0.62 & ~0.55 mag; S8 distorted after mid-sector break (1534, 1543); potential sources of L3 nearby; slightly eccentric with some phase shift in later sectors;",
             "notes": "will need to join sectors for good coverage; test fits of S9+10, S62+63 & S89-90 work well with no errors and consistent params;",
-            "sectors":[[9, 10], [62, 63], [89, 90]],
-            "quality_masks": [[1534.0, 1543.0]],
+            "sectors":[[8, 9, 10], [62, 63], [89, 90]],
             "detrend_gap_threshold": 0.2,
             "phiS": 0.51
         }
