@@ -21,7 +21,8 @@ _default_target_config_defaults = {
     "phiS": 0.5,
     "t0": None,
     "period": None,
-    "double_period": False
+    "double_period": False,
+    "av": None
 }
 
 class TargetConfig():
