@@ -206,7 +206,8 @@
             "aka": "TIC 258314976, HD 105509",
             "SpT": "A2mA5-F2",
             "details": "3 short cadence sectors (10, 37 & 64); an inclined circular orbit with partial eclipses of ~0.19 and ~0.16 mag;",
-            "notes": "",
+            "notes": "S10 gives warnings and an incorrect fit; source characterisation excludes S10 and fixes L3=0.021; cannot use pdc_tot rules to exclude S10 as all have pdc_tot=0;",
+            "exclude_sectors": [10],
             "labels": {
                 "MA": 1.9621,           "MA_err": 0.0070,
                 "MB": 1.5463,           "MB_err": 0.0034,
