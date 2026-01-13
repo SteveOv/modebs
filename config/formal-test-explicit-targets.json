@@ -119,11 +119,11 @@
             "aka": "TIC 125754991, HD 23642",
             "SpT": "A0 Vp(Si) + Am",
             "details": "5 short cadence sectors (42-44 & 70-71); an inclined, circular orbit with shallow primary (~0.10 mag) and secondary (~0.05 mag) partial eclipses, reflection and ellipsoidal effects;",
-            "notes": "not in TESS-ebs so ephemeris & morph defined here; SouthworthMurphy+23mnrasl give E(B-V)=0.04+/-0.01 mag & dist(K-band)=134.7+/-2.0 pc;",
+            "notes": "not in TESS-ebs so ephemeris & morph defined here; S44 (0.939) & S71 (0.547) have highest pdc_tot in each group of sectors; SouthworthMurphy+23mnrasl use an lrat (to mitigate shallow partial eclipses) and circular orbit in LC fit; SouthworthMurphy+23mnrasl give E(B-V)=0.04+/-0.01 mag & dist(K-band)=134.7+/-2.0 pc;",
             "t0": 2464.981943071,
             "period": 2.461126371,
             "morph": 0.5,
-            "jktebop_overrides": { "lrat": ["2464.20 0.328 0.011", "2465.80 0.328 0.011"] },
+            "sectors": [[44], [71]],
             "labels": {
                 "MA": 2.273,            "MA_err": 0.011,
                 "MB": 1.595,            "MB_err": 0.008,
