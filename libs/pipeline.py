@@ -1,12 +1,15 @@
 """
 Low level utility functions for light curve ingest, pre-processing, estimation and fitting.
 """
-#pylint: disable=no-member
+# pylint: disable=no-member
 import warnings
 import re
 
 import numpy as np
 from uncertainties import UFloat, ufloat
+import astropy.units as u
+from astropy.coordinates import SkyCoord
+from astroquery.gaia import Gaia
 
 from deblib import limb_darkening
 from deblib.vmath import arccos, arcsin, degrees
@@ -23,6 +26,79 @@ _spt_to_teff_map = {
     "B": ufloat(20000, 10000),
     "O": ufloat(35000, 10000)
 }
+
+def get_teff_from_spt(target_spt):
+    """
+    Estimates a stellar T_eff [K] from the passed spectral type.
+
+    :target_spt: the spectral type string
+    :returns: the estimated teff in K
+    """
+    teff = None
+
+    # Also add the whole spt in case it's just a single char (i.e.: V889 Aql is set to "A")
+    if target_spt is not None \
+            and (spts := re.findall(r"([A-Z][0-9])", target_spt) + [target_spt.upper()]):
+        for spt in spts:
+            if spt and len(spt) and (tp := spt.strip()[0]) in _spt_to_teff_map \
+                and _spt_to_teff_map[tp].n > (teff.n if teff is not None else 0):
+                teff = _spt_to_teff_map[tp]
+    return teff
+
+
+def estimate_l3_with_gaia(centre: SkyCoord, radius_as: float=120,
+                          target_source_id: int=None, target_g_mag: float=None,
+                          verbose: bool=False) -> float:
+    """
+    Estimates the third-light contribution from any sources near the target found in Gaia DR3.
+    The returned L3 value is the sum of the values for each source found. Each target's L3 is its
+    flux ratio compared with the target's, multiplied by a factor derived from its angular distance
+    from the centre of the search area.
+
+    Either target_source_id or target_g_mag must be supplied.
+    
+    :centre: the coordinates of the target and the centre of the search cone
+    :radius: the radius of the search in arcsec
+    :target_source_id: the Gaia DR3 source id of the target, if known
+    :target_g_mag: the apparent G-band magnitude of the target, if it is not in Gaia DR3
+    :returns: an estimated starting L3 value
+    """
+    l3 = 0
+    Gaia.MAIN_GAIA_TABLE = "gaiadr3.gaia_source"
+    if (job := Gaia.cone_search(coordinate=centre, radius=radius_as * u.arcsec,
+                                columns=("source_id", "phot_g_mean_mag", "ra", "dec"))):
+        tbl = job.get_results()
+        if len(tbl) > 0:
+
+            if target_source_id is not None:
+                target_mask = tbl["source_id"] == int(target_source_id)
+            else:
+                target_mask = np.zeros((len(tbl)), dtype=bool)
+
+            if target_g_mag is None:
+                if any(target_mask):
+                    target_g_mag = np.max(tbl[target_mask]["phot_g_mean_mag"])
+                else:
+                    raise ValueError("No target_g_mag and cannot find target in cone")
+
+            if any(~target_mask):
+                flux_ratios = 10**(0.4 * (target_g_mag - tbl[~target_mask]["phot_g_mean_mag"]))
+
+                # The dist field is calculated by Gaia as distance from centre in degrees.
+                # Calculate a weighting based on the normalized distance from the search centre.
+                radius_deg = radius_as / 3600
+                dist_weights = 1 - (tbl[~target_mask]["dist"] / radius_deg)
+
+                l3 = np.sum(flux_ratios * dist_weights)
+
+                if verbose:
+                    print("Estimated the total third-light (L3) contribution of",
+                          f"{len(tbl[~target_mask])} nearby object(s) found in Gaia DR3",
+                          f"to be {l3:.6f} (6 d.p.).")
+            elif verbose:
+                print("No nearby objects found in Gaia DR3 so estimated L3=0")
+    return l3
+
 
 def append_calculated_inc_predictions(preds: np.ndarray[UFloat],
                                       field_name: str="inc") -> np.ndarray[UFloat]:
@@ -63,24 +139,6 @@ def append_calculated_inc_predictions(preds: np.ndarray[UFloat],
         new[field_name] = inc
         return new
 
-
-def get_teff_from_spt(target_spt):
-    """
-    Estimates a stellar T_eff [K] from the passed spectral type.
-
-    :target_spt: the spectral type string
-    :returns: the estimated teff in K
-    """
-    teff = None
-
-    # Also add the whole spt in case it's just a single char (i.e.: V889 Aql is set to "A")
-    if target_spt is not None \
-            and (spts := re.findall(r"([A-Z][0-9])", target_spt) + [target_spt.upper()]):
-        for spt in spts:
-            if spt and len(spt) and (tp := spt.strip()[0]) in _spt_to_teff_map \
-                and _spt_to_teff_map[tp].n > (teff.n if teff is not None else 0):
-                teff = _spt_to_teff_map[tp]
-    return teff
 
 def pop_and_complete_ld_config(source_cfg: dict[str, any],
                                teffa: float, teffb: float,
