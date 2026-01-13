@@ -83,8 +83,7 @@
             "aka": "TIC 265767012, HD 24909",
             "SpT": "B8 V + A6 V",
             "details": "3 short cadence sectors (19, 59 & 86); totally eclipsing system with an eccentric orbit and apsidal motion; eclipses are ~0.45 and ~0.15 mag deep with the secondary appearing before phase 0.5; an additional challange is presented by the primary B-type star which is pulsating;",
-            "notes": "early part of S86 requires clipping to remove distortions; Southworth24obsR21 uses E(B-V)=0.12+/-0.03 mag and gives dist=278.1+/-3.8 pc;",
-            "quality_masks": [[3635.0, 3643.0]],
+            "notes": "early part of S86 is 'messy' and not clipping leads to a fit with iterations warning but one which is consistent with 19 & 59; all 3 sectors have pdc_tot=0 so cannot select/exclude based on this; Southworth24obsR21 uses E(B-V)=0.12+/-0.03 mag and gives dist=278.1+/-3.8 pc;",
             "phiS": 0.47,
             "labels": {
                 "MA": 3.516,            "MA_err": 0.050,
