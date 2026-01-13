@@ -142,7 +142,7 @@
             "aka": "TIC 300000680, HD 181166",
             "SpT": "B9.5 V",
             "details": "sectors 40 & 54 @ 600 s cadence and sector 80 @ 200 s; a highly eccentric orbit with the secondary eclipse at phase ~0.35; eclipse depths differ despite the stars having similar radii and brightness;",
-            "notes": "not in Tess-ebs so ephemeris & morph defined here; nothing at short/120 s cadence so chosing available sector(s) with highest cadence;",
+            "notes": "not in Tess-ebs so ephemeris & morph defined here; nothing at short/120 s cadence so chosing available sector(s) with highest cadence; useful test that code works at cadences > 120 s; published fit uses a lrat to mitigate k & J being near unity; better fit after quad detrending - not sure how to automate this choice so may default to quad for all;",
             "t0": 2772.124954368,
             "period": 11.120757,
             "morph": 0.2,
