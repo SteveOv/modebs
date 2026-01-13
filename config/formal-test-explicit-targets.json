@@ -102,7 +102,7 @@
             "aka": "TIC 144085463, HD 34364",
             "SpT": "B9 V + B9.5 V",
             "details": "8 short cadence sectors (19, 43-45, 59, 71, 73 & 86); a pair of late-B stars in a circular 4.135 day orbit; primary and secondary partial eclipses of depth ~0.6 and ~0.55 mag;",
-            "notes": "sections of S73 and 86 require clipping; works well by taking the mean of the fits of each sector; Southworth25obsR25 uses E(B-V)=0.01+/-0.01 mag and gives dist=136.4+/-1.7 pc;",
+            "notes": "works well by taking the mean of the fits of each sector; Southworth25obsR25 uses E(B-V)=0.01+/-0.01 mag and gives dist=136.4+/-1.7 pc;",
             "labels": {
                 "MA": 2.5444,           "MA_err": 0.0086,
                 "MB": 2.3581,           "MB_err": 0.0085,
