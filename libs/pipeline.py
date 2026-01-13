@@ -48,7 +48,7 @@ def get_teff_from_spt(target_spt):
 
 def estimate_l3_with_gaia(centre: SkyCoord, radius_as: float=120,
                           target_source_id: int=None, target_g_mag: float=None,
-                          verbose: bool=False) -> float:
+                          max_l3: float=None, verbose: bool=False) -> float:
     """
     Estimates the third-light contribution from any sources near the target found in Gaia DR3.
     The returned L3 value is the sum of the values for each source found. Each target's L3 is its
@@ -61,6 +61,7 @@ def estimate_l3_with_gaia(centre: SkyCoord, radius_as: float=120,
     :radius: the radius of the search in arcsec
     :target_source_id: the Gaia DR3 source id of the target, if known
     :target_g_mag: the apparent G-band magnitude of the target, if it is not in Gaia DR3
+    :max_l3: optional max allowable L3 value
     :returns: an estimated starting L3 value
     """
     l3 = 0
@@ -78,8 +79,10 @@ def estimate_l3_with_gaia(centre: SkyCoord, radius_as: float=120,
             if target_g_mag is None:
                 if any(target_mask):
                     target_g_mag = np.max(tbl[target_mask]["phot_g_mean_mag"])
+                    if verbose:
+                        print(f"Target object has a Gaia magnitude of {target_g_mag:.3f} (3 d.p.)")
                 else:
-                    raise ValueError("No target_g_mag and cannot find target in cone")
+                    raise ValueError("Cannot find target in search cone & no target_g_mag given")
 
             if any(~target_mask):
                 flux_ratios = 10**(0.4 * (target_g_mag - tbl[~target_mask]["phot_g_mean_mag"]))
@@ -92,11 +95,15 @@ def estimate_l3_with_gaia(centre: SkyCoord, radius_as: float=120,
                 l3 = np.sum(flux_ratios * dist_weights)
 
                 if verbose:
-                    print("Estimated the total third-light (L3) contribution of",
-                          f"{len(tbl[~target_mask])} nearby object(s) found in Gaia DR3",
-                          f"to be {l3:.6f} (6 d.p.).")
+                    print(f"Estimated the total third-light ratio (L3) to be {l3:.3f} (3 d.p.)",
+                          f"for the {len(tbl[~target_mask])} nearby object(s) found in Gaia DR3.")
+
+                if max_l3 is not None and max_l3 < l3:
+                    l3 = max_l3
+                    if verbose:
+                        print(f"The estimate is reduced to the maximum allowed value of {max_l3}.")
             elif verbose:
-                print("No nearby objects found in Gaia DR3 so estimated L3=0")
+                print("No nearby objects found in Gaia DR3 so the estimated L3=0")
     return l3
 
 
