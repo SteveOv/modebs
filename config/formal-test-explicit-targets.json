@@ -5,6 +5,8 @@
     },
     "target_configs": {
         "V436 Per": {
+            "exclude": true,
+            "why_exclude": "unable to achieve good fit without jktebop overide of LD params",
             "source": "DEBCat and Southworth & Bowman (2022) Table 3. Tess sector 18 SAP data analysed with JKTEBOP. Teffs reproduced from Janik et al. (2003)",
             "reference": "SouthworthBowman22mnras",
             "aka": "TIC 403625251, HD 11241",
