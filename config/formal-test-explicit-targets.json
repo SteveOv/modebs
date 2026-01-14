@@ -183,13 +183,12 @@
             }
         },
         "WW Aur": {
-            "source": "DEBCat and Southworth et al. (2005) table 12. Uses EBOP (with mods to fit rA+rB & k and to use MRQMIN) for fitting of observations from the 1970s. We use V-band fitting results (Table 10). Available TESS sectors 20, 43-45, 60 & 71-73 at 120 s cadence.",
+            "source": "DEBCat and Southworth et al. (2005) table 12. Uses EBOP (with mods to fit rA+rB & k and to use MRQMIN) for fitting of observations from the 1970s. We use V-band fitting results (Table 10).",
             "reference": "SouthworthSmalley+05mnras",
             "aka": "TIC 172171873, HD 46052",
             "SpT": "A4 m + A5 m",
-            "details": "8 short cadence sectors (20, 43-45, 60 & 71-73); an inclined circular orbit showing partial eclipses of approximately 0.64 and 0.55 mag; secondary nr phase 0.5 yet noticable phase shift on later sectors; published work based on legacy photometry whereas we have used TESS data;",
-            "notes": "benefits from fixing L3=0 (esp S73);",
-            "jktebop_overrides": { "L3_fit": 0 },
+            "details": "8 short cadence sectors (20, 43-45, 60 & 71-73); an inclined circular orbit showing partial eclipses of approximately 0.64 and 0.55 mag; secondary nr phase 0.5 yet noticable phase shift on later sectors; published work based on legacy photometry;",
+            "notes": "",
             "labels": {
                 "MA": 1.964,            "MA_err": 0.007,
                 "MB": 1.814,            "MB_err": 0.007,
