@@ -264,8 +264,8 @@
             "reference": "VanReethSouthworth+22aa, BakisHensberge+14aj",
             "aka": "TIC 15795549",
             "SpT": "A2hA7mA4V + F3V",
-            "details": "4 short cadence sectors (14-15, 41 & 75); a tight circular orbit of just 0.9 d with deep eclipses of ~0.6 & ~0.4 mag; variability is seen in the light curve from pulsations dicussed in the source article; both fractional radii are > 0.2, outside the range normally deemed suitable for fitting with JKTEBOP, but it was used in the source article and ebop maven testing was able to achieve a similar fit;",
-            "notes": "",
+            "details": "4 short cadence sectors (14-15, 41 & 75); a tight circular orbit of just 0.9 d with deep eclipses of ~0.6 & ~0.4 mag; variability is seen in the light curve from pulsations dicussed in the source article;",
+            "notes": "both fractional radii are > 0.2, outside the range normally deemed suitable for fitting with JKTEBOP, but it was used in the source article and ebop maven testing was able to achieve a similar fit; all sectors give consistent fits despite the variability and minimal pre-processing;",
             "labels": {
                 "MA": 1.859,            "MA_err": 0.041,
                 "MB": 1.576,            "MB_err": 0.037,
