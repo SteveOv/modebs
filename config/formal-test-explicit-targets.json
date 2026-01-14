@@ -589,18 +589,18 @@
             }
         },
         "V530 Ori": {
+            "exclude": true,
+            "why_exclude": "very shallow secondary and without flattening and fixed L3 & LD params the fit is unreliable - params vary greatly between runs.",
             "source": "DEBCat and Torres et al. (2014) table 10. JKTEBOP was used to analyse various non-TESS photometry sources.",
             "reference": "TorresSandbergLacy+14apj",
             "aka": "TIC 11961096, HD 294598",
             "SpT": "G1 V + M1 V",
             "details": "1 short cadence sector (33); a G+M pair in an eccentric 6.1 d orbit; partial primary partial eclipses of ~0.5 mag and shallow secondary total eclipses of ~0.06 mag; some variability, potentially from star spots;",
-            "notes": "not in TESS-ebs so ephemeris & morph defined here; maven tests used flattening & fixing L3=0 to get control fit; as field is sparse we fix L3=0; keeping flattening for now as otherwise we cannot fit secondary; TorresSandbergLacy+14apj give E(B-V)=0.045+/-0.020 mag and dist=103+/-6 pc;",
+            "notes": "not in TESS-ebs so ephemeris & morph defined here; TorresSandbergLacy+14apj give E(B-V)=0.045+/-0.020 mag and dist=103+/-6 pc;",
             "t0": 2210.491034996,
             "period": 6.110760760,
             "morph": 0.3,
-            "flatten": { "mask_time_ranges": [[2210.3, 2210.7], [2213.1, 2213.5]] },
             "phiS": 0.45,
-            "jktebop_overrides": { "L3_fit": 0 },
             "labels": {
                 "MA": 1.0038,           "MA_err": 0.0066,
                 "MB": 0.5955,           "MB_err": 0.0022,
