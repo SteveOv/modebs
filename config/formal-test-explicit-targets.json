@@ -282,8 +282,8 @@
             "reference": "GraczykPietrzynski+22aa",
             "aka": "TIC 149861542, HD 26591",
             "SpT": "A1mA2-A8",
-            "details": "2 short cadence sectors (5 & 31); an inclined circuler orbit with partial eclipses of ~0.27 mag; noticable ellipsoidal effect; the stars have similar radii and luminosities;",
-            "notes": "",
+            "details": "2 short cadence sectors (5 & 31); an inclined circuler orbit with partial eclipses of ~0.27 mag; noticable ellipsoidal effect; clear trends in both sectors; the stars have similar radii and luminosities;",
+            "notes": "both sectors have pdb_tot=0 however the data are of a good quality; likely L3 from nearby bright object;",
             "labels": {
                 "MA": 1.79,             "MA_err": 0.0057,
                 "MB": 1.78,             "MB_err": 0.0054,
