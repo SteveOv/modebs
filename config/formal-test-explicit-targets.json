@@ -301,7 +301,7 @@
             "aka": "TIC 314847177, HS 206417",
             "SpT": "F2 V",
             "details": "just sector 55 and only at 600 s cadence; a circular orbit with clear eclipses of ~0.38 and ~0.35 mag;",
-            "notes": "not in TESS-ebs so ephemeris & morph defined here; mask out isolated section in S55; Southworth24obsR18 uses E(B-V)=0.09+/-0.02 mag and gives dist=238.8+/-6.1 pc;",
+            "notes": "not in TESS-ebs so ephemeris & morph defined here; Southworth24obsR18 uses E(B-V)=0.09+/-0.02 mag and gives dist=238.8+/-6.1 pc;",
             "exptime": 600,
             "t0": 2813.984145622,
             "period": 2.9846559,
