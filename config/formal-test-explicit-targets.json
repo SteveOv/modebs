@@ -476,12 +476,14 @@
             }
         },
         "V505 Per": {
+            "exclude": true,
+            "why_exclude": "requires too many interventions to get consistent fit across sectors",
             "source": "DEBCat and Rediscussion 6, Table V. TESS sector 18 SAP photometry analysed with JKTEBOP version 41. TESS sector 58 observations released subsequent to publication.",
             "reference": "Southworth21obsR6",
             "aka": "TIC 348517784, HD 14384",
             "SpT": "F5 V + F5 V",
             "details": "3 short cadence sectors (18, 58 & 85); an inclined circular orbit with eclipses of ~0.5 mag; some phase shift on later sectors;",
-            "notes": "TESS-ebs period is half actual value; distortion of the light curve near BTJD 1791; for now omitting S58 & 85 as cannot get consistent fit; Southworth21obsR6 uses E(B-V)=0.002+/-0.002 mag and gives dist=61.19+/-0.62 pc;",
+            "notes": "TESS-ebs period is half actual value; very difficult to get fits for 58 & 85 consistent with 18 and the published characterisation (needs combo of fixing L3=0 and explicit LD params); all sectors have pdc_tot=0 so this is no use as a selection criterion; Southworth21obsR6 uses E(B-V)=0.002+/-0.002 mag and gives dist=61.19+/-0.62 pc;",
             "sectors": [[18]],
             "double_period": true,
             "labels": {
