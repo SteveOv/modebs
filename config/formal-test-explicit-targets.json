@@ -565,15 +565,18 @@
             }
         },
         "QR Hya": {
+            "exclude": true,
+            "why_exclude": "Need flattening and fixing L3 for correct fit",
             "source": "DEBCat and Graczyk et al. (2022) table 9. WD code used for fitting TESS sector 9 PDCSAP data (omitted sector 36 due to starspots). Sector 63 released subsequent to publication.",
             "reference": "GraczykPietrzynski+22aa",
             "aka": "TIC 49003142, HD 94853",
             "SpT": "G1 V",
             "details": "3 short cadence sectors (9, 36 & 63); an inclined orbit with partial eclipses of ~0.30 & ~0.28 mag; startspot activity;",
-            "notes": "tess-ebs ephemeris has incorrect (half) period; omitting sector 63 for low pdc_tot relative to others; sparse field so replicating maven test by fixing L3=0;",
+            "notes": "tess-ebs ephemeris has incorrect (half) period; pdc_tot is 0.629 (9), 0.479 (36) & 0.017 (63); omitting sector 63 for low pdc_tot relative to others; for S9 & 36 neither fit is currently 'correct', even if L3 fixed at zero; can only get good fits with flattening & fixing L3 at zero (as in EM testing);",
             "double_period": true,
-            "sectors": [[9], [36]],
-            "jktebop_overrides": { "L3_fit": 0 },
+            "exclude_sectors": [63],
+            "flatten": { "mask_time_ranges": [[1551.8, 1552.1], [1554.3, 1554.6]] },
+            "jktebop_overrides": { "L3": 0, "L3_fit": 0 },
             "labels": {
                 "MA": 1.1002,           "MA_err": 0.0018,
                 "MB": 1.0673,           "MB_err": 0.0019,
