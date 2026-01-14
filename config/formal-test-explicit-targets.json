@@ -341,7 +341,7 @@
             "aka": "TIC 357358259, HD 121648",
             "SpT": "F3 V",
             "details": "2 short cadence sectors (23 & 50); a circular orbit with similar eclipses of ~0.65 mag each; the stars are of similar size and luminosity;",
-            "notes": "tess-ebs period is half the actual value; mask isolated section of S50; Southworth23obsR12 uses E(B-V)=0.00+/-0.01 mag and gives dist=106.5+/-1.4 pc;",
+            "notes": "tess-ebs period is half the actual value; fit of S50 may give iteration warning but is consistent with L23; Southworth23obsR12 uses E(B-V)=0.00+/-0.01 mag and gives dist=106.5+/-1.4 pc;",
             "double_period": true, 
             "labels": {
                 "MA": 1.558,            "MA_err": 0.008,
