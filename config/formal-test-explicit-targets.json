@@ -550,10 +550,9 @@
             "reference": "Southworth22obsR11",
             "aka": "TIC 138505004",
             "SpT": "G0 V + G8 V",
-            "details": "7 short sectors (14, 21, 41, 47-78 & 74-75); circular orbit with total eclipses of ~0.65 and ~0.35 mag; significant variability due to starspot activity;",
-            "notes": "very sparse field so can fix L3=0; omitting S74 & 75 as poor quality with lower pdc_tot than others; Southworth22obsR11 uses E(B-V)=0.00+/-0.01 mag and gives dist=180.8+/-1.9 pc;",
-            "sectors": [[14], [21], [41], [47], [48]],
-            "jktebop_overrides": { "L3_fit": 0 },
+            "details": "7 short sectors (14, 21, 41, 47-48 & 74-75); circular orbit with total eclipses of ~0.65 and ~0.35 mag; significant variability due to starspot activity;",
+            "notes": "omitting S74 & 75 as poor quality with lower pdc_tot than others; fits vary but the mean set of parameters is usable (this is effectively a test of using the mean of multiple sectors as way of dealing with such variability); fits & mean fit improved with L3, ecosw & esinw fixed at zero (as with EM testing); fixing scale factor (sf_fit=0) helps further; Southworth22obsR11 uses E(B-V)=0.00+/-0.01 mag and gives dist=180.8+/-1.9 pc;",
+            "exclude_sectors": [74, 75],
             "labels": {
                 "MA": 1.135,            "MA_err": 0.009,
                 "MB": 0.965,            "MB_err": 0.005,
