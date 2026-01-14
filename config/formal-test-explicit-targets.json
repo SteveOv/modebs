@@ -220,12 +220,14 @@
             }
         },
         "RR Lyn": {
+            "exclude": true,
+            "why_exclude": "Can only get a workable fit on S20 and there is currently no way that a pipeline could make an informed decision to exclude the other sectors (all pdc_tot=0).",
             "source": "Rediscussion 7, Table III. TESS sector 20 SAP photometry analysed with JKTEBOP version 41.",
             "reference": "Southworth21obsR7",
             "aka": "TIC 11491822, HD 44691",
             "SpT": "A3/A7V/F2 + F0 V",
             "details": "3 short cadence sectors (20, 60 & 73); an eccentric orbit with eclipses of approximately 0.35 and 0.25 mag and the secondary near phase 0.45; significant phase shift on later sectors; evidence of delta-Scuti & gamma-Dor pulsations;",
-            "notes": "ebop maven testing uses flatten for best fit of S20; sticking with S20 until we can extend flattening; will challenge an 'auto-flatten' algo as the phase shift is significant - a test with the params from the ebop maven data shows it doesn't transfer to S60 & 73 well; Southworth21obsR7 uses E(B-V)=0.002+/-0.002 mag and gives dist=76.7+/-1.0 pc;",
+            "notes": "ebop maven testing uses flatten for best fit of S20; sticking with S20 until we can extend flattening; cannot use pdc_tot to select/exclude as all sectors are zero; will challenge an 'auto-flatten' algo as the phase shift is significant - a test with the params from the ebop maven data shows it doesn't transfer to S60 & 73 well; Southworth21obsR7 uses E(B-V)=0.002+/-0.002 mag and gives dist=76.7+/-1.0 pc;",
             "sectors": [[20]],
             "phiS": 0.45,
             "labels": {
