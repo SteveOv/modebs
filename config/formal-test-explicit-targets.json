@@ -531,9 +531,8 @@
             "aka": "TTIC 48356677, HD 175900",
             "SpT": "F9 V + F9 V",
             "details": "14 short cadence sectors (14-15, 26, 40-41, 53-55, 59, 74-75, 80, 82 & 86); a pair of late-F stars in a 10.76 d orbit; primary and secondary eclipses of ~0.28 and 0.24 mag; eccentric with slightly late secondary; slow variability in the light curves is likely instrumental in origin;",
-            "notes": "taking best sector from each group by pdc_tot (treating 0 as 1) & excluding < 0.5; using flattening as morph < 0.2; Southworth25obsR26 uses E(B-V)=0.00+/-0.01 mag and gives dist=77.9+/-1.2 pc;",
+            "notes": "taking best sector from each group by pdc_tot (treating 0 as 1) & excluding < 0.5; fits are not very consistent but the mean is usable; Southworth25obsR26 uses E(B-V)=0.00+/-0.01 mag and gives dist=77.9+/-1.2 pc;",
             "sectors": [[15], [41], [55], [59], [75]],
-            "flatten": { "mask_time_ranges": [[1714.25, 1714.65], [1719.85, 1720.2]] },
             "phiS": 0.52,
             "labels": {
                 "MA": 1.1354,           "MA_err": 0.0023,
