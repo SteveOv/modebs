@@ -322,8 +322,8 @@
             "reference": "OverallSouthworth24obsR17",
             "aka": "TIC 98853987, HD 19115",
             "SpT": "F2 V",
-            "details": "2 short cadence sectors (4 & 31); a slightly eccentric orbit with eclipses of ~0.46 and ~0.40 mag; evidence of ellipsoidal variation;",
-            "notes": "mask out section of isolated & distorted LC in sector 4; OverallSouthworth24obsR17 uses E(B-V)=0.013+/-0.015 mag and gives dist=191.7+/-3.8 pc;",
+            "details": "2 short cadence sectors (4 & 31); a slightly eccentric orbit with eclipses of ~0.46 and ~0.40 mag; evidence of ellipsoidal variation; short, isolated distorted section within mid sector gap of S4;",
+            "notes": "OverallSouthworth24obsR17 uses E(B-V)=0.013+/-0.015 mag and gives dist=191.7+/-3.8 pc;",
             "labels": {
                 "MA": 1.568,            "MA_err": 0.016,
                 "MB": 1.314,            "MB_err": 0.010,
