@@ -376,6 +376,8 @@
             }
         },
         "V570 Per": {
+            "exclude": true,
+            "why_exclude": "reference characterisation uses an lrat to get fit",
             "source": "Rediscussion 14, Table III. TESS sectors 18 and 58 SAP photometry analysed with JKTEBOP version 43.",
             "reference": "Southworth23obsR14",
             "aka": "TIC 116991977, HD 19457",
