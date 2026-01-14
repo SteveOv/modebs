@@ -425,7 +425,7 @@
             "aka": "TIC 26801525",
             "SpT": "F3 V + F3 V",
             "details": "3 short cadence sectors (17, 24 & 57); an eccentric orbit with low inclination; similar eclipse depths of ~0.7 mag; the two components are similar;",
-            "notes": "maven tests use flattening but we get a good fit with or without; Southworth23obsR13 uses E(B-V)=0.083+/-0.056 mag and gives dist=505.5+/-8.3 pc;",
+            "notes": "Southworth23obsR13 uses E(B-V)=0.083+/-0.056 mag and gives dist=505.5+/-8.3 pc;",
             "phiS": 0.55,
             "labels": {
                 "MA": 1.324,            "MA_err": 0.009,
