@@ -7,7 +7,7 @@ astroquery>=0.4.8.dev9474  # 2024-09-24 pinned for Gaia column capitalization is
 lightkurve>=2.4
 numba
 scikit-learn>=1.0
-uncertainties
+uncertainties<=3.2.3       # 2026-01-15 avoid annoying FutureWarnings about deprecated function used internally
 emcee
 corner
 h5py
