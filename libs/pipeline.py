@@ -74,28 +74,32 @@ def estimate_l3_with_gaia(centre: SkyCoord, radius_as: float=120,
             if target_source_id is not None:
                 target_mask = tbl["source_id"] == int(target_source_id)
             else:
-                target_mask = np.zeros((len(tbl)), dtype=bool)
+                # It may not be known, but if there is an object close to the centre of the search
+                # cone with a magnitude similar to the target's we will assume it's the target.
+                target_mask = (tbl["dist"] * 3600 < 5.0) \
+                                & (np.abs(tbl["phot_g_mean_mag"] - target_g_mag) < 0.5)
+                if verbose and any(target_mask):
+                    print(f"Omitting {target_mask.sum()} object(s) likely to be the target")
 
             if target_g_mag is None:
                 if any(target_mask):
                     target_g_mag = np.max(tbl[target_mask]["phot_g_mean_mag"])
                     if verbose:
-                        print(f"Target object has a Gaia magnitude of {target_g_mag:.3f} (3 d.p.)")
+                        print(f"Target object has a Gaia magnitude of {target_g_mag:.4f} (4 d.p.)")
                 else:
                     raise ValueError("Cannot find target in search cone & no target_g_mag given")
 
             if any(~target_mask):
                 flux_ratios = 10**(0.4 * (target_g_mag - tbl[~target_mask]["phot_g_mean_mag"]))
 
-                # The dist field is calculated by Gaia as distance from centre in degrees.
-                # Calculate a weighting based on the normalized distance from the search centre.
-                radius_deg = radius_as / 3600
-                dist_weights = 1 - (tbl[~target_mask]["dist"] / radius_deg)
+                # The Gaia query gives us a dist field which appears to be the angular distance
+                # from search centre in degrees. Calculate a weighting based on the normalized dist.
+                proximity_weights = 1 - (tbl[~target_mask]["dist"] * 3600 / radius_as)
 
-                l3 = np.sum(flux_ratios * dist_weights)
+                l3 = np.sum(flux_ratios * proximity_weights)
 
                 if verbose:
-                    print(f"Estimated the total third-light ratio (L3) to be {l3:.3f} (3 d.p.)",
+                    print(f"Estimated the total third-light ratio (L3) to be {l3:.4f} (4 d.p.)",
                           f"for the {len(tbl[~target_mask])} nearby object(s) found in Gaia DR3.")
 
                 if max_l3 is not None and max_l3 < l3:
