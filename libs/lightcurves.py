@@ -10,6 +10,7 @@ from uncertainties import unumpy
 import astropy.units as u
 from astropy.time import Time, TimeDelta
 from lightkurve import LightCurve, LightCurveCollection, FoldedLightCurve, SearchResult
+from deblib import orbital
 
 
 def load_lightcurves(results: SearchResult,
@@ -197,10 +198,9 @@ def fit_polynomial(times: Time,
     return (fit_ydata, coeffs) if include_coeffs else fit_ydata
 
 
-@u.quantity_input(period=u.d)
 def flatten_lightcurve(lc: LightCurve,
                        mask_time_ranges: List[Union[Tuple[Time, Time], Tuple[float, float]]]=None,
-                       period: u.Quantity=None,
+                       period: Union[u.Quantity[u.d], float]=None,
                        verbose: bool=False,
                        **kwargs) -> LightCurve:
     """
@@ -212,13 +212,15 @@ def flatten_lightcurve(lc: LightCurve,
 
     :lc: the LightCurve to flatten
     :mask_time_ranges: optional List of time ranges for which a mask is generated
-    :period: the orbital period to use with the above time ranges
+    :period: orbital period (assumed to be days if not a Quantity) to use with the above time ranges
     :verbose: whether or not to generate progress messages
     :kwargs: to be passed directly to the LightCurve.flatten() function
     :returns: the flattened LightCurve
     """
     if mask_time_ranges and period is not None:
         # This will be used to set the mask kwargs item, so will override it if already present.
+        if not isinstance(period, u.Quantity):
+            period *= u.d
         if verbose:
             print(f"Creating a flatten eclipse mask from {len(mask_time_ranges)}",
                   f"eclipse time range(s) and the orbital period of {period}.")
@@ -234,6 +236,39 @@ def flatten_lightcurve(lc: LightCurve,
     if verbose:
         print("Flattening the light curve")
     return lc.flatten(**kwargs)
+
+
+def create_flatten_kwargs_from_params(t0: Union[Time, float],
+                                      period: Union[u.Quantity[u.d], float],
+                                      sum_r: float, inc: float,
+                                      ecosw: float=0, esinw: float=0,
+                                      dur_factor: float=1.01) -> dict:
+    """
+    Create a set of kwargs for use with the flatten_lightcurve() func based on estimating the
+    eclipse timings and widths with parameters from a prior characterisation of the target system.
+    
+    :t0: reference time of a primary eclipse
+    :period: the orbital period (assumed to be in days if not a Quantity)
+    :sum_r: the sum of the fractional radii (rA + rB)
+    :inc: the inclination in degree
+    :ecosw: the e*cos(omega) Poincare element
+    :esinw: the e*sin(omega) Poincare element
+    :dur_factor: factor to apply to the calculated durations to stretch them for the time ranges
+    :returns: a kwargs dict suitable for passing to flatten_lightcurve()
+    """
+    if isinstance(t0, Time):
+        t0 = t0.value
+    if isinstance(period, u.Quantity):
+        period = period.to(u.d).value
+
+    half_dpri = orbital.eclipse_duration(period, sum_r, inc, ecosw, esinw, False) * dur_factor / 2
+    half_dsec = orbital.eclipse_duration(period, sum_r, inc, ecosw, esinw, True) * dur_factor / 2
+    tsec = t0 + period * orbital.phase_of_secondary_eclipse(ecosw, (ecosw**2 + esinw**2)**.5)
+
+    return {
+        "period": period,
+        "mask_time_ranges": [[t0 - half_dpri, t0 + half_dpri], [tsec - half_dsec, tsec + half_dsec]]
+    }
 
 
 def to_lc_time(value: Union[Time, np.double, Tuple[np.double], List[np.double,]], lc: LightCurve) \
