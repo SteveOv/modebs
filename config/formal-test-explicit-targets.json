@@ -17,7 +17,7 @@
             "period": 25.935953,
             "morph": 0.3,
             "exclude_sectors": [85],
-            "teff_sys": 20000,
+            "Teff_sys": 20000,
             "phiS": 0.44,
             "jktebop_overrides": {
                 "LDA": "quad", "LDA1": 0.046, "LDA2": 0.22, "LDA1_fit": 0,
@@ -43,7 +43,7 @@
             "notes": "sectors 39, 66 & 93 omitted as jktebop throws gaussj errors on param 18 (phase shift?) - we could use errors to exclude these on retry; all sectors have pdc_tot=0 so cannot be used for selection; override teff_sys to more appropriate value for SpT;",
             "exclude_sectors": [39, 66, 93],
             "phiS": 0.47,
-            "teff_sys": 20000,
+            "Teff_sys": 20000,
             "labels": {
                 "MA": 6.239,            "MA_err": 0.066,
                 "MB": 5.313,            "MB_err": 0.060,
@@ -65,7 +65,7 @@
             "exclude_sectors": [18, 78],
             "quality_masks": [[1790.0, 1794.0], [3417.0, 3418.0]],
             "phiS": 0.62,
-            "teff_sys": 12000,
+            "Teff_sys": 12000,
             "labels": {
                 "MA": 4.674,            "MA_err": 0.091,
                 "MB": 4.586,            "MB_err": 0.084,

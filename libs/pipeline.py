@@ -2,14 +2,17 @@
 Low level utility functions for light curve ingest, pre-processing, estimation and fitting.
 """
 # pylint: disable=no-member
+from typing import Union
 import warnings
 import re
+from numbers import Number
 
 import numpy as np
 from uncertainties import UFloat, ufloat
 import astropy.units as u
 from astropy.coordinates import SkyCoord
 from astroquery.gaia import Gaia
+from astroquery.vizier import Vizier
 
 from deblib import limb_darkening
 from deblib.vmath import arccos, arcsin, degrees
@@ -44,6 +47,54 @@ def get_teff_from_spt(target_spt):
                 and _spt_to_teff_map[tp].n > (teff.n if teff is not None else 0):
                 teff = _spt_to_teff_map[tp]
     return teff
+
+
+def nominal_value(value: Union[UFloat, Number]) -> Number:
+    """
+    Simple helper function to get the nominal value of a number
+    whether or not it's a UFloat
+    """
+    if isinstance(value, UFloat):
+        return value.nominal_value
+    return value
+
+
+def get_tess_ebs_data(search_term: str, radius_as: float=5.) -> dict:
+    """
+    Gets a dictionary of ephemeris and morphology data from the TESS-ebs catalogue.
+    """
+    tess_ebs_catalog = Vizier(catalog="J/ApJS/258/16", row_limit=1)
+    if (tbl := tess_ebs_catalog.query_object(search_term, radius=radius_as * u.arcsec)):
+        sub_tbl = tbl[0]
+
+        data = {
+            "t0": ufloat(sub_tbl["BJD0"][0], sub_tbl["e_BJD0"][0]),
+            "period": ufloat(sub_tbl["Per"][0], sub_tbl["e_Per"][0]),
+        }
+
+        if not sub_tbl.mask["Morph"][0]:
+            morph = sub_tbl["Morph"][0]
+            if not np.isnan(morph) and isinstance(morph, Number):
+                data["morph"] = morph
+
+        # For these there are two fields with values,
+        # each of which may be masked and may not be a number!
+        for data_key, ebs_prefix, op in zip(["durP", "durS", "phiP", "phiS"],
+                                            ["Wp", "Ws", "Phip", "Phis"],
+                                            [np.max, np.max, np.max, np.min]):
+            vals = []
+            for ebs_pattern in ["{0}-pf", "{0}-2g"]:
+                ebs_key = ebs_pattern.format(ebs_prefix)
+                if not sub_tbl.mask[ebs_key][0]:
+                    val = sub_tbl[ebs_key][0]
+                    if not np.isnan(val) and isinstance(val, Number):
+                        vals += [val]
+            if len(vals) > 0:
+                data[data_key] = op(vals)
+
+    else:
+        data = None
+    return data
 
 
 def estimate_l3_with_gaia(centre: SkyCoord, radius_as: float=120,

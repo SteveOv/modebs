@@ -27,7 +27,7 @@
             "notes": "analysis on best contiguous sectors from across the range of obs; quit a fussy fit, with some warnings - needs more  work",
             "sectors": [[1, 2], [5, 6], [64, 65], [88, 89], [95, 96]],
             "flatten": { "mask_time_ranges": [[1347.3, 1347.9], [1332.9, 1333.6]] },
-            "teff_sys": 6800,
+            "Teff_sys": 6800,
             "phiS": 0.55
         },
         "0063192395": {
@@ -60,7 +60,7 @@
         "0080650858": {
             "details": "4 short cadence sectors (7, 8, 61 & 62); tess-ebs morph 0.517 & period ~1.916 d; Gaia DR3 ruwe 0.963; aka BH Pup; SpT B3/5III; eclipses of ~0.32 & ~0.10 mag; some variability; S8 heavily distorted after mid-sector break (clip region used); secondary eclipse may be total;",
             "notes": "tough target - close B-Type - but LCs fit well so worth including; override teff_sys with starting value appropriate for B-type;",
-            "teff_sys": 20000
+            "Teff_sys": 20000
         },
         "0118313102": {
             "details": "8 short cadence sectors (8-10, 35-36, 61-63); tess-ebs morph 0.180 & period ~9.256 d; Gaia DR3 ruwe 0.962; aka NT Vel; SpT B6V(n); deep eclipses of ~0.69 & ~0.66 mag; clear pulsations; S8 distorted after mid-sector break; eccentric with phiS nr 0.4;",
