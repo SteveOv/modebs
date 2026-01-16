@@ -18,11 +18,7 @@ _default_target_config_defaults = {
     "detrend_gap_threshold": 0.5,
     "detrend_poly_degree": 1,
     "detrend_iterations": 3,
-    "phiS": 0.5,
-    "t0": None,
-    "period": None,
     "double_period": False,
-    "av": None
 }
 
 class TargetConfig():
