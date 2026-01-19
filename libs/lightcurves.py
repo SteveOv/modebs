@@ -198,77 +198,66 @@ def fit_polynomial(times: Time,
     return (fit_ydata, coeffs) if include_coeffs else fit_ydata
 
 
-def flatten_lightcurve(lc: LightCurve,
-                       mask_time_ranges: List[Union[Tuple[Time, Time], Tuple[float, float]]]=None,
-                       period: Union[u.Quantity[u.d], float]=None,
-                       verbose: bool=False,
-                       **kwargs) -> LightCurve:
+def create_eclipse_mask_from_ephemeris(lc: LightCurve,
+                                       t0: Union[Time, float],
+                                       period: Union[u.Quantity[u.d], float],
+                                       dur_pri: Union[u.Quantity[u.d], float],
+                                       dur_sec: Union[u.Quantity[u.d], float],
+                                       phi_sec: float=0.5,
+                                       dfactor: float=1.0,
+                                       verbose: bool=False) -> np.ndarray[bool]:
     """
-    Will return a flattened copy of the passed Lightcurve. This uses the LightCurve.flatten()
-    function and you can pass in a set of kwargs to be passed on to flatten(). As a convenience,
-    rather than setting the flatten() function's mask argument directly, you can specify the
-    mask_time_ranges List[(from, to)] and period arguments from which the mask is generated.
-    You must supply either mask_time_ranges & period values or a mask kwarg.
+    Create an eclipse mask for the passed LightCurve based on the accompanying
+    extended ephemeris values.
 
-    :lc: the LightCurve to flatten
-    :mask_time_ranges: optional List of time ranges for which a mask is generated
-    :period: orbital period (assumed to be days if not a Quantity) to use with the above time ranges
-    :verbose: whether or not to generate progress messages
-    :kwargs: to be passed directly to the LightCurve.flatten() function
-    :returns: the flattened LightCurve
+    :lc: the LightCurve to create the mask for
+    :t0: the reference time of a primary eclipse
+    :period: the orbital period (assumed to be in days if not a Quantity)
+    :dur_pri: the duration of the primary eclipses
+    :dur_sec: the duration of the secondary eclipses
+    :phi_sec: the phase of secondary eclipses (assuming the primary eclipses are at phase 0)
+    :dfactor: an expansion factor applied to the eclipse lengths
+    :returns: the eclipse mask
     """
-    if mask_time_ranges and period is not None:
-        # This will be used to set the mask kwargs item, so will override it if already present.
-        if not isinstance(period, u.Quantity):
-            period *= u.d
-        if verbose:
-            print(f"Creating a flatten eclipse mask from {len(mask_time_ranges)}",
-                  f"eclipse time range(s) and the orbital period of {period}.")
-        eclipse_times = [to_lc_time(np.mean(t), lc) for t in mask_time_ranges]
-        durations = [max(t)-min(t) for t in mask_time_ranges]
-        period = [period] * len(eclipse_times)
-        kwargs["mask"] = lc.create_transit_mask(period, eclipse_times, durations)
-    if "mask" in kwargs:
-        pass
-    else:
-        raise ValueError("Must specify mask_time_ranges and period, or give a mask kwarg")
-
+    # pylint: disable=too-many-arguments, too-many-positional-arguments
     if verbose:
-        print("Flattening the light curve")
-    return lc.flatten(**kwargs)
+        print(f"Creating an eclipse mask for t0={t0}, period={period},",
+              f"dur_pri={dur_pri:.6f}, dur_sec={dur_sec:.6f} & phi_sec={phi_sec:.6f}")
+
+    eclipse_times = [to_lc_time(t0, lc), to_lc_time(t0 + period * phi_sec, lc)]
+    durations = [dur_pri * dfactor, dur_sec * dfactor]
+    return lc.create_transit_mask([period] * 2, eclipse_times, durations)
 
 
-def create_flatten_kwargs_from_params(t0: Union[Time, float],
-                                      period: Union[u.Quantity[u.d], float],
-                                      sum_r: float, inc: float,
-                                      ecosw: float=0, esinw: float=0,
-                                      dur_factor: float=1.01) -> dict:
+def create_eclipse_mask_from_fitted_params(lc: LightCurve,
+                                           t0: Union[Time, float],
+                                           period: Union[u.Quantity, float],
+                                           sum_r: float,
+                                           inc: float,
+                                           ecosw: float,
+                                           esinw: float,
+                                           dfactor: float=1.0,
+                                           verbose:bool=False) -> np.ndarray[bool]:
     """
-    Create a set of kwargs for use with the flatten_lightcurve() func based on estimating the
-    eclipse timings and widths with parameters from a prior characterisation of the target system.
-    
+    Create an eclipse mask for the passed LightCurve based on the accompanying
+    basic ephemeris information and fitted light curve parameters.
+
+    :lc: the LightCurve to create the mask for
     :t0: reference time of a primary eclipse
     :period: the orbital period (assumed to be in days if not a Quantity)
     :sum_r: the sum of the fractional radii (rA + rB)
     :inc: the inclination in degree
     :ecosw: the e*cos(omega) Poincare element
     :esinw: the e*sin(omega) Poincare element
-    :dur_factor: factor to apply to the calculated durations to stretch them for the time ranges
-    :returns: a kwargs dict suitable for passing to flatten_lightcurve()
+    :dfactor: an expansion factor applied to the eclipse lengths
+    :returns: the eclipse mask
     """
-    if isinstance(t0, Time):
-        t0 = t0.value
-    if isinstance(period, u.Quantity):
-        period = period.to(u.d).value
-
-    half_dpri = orbital.eclipse_duration(period, sum_r, inc, ecosw, esinw, False) * dur_factor / 2
-    half_dsec = orbital.eclipse_duration(period, sum_r, inc, ecosw, esinw, True) * dur_factor / 2
-    tsec = t0 + period * orbital.phase_of_secondary_eclipse(ecosw, (ecosw**2 + esinw**2)**.5)
-
-    return {
-        "period": period,
-        "mask_time_ranges": [[t0 - half_dpri, t0 + half_dpri], [tsec - half_dsec, tsec + half_dsec]]
-    }
+    # pylint: disable=too-many-arguments, too-many-positional-arguments
+    period_d = period.to(u.d).value if isinstance(period, u.Quantity) else period
+    return create_eclipse_mask_from_ephemeris(lc, t0, period, dfactor=dfactor, verbose=verbose,
+        dur_pri=orbital.eclipse_duration(period_d, sum_r, inc, ecosw, esinw, False),
+        dur_sec=orbital.eclipse_duration(period_d, sum_r, inc, ecosw, esinw, True),
+        phi_sec=orbital.phase_of_secondary_eclipse(ecosw, (ecosw**2 + esinw**2)**0.5))
 
 
 def to_lc_time(value: Union[Time, np.double, Tuple[np.double], List[np.double,]], lc: LightCurve) \
