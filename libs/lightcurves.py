@@ -254,9 +254,10 @@ def create_eclipse_mask_from_fitted_params(lc: LightCurve,
     """
     # pylint: disable=too-many-arguments, too-many-positional-arguments
     period_d = period.to(u.d).value if isinstance(period, u.Quantity) else period
+    e = (ecosw**2 + esinw**2)**0.5
     return create_eclipse_mask_from_ephemeris(lc, t0, period, dfactor=dfactor, verbose=verbose,
-        dur_pri=orbital.eclipse_duration(period_d, sum_r, inc, ecosw, esinw, False),
-        dur_sec=orbital.eclipse_duration(period_d, sum_r, inc, ecosw, esinw, True),
+        dur_pri=orbital.eclipse_duration(period_d, sum_r, inc, e, esinw, False),
+        dur_sec=orbital.eclipse_duration(period_d, sum_r, inc, e, esinw, True),
         phi_sec=orbital.phase_of_secondary_eclipse(ecosw, (ecosw**2 + esinw**2)**0.5))
 
 
