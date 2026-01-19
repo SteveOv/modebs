@@ -63,13 +63,15 @@ def get_tess_ebs_data(search_term: str, radius_as: float=5.) -> dict:
     """
     Gets a dictionary of ephemeris and morphology data from the TESS-ebs catalogue.
     """
+    ebs_key_patterns = ["{0}-2g", "{0}-pf"] # data derived from 2-Gaussian & polyfit algos
     tess_ebs_catalog = Vizier(catalog="J/ApJS/258/16", row_limit=1)
     if (tbl := tess_ebs_catalog.query_object(search_term, radius=radius_as * u.arcsec)):
         sub_tbl = tbl[0]
 
+        period = ufloat(sub_tbl["Per"][0], sub_tbl["e_Per"][0])
         data = {
             "t0": ufloat(sub_tbl["BJD0"][0], sub_tbl["e_BJD0"][0]),
-            "period": ufloat(sub_tbl["Per"][0], sub_tbl["e_Per"][0]),
+            "period": period,
         }
 
         if not sub_tbl.mask["Morph"][0]:
@@ -77,20 +79,39 @@ def get_tess_ebs_data(search_term: str, radius_as: float=5.) -> dict:
             if not np.isnan(morph) and isinstance(morph, Number):
                 data["morph"] = morph
 
-        # For these there are two fields with values,
-        # each of which may be masked and may not be a number!
-        for data_key, ebs_prefix, op in zip(["durP", "durS", "phiP", "phiS"],
-                                            ["Wp", "Ws", "Phip", "Phis"],
-                                            [np.max, np.max, np.max, np.min]):
-            vals = []
-            for ebs_pattern in ["{0}-pf", "{0}-2g"]:
-                ebs_key = ebs_pattern.format(ebs_prefix)
-                if not sub_tbl.mask[ebs_key][0]:
-                    val = sub_tbl[ebs_key][0]
-                    if not np.isnan(val) and isinstance(val, Number):
-                        vals += [val]
-            if len(vals) > 0:
-                data[data_key] = op(vals)
+        # There are two sets of eclipse data; those based on the polyfit algorithm and those on the
+        # 2-Gaussian algorithm. For the best chance of consistent values we use one or other set.
+        for k_pattern in ebs_key_patterns:
+            k_phip, k_phis = k_pattern.format("Phip"), k_pattern.format("Phis")
+            k_durp, k_durs = k_pattern.format("Wp"), k_pattern.format("Ws")
+
+            # Each value may be masked, NaN or non-numeric. We try to work with an unmasked set.
+            if not any(sub_tbl.mask[k][0] for k in [k_phip, k_phis, k_durp, k_durs]):
+                # We want to get the phases so that the primary is zero and the secondary is
+                # offset from this. Within TESS-ebs these are usually Phip=1 and Phis=offset
+                # which is OK if we wrap 1 to 0. However, some appear shifted so that Phis=1
+                # (i.e. TIC 26801525; phip-pf=0.448 & phis-pf=1.000 rather than phip=0 & phis=0.552)
+                # In this case we need to undo the shift and switch the widths/durations.
+                vals = sub_tbl[[k_phip, k_phis, k_durp, k_durs]][0]
+                if all(not np.isnan(v) and isinstance(v, Number) for v in vals):
+                    phip, phis, durp, durs = vals
+
+                    # Get both phases into the range [0, 1)
+                    phip %= 1
+                    phis %= 1
+                    if phis < phip: # The phases have been shifted
+                        phip, phis = 0, 1 - (phip - phis)
+                        durp, durs = durs, durp
+                    else:
+                        phip, phis = 0, phis - phip
+
+                    data["phiP"] = phip
+                    data["phiS"] = phis
+
+                    # The TESS-ebs eclipse widths are in units of phase
+                    data["durP"] = durp * period
+                    data["durS"] = durs * period
+                    break
 
     else:
         data = None
