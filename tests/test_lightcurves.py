@@ -6,11 +6,12 @@ import unittest
 
 # pylint: disable=no-member, wrong-import-position, line-too-long
 warnings.filterwarnings("ignore", "Using UFloat objects with std_dev==0 may give unexpected results.", category=UserWarning)
+from uncertainties import ufloat
 import numpy as np
 import astropy.units as u
 import lightkurve as lk
 
-from libs import lightcurves
+from libs import lightcurves, pipeline
 
 # pylint: disable=too-many-public-methods, line-too-long
 class Testlightcurves(unittest.TestCase):
@@ -102,6 +103,32 @@ class Testlightcurves(unittest.TestCase):
             with self.subTest(msg=msg):
                 _, mags = lightcurves.get_binned_phase_mags_data(flc[mask], 2048, wrap_phase)
                 self.assertFalse(any(np.isnan(mags)))
+
+    #
+    #   get_lightcurve_t0_time(lc: LightCurve, t0: Time, period: u.d, max_phase_shift: float) -> float
+    #
+    def test_get_lightcurve_t0_time_rr_lyn(self):
+        """ Tests get_lightcurve_t0_time(RR Lyn) which has a distinct shift on later sectors. """
+        # Ephemeris for RR Lyn in TESS-ebs (works well on S20)
+        target = "RR Lyn"
+        t0 = ufloat(1851.9277371299124, 0.0006761397339687)     # btjd
+        period = ufloat(9.946591112938657, 0.0005646471183542)  # d
+        sectors = [20, 60, 73]
+        exp_revised_t0s = [1851.93, 2945.89, 3293.96]           # btjd
+
+        download_dir = Path.cwd() / ".cache" / re.sub(r"[^\w\d]", "-", target.lower())
+
+        # We know there is significant shift between S20 and S60/73
+        results = lk.search_lightcurve(f"V* {target}", sector=sectors, exptime="short")
+        lcs = lightcurves.load_lightcurves(results, "hardest", "sap_flux", download_dir)
+        for lc, exp_revised_t0 in zip(lcs, exp_revised_t0s):
+            with self.subTest(f"Testing {target} sector {lc.meta['SECTOR']}"):
+                # Replicate the likely masking of poor/unusable fluxes
+                lc = lc[~((np.isnan(lc.flux)) | (lc.flux < 0))].normalize()
+
+                revised_t0 = lightcurves.get_lightcurve_t0_time(lc, t0.n, period.n)
+
+                self.assertAlmostEqual(revised_t0, exp_revised_t0, 2)
 
 if __name__ == "__main__":
     unittest.main()

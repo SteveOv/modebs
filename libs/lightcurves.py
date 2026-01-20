@@ -6,6 +6,8 @@ from typing import Union, List, Iterable, Tuple, Generator
 from pathlib import Path
 
 import numpy as np
+from scipy.signal import find_peaks
+
 from uncertainties import unumpy
 import astropy.units as u
 from astropy.time import Time, TimeDelta
@@ -259,6 +261,58 @@ def create_eclipse_mask_from_fitted_params(lc: LightCurve,
         dur_pri=orbital.eclipse_duration(period_d, sum_r, inc, e, esinw, False),
         dur_sec=orbital.eclipse_duration(period_d, sum_r, inc, e, esinw, True),
         phi_sec=orbital.phase_of_secondary_eclipse(ecosw, e))
+
+
+def get_lightcurve_t0_time(lc: LightCurve,
+                           t0: Union[Time, float],
+                           period: Union[u.Quantity, float],
+                           max_phase_shift: float=0.1) -> float:
+    """
+    Will find the time of the first eclipse, equivalent to the reference time,
+    within the passed LightCurve. This can handle moderate shifts, up to
+    max_phase_shift, in eclipse timing compared with the reference ephemeris.
+
+    :lc: the LightCurve to inspect
+    :t0: the known reference time of an eclipse
+    :period: the known orbital period (assumed to be in days if not a Quantity)
+    :max_phase_shift: the maximum allowed positive or negative phase shift - increasing this will
+    increase the likelihood of incorrectly selecting an instance of the "other" eclipse type 
+    :returns: the time of the first eclipse found, in the frame/scale of the lightcurve
+    """
+    # Get these into the format/scale of the light-curve
+    if isinstance(t0, Time):
+        t0 = to_lc_time(t0, lc).value
+    if isinstance(period, u.Quantity):
+        period = period.to(u.d).value
+
+    found_ecl_time = None
+    times = lc.time.value
+
+    # These are the expected t0 timings projected into this lightcurve sector.
+    cycles_offset = int(np.ceil((times.min() - t0) / period))
+    cycles_in_lc = int(np.ceil((times.max() - times.min()) / period))
+    exp_ecl_times = [t0 + p
+                        for p in (period * (cycles_offset + c) for c in range(cycles_in_lc))
+                            if times.min() <= (t0 + p) <= times.max()]
+
+    # Cannot use a periodogram as there may be too few eclipses to derive a period. Instead
+    # we're relying on finding the most prominent dip nearest the expected eclipse timings.
+    # As there may be gaps in the LC at these times, we go through until a shifted eclipse is found.
+    for exp_ecl_time in exp_ecl_times:
+        half_window = period * max_phase_shift
+        mask = (exp_ecl_time - half_window < times) & (times < exp_ecl_time + half_window)
+        if np.any(mask):
+            # Invert the fluxes so we get peaks rather than dips
+            window_fluxes = lc.flux[mask].unmasked.value
+            window_fluxes = window_fluxes.max() - window_fluxes
+
+            peaks, _ = find_peaks(window_fluxes, width=5, distance=100)
+            if len(peaks) > 0:
+                highest_peak_ix = peaks[np.argmax(window_fluxes[peaks])]
+                found_ecl_time = times[mask][highest_peak_ix]
+                break
+
+    return found_ecl_time
 
 
 def to_lc_time(value: Union[Time, np.double, Tuple[np.double], List[np.double,]], lc: LightCurve) \
