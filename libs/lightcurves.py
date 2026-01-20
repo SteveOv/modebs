@@ -258,7 +258,7 @@ def create_eclipse_mask_from_fitted_params(lc: LightCurve,
     return create_eclipse_mask_from_ephemeris(lc, t0, period, dfactor=dfactor, verbose=verbose,
         dur_pri=orbital.eclipse_duration(period_d, sum_r, inc, e, esinw, False),
         dur_sec=orbital.eclipse_duration(period_d, sum_r, inc, e, esinw, True),
-        phi_sec=orbital.phase_of_secondary_eclipse(ecosw, (ecosw**2 + esinw**2)**0.5))
+        phi_sec=orbital.phase_of_secondary_eclipse(ecosw, e))
 
 
 def to_lc_time(value: Union[Time, np.double, Tuple[np.double], List[np.double,]], lc: LightCurve) \
