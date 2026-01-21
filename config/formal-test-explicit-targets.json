@@ -589,7 +589,7 @@
         },
         "V530 Ori": {
             "exclude": true,
-            "why_exclude": "very shallow secondary and without flattening and fixed L3 & LD params the fit is unreliable - params vary greatly between runs.",
+            "why_exclude": "very shallow secondary and without flattening and fixed L3 & LD params the fit is unreliable; flattening helps get a reasonable fit but task 8 MC analysis failures indicate that it's not durable;",
             "source": "DEBCat and Torres et al. (2014) table 10. JKTEBOP was used to analyse various non-TESS photometry sources.",
             "reference": "TorresSandbergLacy+14apj",
             "aka": "TIC 11961096, HD 294598",
@@ -601,7 +601,7 @@
             "durP": 0.173,
             "durS": 0.198,
             "phiS": 0.464,
-            "morph": 0.200,
+            "morph": 0.100,
             "labels": {
                 "MA": 1.0038,           "MA_err": 0.0066,
                 "MB": 0.5955,           "MB_err": 0.0022,
