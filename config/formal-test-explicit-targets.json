@@ -377,13 +377,13 @@
         },
         "V570 Per": {
             "exclude": true,
-            "why_exclude": "reference characterisation uses an lrat to get fit",
+            "why_exclude": "reference characterisation uses an lrat to constrain fit",
             "source": "Rediscussion 14, Table III. TESS sectors 18 and 58 SAP photometry analysed with JKTEBOP version 43.",
             "reference": "Southworth23obsR14",
             "aka": "TIC 116991977, HD 19457",
             "SpT": "F3 V + F5 V",
             "details": "2 short cadence sectors (18 & 58); an inclined circular orbit with variability due to starspots & evidence of the ellipsoidal effect; shallow eclipses of ~0.11 & ~0.10 mag; the source characterisation used a spectroscopic light ratio to constrain the fit;",
-            "notes": "unable to get the sector fits to agree - going to limit to S58 which has significantly higher pdc_tot (0.871 vs 0.591); Southworth23obsR14 uses E(B-V)=0.05+/-0.02 mag and gives a dist=117.2+/-2.3 pc;",
+            "notes": "unable to get the sector fits to agree; S58 has significantly higher pdc_tot (0.871 vs 0.591); Southworth23obsR14 uses an lrat and fixes eccentricity to zero to constrain the fit; Southworth23obsR14 uses E(B-V)=0.05+/-0.02 mag and gives a dist=117.2+/-2.3 pc;",
             "sectors":[[58]],
             "labels": {
                 "MA": 1.4489,           "MA_err": 0.0063,
