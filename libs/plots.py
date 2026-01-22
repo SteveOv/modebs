@@ -142,7 +142,7 @@ def plot_fitted_model(sed: Table,
 
 def plot_lightcurves(lcs: Union[_LCC, _LC, _FLC],
                      column: str="flux",
-                     ax_titles: Union[str, Iterable[str]]=None,
+                     ax_titles: Union[str, Iterable[str]]="LABEL",
                      normalize_lcs: bool=False,
                      cols: int=2,
                      ax_func: Callable[[int, _Axes], None]=None,
@@ -152,7 +152,7 @@ def plot_lightcurves(lcs: Union[_LCC, _LC, _FLC],
 
     :lcs: the lightcurves to plot, one per matplotlib Axes
     :column: the lightcurve data column to plot of the y-axis
-    :ax_titles: the titles to give each Axes
+    :ax_titles: the titles to give each Axes or if a single str a meta key to read for each title
     :normalize_lcs: whether or not to normalize the y-axis data before plotting
     :cols: the number of columns on the grid of Axes
     :ax_func: callback taking (ax index, ax) called for each Axes prior to applying format_kwargs
@@ -166,7 +166,7 @@ def plot_lightcurves(lcs: Union[_LCC, _LC, _FLC],
     if ax_titles is None:
         ax_titles = []
     elif isinstance(ax_titles, str):
-        ax_titles = [ax_titles] * count_lcs
+        ax_titles = [lc.meta.get(ax_titles, ax_titles) for lc in lcs]
 
     # Set up the figure and Axes
     rows = int(np.ceil(count_lcs / cols))

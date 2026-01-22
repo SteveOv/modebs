@@ -341,7 +341,7 @@
             "SpT": "F3 V",
             "details": "2 short cadence sectors (23 & 50); a circular orbit with similar eclipses of ~0.65 mag each; the stars are of similar size and luminosity;",
             "notes": "tess-ebs period is half the actual value; fit of S50 may give iteration warning but is consistent with L23; Southworth23obsR12 uses E(B-V)=0.00+/-0.01 mag and gives dist=106.5+/-1.4 pc;",
-            "double_period": true, 
+            "period_factor": 2, 
             "labels": {
                 "MA": 1.558,            "MA_err": 0.008,
                 "MB": 1.599,            "MB_err": 0.012,
@@ -486,7 +486,7 @@
             "SpT": "F5 V + F5 V",
             "details": "3 short cadence sectors (18, 58 & 85); an inclined circular orbit with eclipses of ~0.5 mag; some phase shift on later sectors;",
             "notes": "TESS-ebs period is half actual value; initially unable to get fits for 58 & 85 consistent with 18 and the published characterisation without fixed L3=0 and explicit LD params from ref; addition of logic to shift t0 times to each sector has made the fits usable; to all sectors have pdc_tot=0; Southworth21obsR6 analysis uses quad LD and L3 & eccentricity fixed at zero; Southworth21obsR6 uses E(B-V)=0.002+/-0.002 mag and gives dist=61.19+/-0.62 pc;",
-            "double_period": true,
+            "period_factor": 2,
             "labels": {
                 "MA": 1.275,            "MA_err": 0.004,
                 "MB": 1.258,            "MB_err": 0.003,

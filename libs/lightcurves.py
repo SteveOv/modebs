@@ -200,14 +200,14 @@ def fit_polynomial(times: Time,
     return (fit_ydata, coeffs) if include_coeffs else fit_ydata
 
 
-def create_eclipse_mask_from_ephemeris(lc: LightCurve,
-                                       t0: Union[Time, float],
-                                       period: Union[u.Quantity[u.d], float],
-                                       dur_pri: Union[u.Quantity[u.d], float],
-                                       dur_sec: Union[u.Quantity[u.d], float],
-                                       phi_sec: float=0.5,
-                                       dfactor: float=1.0,
-                                       verbose: bool=False) -> np.ndarray[bool]:
+def create_eclipse_mask(lc: LightCurve,
+                        t0: Union[Time, float],
+                        period: Union[u.Quantity[u.d], float],
+                        dur_pri: Union[u.Quantity[u.d], float],
+                        dur_sec: Union[u.Quantity[u.d], float],
+                        phi_sec: float=0.5,
+                        dfactor: float=1.0,
+                        verbose: bool=False) -> np.ndarray[bool]:
     """
     Create an eclipse mask for the passed LightCurve based on the accompanying
     extended ephemeris values.
@@ -257,7 +257,7 @@ def create_eclipse_mask_from_fitted_params(lc: LightCurve,
     # pylint: disable=too-many-arguments, too-many-positional-arguments
     period_d = period.to(u.d).value if isinstance(period, u.Quantity) else period
     e = (ecosw**2 + esinw**2)**0.5
-    return create_eclipse_mask_from_ephemeris(lc, t0, period, dfactor=dfactor, verbose=verbose,
+    return create_eclipse_mask(lc, t0, period, dfactor=dfactor, verbose=verbose,
         dur_pri=orbital.eclipse_duration(period_d, sum_r, inc, e, esinw, False),
         dur_sec=orbital.eclipse_duration(period_d, sum_r, inc, e, esinw, True),
         phi_sec=orbital.phase_of_secondary_eclipse(ecosw, e))

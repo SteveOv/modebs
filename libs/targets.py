@@ -19,7 +19,7 @@ _default_target_config_defaults = {
     "detrend_poly_degree": 1,
     "detrend_iterations": 3,
     "flatten": None,
-    "double_period": False,
+    "period_factor": 1,
 }
 
 class TargetConfig():
