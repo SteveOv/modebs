@@ -8,6 +8,7 @@ import re
 from numbers import Number
 
 import numpy as np
+from numpy.typing import ArrayLike
 from uncertainties import UFloat, ufloat
 import astropy.units as u
 from astropy.coordinates import SkyCoord
@@ -183,44 +184,52 @@ def estimate_l3_with_gaia(centre: SkyCoord, radius_as: float=120,
     return l3
 
 
-def append_calculated_inc_predictions(preds: np.ndarray[UFloat],
-                                      field_name: str="inc") -> np.ndarray[UFloat]:
+def calculate_orbital_inclination(sum_r: ArrayLike,
+                                  k: ArrayLike,
+                                  ecosw: ArrayLike,
+                                  esinw: ArrayLike,
+                                  bp: ArrayLike) -> ArrayLike:
     """
-    Calculate the predictions' inclination value(s) (in degrees) and append/overwrite to the array.
+    Calculate the predictions' inclination value(s) (in degrees).
+    
+    With the primary impact param:  inc = arccos(b * r1 * (1+esinw)/(1-e^2))
 
-    :predictions: the predictions structured array to which inclination should be appended
-    :field_name: the name of the inclination field to write to
-    :returns: the revised array
+    :sum_r: the sum of the fractional radii
+    :k: the ratio of the fractional radii
+    :ecosw: the e*cos(omega) Poincare element
+    :esinw: the e*sin(omega) Poincare element
+    :bp: the primary impact parameters
+    :returns: the orbital inclination(s) in units of degree
     """
     with warnings.catch_warnings(category=[FutureWarning]):
         # Deprecation warning caused by the use of np.clip on ufloats
+        # We use clip because the predictions may contain unphysical values
         warnings.filterwarnings("ignore", r"AffineScalarFunc.(__le__|__ge__)\(\) is deprecated.")
-        names = list(preds.dtype.names)
-        if "bP" in names:
-            # From primary impact param:  i = arccos(bP * r1 * (1+esinw)/(1-e^2))
-            r1 = preds["rA_plus_rB"] / (1+preds["k"])
-            e_squared = preds["ecosw"]**2 + preds["esinw"]**2
-            cosi = np.clip(preds["bP"]*r1*(1+preds["esinw"]) / (1-e_squared), _TRIG_MIN, _TRIG_MAX)
-            inc = degrees(arccos(cosi))
-        elif "cosi" in names:
-            cosi = np.clip(preds["cosi"], _TRIG_MIN, _TRIG_MAX)
-            inc = degrees(arccos(cosi))
-        elif "sini" in names:
-            sini = np.clip(preds["sini"], _TRIG_MIN, _TRIG_MAX)
-            inc = degrees(arcsin(sini))
-        else:
-            raise KeyError("Missing bP, cosi or sini in predictions required to calc inc.")
 
-        if field_name not in names:
-            # It's difficult to append a field to structured array or recarray so copy to new inst.
-            # The numpy recfunctions module has merge and append_field funcs but they're slower.
-            new = np.empty_like(preds, np.dtype(preds.dtype.descr + [(field_name, UFloat.dtype)]))
-            new[names] = preds[names]
-            new[field_name] = inc
-        else:
-            new = preds
-        new[field_name] = inc
-        return new
+        r1 = sum_r / (1 + k)
+        e_squared = ecosw**2 + esinw**2
+        cosi = np.clip(bp * r1 * (1 + esinw) / (1 - e_squared), _TRIG_MIN, _TRIG_MAX)
+        return degrees(arccos(cosi))
+
+
+def predictions_to_mean_dict(preds: np.ndarray[UFloat],
+                             calculate_inc: bool=False,
+                             inc_key: str="inc") -> dict[str, UFloat]:
+    """
+    Takes an array of predictions and will produce a corresponding dictionary of mean values
+    for use as JKTEBOP input params. Optionally this includes the orbital inclination which
+    is calculated from the other values.
+    
+    :preds: the prediction structured array as produced by the EBOP MAVEN estimator
+    :calculate_inc: whether or not to calculate and append an orbital inclination value
+    :inc_key: the key to give the orbital inclination value
+    :returns: a dictionary with field names and mean values for keys and values
+    """
+    pd = { k: preds[k].mean() for k in preds.dtype.names }
+    if calculate_inc and inc_key is not None:
+        pd[inc_key] = calculate_orbital_inclination(pd["rA_plus_rB"], pd["k"],
+                                                    pd["ecosw"], pd["esinw"], pd["bP"])
+    return pd
 
 
 def pop_and_complete_ld_config(source_cfg: dict[str, any],
