@@ -619,8 +619,9 @@
             "aka": "TIC 199574208",
             "SpT": "M4.5",
             "details": "25 short cadence sectors (16, 19, 22-26, 49-52, 56-59, 76-80 & 82-86); many sectors at slower cadences; a pair of M-dwarfs in a nearly circular, slightly inclined 1.27 d orbit; eclipses are ~0.76 and ~0.73 mag deep; frequent flares however these appear to have little affect on the fit;",
-            "notes": "many sectors and short cadence with a good fit possible on most; we pick the sector from each group with the highest pdc_tot;",
+            "notes": "many sectors and short cadence with a good fit possible on most; we pick the sector from each group with the highest pdc_tot; fits are significantly quicker with flatten/clip;",
             "sectors": [[16], [19], [26], [52], [59], [80], [84]],
+            "flatten": true,
             "labels": {
                 "MA": 0.2310,           "MA_err": 0.0009,
                 "MB": 0.2141,           "MB_err": 0.0010,

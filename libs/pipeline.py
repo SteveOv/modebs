@@ -2,7 +2,7 @@
 Low level utility functions for light curve ingest, pre-processing, estimation and fitting.
 """
 # pylint: disable=no-member
-from typing import Union
+from typing import Union, Tuple
 import warnings
 import re
 from numbers import Number
@@ -18,8 +18,6 @@ from astroquery.vizier import Vizier
 
 from deblib import limb_darkening
 from deblib.vmath import arccos, arcsin, degrees
-
-from sed_fit.fitter import median_and_quantile_values
 
 _TRIG_MIN = ufloat(-1, 0)
 _TRIG_MAX = ufloat(1, 0)
@@ -292,22 +290,32 @@ def pop_and_complete_ld_config(source_cfg: dict[str, any],
     return params
 
 
-def median_fitted_params(fitted_params: ArrayLike, min_uncertainty_pc: float=0.) -> ArrayLike:
+def median_fitted_params(fitted_params: ArrayLike,
+                         quantiles: Tuple[float, float]=(0.16, 0.84),
+                         min_uncertainty_pc: float=0.) -> ArrayLike:
     """
     Produce aggregated values for the passed structured array of fitted params.
     The values are based on the median of the nominal values of the fitted params
-    with uncertainties from the corresponding 1-sigma scatter in the fitted values.
+    with uncertainties from the corresponding scatter in the fitted values.
 
     This approach makes the assumption that any inidividual uncertainties in the source
     fitted params are negligible when compared with the scatter in the values.
     
     :fitted_params: a structured array containing the source fitted parameter values
+    :quantiles: quantiles used to derive uncertainties with the default value equivalent to 1-sigma
     :min_uncertainty_pc: optional minimum uncertainty as a percentage of the nominal
     :return: a single row of a corresponding structured array
     """
+    if sum(quantiles) != 1.:
+        warnings.warn("Quantiles are not balanced; they do not total 1.0", UserWarning)
+
     agg_params = np.empty_like(fitted_params)
     for k in fitted_params.dtype.names:
-        med, qlo, qhi = median_and_quantile_values(nominal_values(fitted_params[k]), q=(0.16, 0.84))
-        unc = max(np.mean([qlo, qhi]), med * min_uncertainty_pc)
-        agg_params[k][0] = ufloat(med, unc)
+        noms = nominal_values(fitted_params[k])
+
+        med = np.median(noms)
+        qlo = med - np.quantile(noms, min(quantiles))
+        qhi = np.quantile(noms, max(quantiles)) - med
+
+        agg_params[k][0] = ufloat(med, max(np.mean([qlo, qhi]), med * min_uncertainty_pc))
     return agg_params[0]
