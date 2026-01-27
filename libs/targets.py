@@ -19,7 +19,7 @@ _default_target_config_defaults = {
     "detrend_poly_degree": 1,
     "detrend_iterations": 3,
     "flatten": None,
-    "create_fit_mask": None,
+    "create_clip_mask": None,
     "period_factor": 1,
 }
 
