@@ -188,7 +188,7 @@ def plot_parameter_scatter(params: ArrayLike,
         keys = list(params.dtype.names)
 
     rows = int(np.ceil(len(keys) / cols))
-    fig, axes = plt.subplots(rows, cols, figsize=(9, 1.5*rows),
+    fig, axes = plt.subplots(rows, cols, figsize=(4*cols, 1.5*rows),
                              sharex=True, constrained_layout=True)
 
     if suptitle is not None:
@@ -252,7 +252,7 @@ def plot_lightcurves(lcs: Union[_LCC, _LC, _FLC],
 
     # Set up the figure and Axes
     rows = int(np.ceil(count_lcs / cols))
-    fig, axes = plt.subplots(rows, cols, figsize=(9, 3*rows), sharey=True, constrained_layout=True)
+    fig, axes = plt.subplots(rows, cols, figsize=(4*cols, 3*rows), sharey=True, constrained_layout=True)
     axes = [axes] if isinstance(axes, _Axes) else axes.flatten()
 
     for ix, (ax, lc, title) in enumerate(zip_longest(axes, lcs, ax_titles)):
