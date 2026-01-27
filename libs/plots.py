@@ -26,7 +26,7 @@ from sed_fit.fitter import model_func, iterate_theta
 all_param_captions = {
     "rA_plus_rB":   r"$r_{\rm A}+r_{\rm B}$",
     "k":            r"$k$",
-    "inc":          r"$i~(^{\circ})$",
+    "inc":          r"$i~[^{\circ}]$",
     "J":            r"$J$",
     "qphot":        r"$q_{phot}$",
     "ecosw":        r"$e\,\cos{\omega}$",
@@ -38,12 +38,12 @@ all_param_captions = {
     "rA":           r"$r_{\rm A}$",
     "rB":           r"$r_{\rm B}$",
     "light_ratio":  r"$L_{\rm B}/L_{\rm A}$",
-    "TeffA":        r"$T_{\rm eff,A}~(\text{K})$",
-    "TeffB":        r"$T_{\rm eff,B}~(\text{K})$",
-    "RA":           r"$R_{\rm A}~(\text{R}_{\odot})$",
-    "RB":           r"$R_{\rm B}~(\text{R}_{\odot})$",
-    "MA":           r"$M_{\rm A}~(\text{M}_{\odot})$",
-    "MB":           r"$M_{\rm B}~(\text{M}_{\odot})$",
+    "TeffA":        r"$T_{\rm eff,A}~[\text{K}]$",
+    "TeffB":        r"$T_{\rm eff,B}~[\text{K}]$",
+    "RA":           r"$R_{\rm A}~[\text{R}_{\odot}]$",
+    "RB":           r"$R_{\rm B}~[\text{R}_{\odot}]$",
+    "MA":           r"$M_{\rm A}~[\text{M}_{\odot}]$",
+    "MB":           r"$M_{\rm B}~[\text{M}_{\odot}]$",
 }
 
 def plot_sed(x: u.Quantity,
