@@ -1,5 +1,6 @@
 """ Training and testing specific plots. """
-# pylint: disable=too-many-arguments, too-many-locals, too-many-branches, too-many-statements
+# pylint: disable=too-many-arguments, too-many-positional-arguments
+# pylint: disable=too-many-locals, too-many-branches, too-many-statements
 from typing import Union, Tuple, Iterable, Generator, Callable, List
 from itertools import zip_longest, cycle
 
@@ -14,12 +15,36 @@ from matplotlib.axes import Axes as _Axes
 import astropy.units as u
 from astropy.table import Table
 
-from uncertainties.unumpy import nominal_values
+from uncertainties.unumpy import nominal_values, std_devs
 
 from lightkurve import LightCurve as _LC, FoldedLightCurve as _FLC, LightCurveCollection as _LCC
 
 from sed_fit.stellar_grids import StellarGrid
 from sed_fit.fitter import model_func, iterate_theta
+
+# Formatted equivalent of various param names for use in plot labels/captions
+all_param_captions = {
+    "rA_plus_rB":   r"$r_{\rm A}+r_{\rm B}$",
+    "k":            r"$k$",
+    "inc":          r"$i~(^{\circ})$",
+    "J":            r"$J$",
+    "qphot":        r"$q_{phot}$",
+    "ecosw":        r"$e\,\cos{\omega}$",
+    "esinw":        r"$e\,\sin{\omega}$",
+    "L3":           r"$L_{\rm 3}$",
+    "bP":           r"$b_{\rm P}$",
+    "ecc":          r"$e$",
+    "e":            r"$e$",
+    "rA":           r"$r_{\rm A}$",
+    "rB":           r"$r_{\rm B}$",
+    "light_ratio":  r"$L_{\rm B}/L_{\rm A}$",
+    "TeffA":        r"$T_{\rm eff,A}~(\text{K})$",
+    "TeffB":        r"$T_{\rm eff,B}~(\text{K})$",
+    "RA":           r"$R_{\rm A}~(\text{R}_{\odot})$",
+    "RB":           r"$R_{\rm B}~(\text{R}_{\odot})$",
+    "MA":           r"$M_{\rm A}~(\text{M}_{\odot})$",
+    "MB":           r"$M_{\rm B}~(\text{M}_{\odot})$",
+}
 
 def plot_sed(x: u.Quantity,
              fluxes: List[u.Quantity],
@@ -137,6 +162,63 @@ def plot_fitted_model(sed: Table,
                                               _cycle_for(comp_colors, nstars)):
         spec_flux = model_grid.get_fluxes(teff, logg, 0, rad, dist, av) * model_grid.flux_unit
         fig.gca().plot(spec_lams[mask], spec_flux[mask], c=c, alpha=0.15, zorder=-100)
+    return fig
+
+
+def plot_parameter_scatter(params: ArrayLike,
+                           xdata: ArrayLike,
+                           keys: List[str]=None,
+                           cols: int=2,
+                           suptitle: str=None,
+                           ax_func: Callable[[str, _Axes], None]=None,
+                           **format_kwargs) -> _Figure:
+    """
+    Plots a set of axes showing the scatter in each set of param values.
+
+    :params: a structured array containing the set of params to plot
+    :xdata: the shared x-axis data
+    :keys: optional the list keys onto data within params to plot - if None all keys
+    :cols: the number of columns in which to arrange the axes
+    :suptitle: the optional overall figure title
+    :ax_func: optional callback taking (key, ax) called on each Axes prior to applying format_kwargs
+    :format_kwargs: kwargs to be passed on to format_axes()
+    :returns: the final Figure
+    """
+    if keys is None:
+        keys = list(params.dtype.names)
+
+    rows = int(np.ceil(len(keys) / cols))
+    fig, axes = plt.subplots(rows, cols, figsize=(9, 1.5*rows),
+                             sharex=True, constrained_layout=True)
+
+    if suptitle is not None:
+        fig.suptitle(suptitle)
+
+    # Extract formatting for use with a single legend
+    legend_loc, legend_ncol = None, 1
+    if "legend_loc" in format_kwargs:
+        legend_loc = format_kwargs.pop("legend_loc")
+        legend_ncol = format_kwargs.pop("legend_ncol", 1)
+
+    for ix, (ax, key) in enumerate(zip_longest(axes.flat, keys)):
+        if ix < len(keys):
+            ax.errorbar(xdata, nominal_values(params[key]), yerr=std_devs(params[key]),
+                        fmt="o", c="tab:blue", capsize=None, fillstyle="none")
+
+            ax.set_xticks(xdata, labels=xdata, minor=False)
+            ax.set_ylabel(all_param_captions.get(key, key))
+
+            if ax_func is not None:
+                ax_func(key, ax)
+
+            format_axes(ax, **format_kwargs)
+        else:
+            # Hide any unused axes
+            ax.axis("off")
+
+    if legend_loc is not None:
+        fig.legend(*axes.flat[0].get_legend_handles_labels(), loc=legend_loc, ncol=legend_ncol)
+
     return fig
 
 
