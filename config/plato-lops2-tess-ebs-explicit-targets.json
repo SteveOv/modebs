@@ -7,8 +7,7 @@
     "target_configs": {
         "0032759110": {
             "details": "1 short cadence sector (6); tess-ebs morph 0.128 & period ~4.077 d; Gaia DR3 ruwe 1.226; SpT M4.5Ve; eclipses of ~0.17 & ~0.15 mag, some noise & flares;",
-            "notes": "in the 2021ApJ...912..123J catalogue;",
-            "flatten": true
+            "notes": "in the 2021ApJ...912..123J catalogue;"
         },
         "0037606218": {
             "details": "2 short cadence sectors (6 & 87); tess-ebs morph 0.210 & period ~7.836 d; Gaia DR3 ruwe 1.270; flat LCs with shallow eclipses of ~0.12 & 0.015 mag (secondary total); discontinuities in S87;",
@@ -56,8 +55,7 @@
         },
         "0078568736": {
             "details": "3 short cadence sectors (6-7 & 33); tess-ebs morph 0.159 & period ~8.220 d; Gaia DR3 ruwe 1.738; SpT G; eclipses of ~0.60 & ~0.12 mag; slow variability; crowded FoV so expected L3>0;",
-            "notes": "in the 2021ApJ...912..123J catalogue;",
-            "flatten": true
+            "notes": "in the 2021ApJ...912..123J catalogue;"
         },
         "0080556181": {
             "details": "2 short cadence sectors (7 & 87); tess-ebs morph 0.481 & period ~2.820 d; Gaia DR3 ruwe 1.705; eclipses of ~0.40 & ~0.26 mag; secondary eclipse may be total; crowded FoV so expected L3>0;",
@@ -71,8 +69,7 @@
         "0118313102": {
             "details": "8 short cadence sectors (8-10, 35-36, 61-63); tess-ebs morph 0.180 & period ~9.256 d; Gaia DR3 ruwe 0.962; aka NT Vel; SpT B6V(n); deep eclipses of ~0.69 & ~0.66 mag; clear pulsations; S8 heavily distorted after mid-sector break (known common region for distortion);",
             "notes": "in the 2021ApJ...912..123J catalogue;",
-            "durS": 0.42,
-            "flatten": true
+            "durS": 0.42
         },
         "0140209204": {
             "details": "1 short cadence sector (5); tess-ebs morph 0.528 & period ~2.752 d; Gaia DR3 ruwe 0.868; aka SV Col; deep eclipses of ~0.46 & ~0.44 mag; ellipsoidal effect;",
@@ -85,8 +82,7 @@
         },
         "0160328766": {
             "details": "4 short cadence sectors (6, 32-33 & 87); tess-ebs morph 0.199 & period ~10.318 d; Gaia DR3 ruwe 1.148; aka AW Col; SpT A3(m)A7-A7; eclipses of ~0.50 & ~0.15 mag; well detached and highly eccentric; some slow variability; all sectors have at least 1 of each eclipse type;",
-            "notes": "in the 2021ApJ...912..123J catalogue;",
-            "flatten": true
+            "notes": "in the 2021ApJ...912..123J catalogue;"
         },
         "0198011271": {
             "details": "5 short cadence sectors (3-5, 69 & 97); S97 covers >50 days; tess-ebs morph 0.429 & period ~1.934 d; Gaia DR3 ruwe 0.852; high snr; eclipses of ~0.60 & ~0.35 mag; slow and random variability;",
@@ -94,14 +90,12 @@
         },
         "0219421171": {
             "details": "3 short cadence sectors (4-5 & 67); tess-ebs morph 0.165 & period ~8.303 d; Gaia DR3 ruwe 0.812; high snr; eclipses of ~0.20 & ~0.07 mag; slight eccentricity; discontinuity in S4 near 1412.5; potential nearby sources of L3;",
-            "notes": "in the 2021ApJ...912..123J catalogue; pdc_tot 0.899, 0.959 & 0.961 although S5 'best' on inspection;",
-            "flatten": true
+            "notes": "in the 2021ApJ...912..123J catalogue; pdc_tot 0.899, 0.959 & 0.961 although S5 'best' on inspection;"
         },
         "0238896417": {
             "details": "9 short cadence sectors (5-7, 61, 65, 68, 87-88 & 95); tess-ebs morph 0.153 & period ~16.244 d; Gaia DR3 ruwe 6.978; good snr; eclipses of ~0.28 & ~0.24 mag; some discontinuities in LCs; slight eccentricity; 2 nearby bright sources of potential L3;",
             "notes": "",
-            "sectors": [[5, 6], [87, 88]],
-            "flatten": true
+            "sectors": [[5, 6], [87, 88]]
         },
         "0259543079": {
             "exclude": true,
@@ -115,32 +109,27 @@
         "0260269456": {
             "details": "26 short cadence sectors (27-29, 31-39, 61-62, 65-69, 87-89 & 93-96); tess-ebs morph 0.169 & period ~10.796 d; Gaia DR3 ruwe 0.893; good snr; eclipses of ~0.55 & ~0.40 mag; bright source of potential L3 just over 2 arcmin away;",
             "notes": "",
-            "exclude_sectors": [27, 61, 65, 66, 67, 87, 88],
-            "flatten": true
+            "exclude_sectors": [27, 61, 65, 66, 67, 87, 88]
         },
         "0260502102": {
             "details": "41 short cadence sectors (1-13, 28-36, 38-39, 61-69 & 93-96); tess-ebs morph 0.125 & period ~7.315 d; Gaia DR3 ruwe 1.316; ok snr; eclipses of ~0.22 & ~0.18 mag; highly eccentric;",
-            "notes": "in the 2021ApJ.*..912..123J catalogue;",
-            "flatten": true
+            "notes": "in the 2021ApJ.*..912..123J catalogue;"
         },
         "0260504147": {
             "details": "38 short cadence sectors (1-9, 11-13, 27-39, 61-62, 65-66, 87-89 & 93-96); tess-ebs morph 0.179 & period ~8.418 d; slightly eccentric; some slow variability; not in Gaia DR3; SpT F6V; good snr; eclipses of ~0.20 & ~0.18 mag; likely source of significant L3 nearby;",
             "notes": "",
             "sectors": [[5, 6], [12, 13], [27, 28], [61, 62], [68, 69], [88, 89], [93, 94]],
-            "jktebop_overrides": { "inc": 89.3, "L3": 0.5 },
-            "flatten": true
+            "jktebop_overrides": { "inc": 89.3, "L3": 0.5 }
         },
         "0278826516": {
             "details": "9 short cadence sectors (7, 9, 12, 61-62 & 66-69); tess-ebs morph 0.082 & period ~14.084 d; Gaia DR3 ruwe 0.899; ok snr; eclipses of ~0.12 mag; discontinuities in S61, 62, 67 & 68; 4 sectors unlikely to have sufficient coverage for solo fit; potential sources of L3 nearby; ",
             "notes": "",
-            "exclude_sectors": [9, 12, 62, 66],
-            "flatten": true
+            "exclude_sectors": [9, 12, 62, 66]
         },
         "0278826996": {
             "details": "14 short cadence sectors (6-7, 61, 66-69, 87-89 & 93-96); tess-ebs morph 0.088 & period ~19.169 d; Gaia DR3 ruwe 1.016; good snr; highly eccentric; eclipses of ~0.45 & ~0.30 mag; S67, 69, 87 & 94 likely insufficient coverage for single sector fits; sparce field so may be able to fix L3=0;",
             "notes": "in the 2021ApJ...912..123J catalogue;",
             "sectors": [[6, 7], [68, 69], [86, 87], [95, 96]],
-            "flatten": true,
             "jktebop_overrides": { "period_fit": 0 }
         },
         "0279741942": {
@@ -158,22 +147,19 @@
             "quality_bitmask": "default",
             "period": 26.3811,
             "phiS": 0.365,
-            "flatten": true,
             "jktebop_overrides": { "period_fit": 0 }
         },
         "0307488184": {
             "details": "14 short cadence sectors (5, 8-12, 62-65, 69, 89-90 & 96); tess-ebs morph 0.142 & period ~10.067 d; Gaia DR3 ruwe 1.307; OK SNR; eclipses of ~0.17 & ~0.02 mag; secondary is total; potential sources of L3 nearby;",
             "notes": "in the 2021ApJ...912..123J catalogue;",
-            "exclude_sectors": [64],
-            "flatten": true
+            "exclude_sectors": [64]
         },
         "0319558164": {
             "details": "5 short cadence sectors (7, 61-62, 66 & 69); tess-ebs morph 0.115 & period ~8.980 d; Gaia DR3 ruwe 1.107; good SNR; discontuities all sectors except 7; eclipses of ~0.29 & ~0.23 mag; S66 & 69 have no primary eclipses; TESS-ebs period & phiS incorrect; source of L3 nearby;",
             "notes": "",
             "period": 16.596535,
             "phiS": 0.54,
-            "exclude_sectors": [66, 69],
-            "flatten": true
+            "exclude_sectors": [66, 69]
         },
         "0319863494": {
             "details": "6 short cadence sectors (7, 33-34, 61 & 87-88); tess-ebs morph 0.124 & period ~5.135 d; Gaia DR3 ruwe 1.153; SpT A1V; good SNR; eclipses of ~0.25 & ~0.15 mag although they differ across sectors and the secondary appears more clearly total on later sectors (change in inc?); crowded field so L3 likely significant; significant eccentricity;",
@@ -183,27 +169,23 @@
             "period": 17.644114,
             "durP": 0.52,
             "durS": 0.52,
-            "phiS": 0.29,
-            "flatten": true
+            "phiS": 0.29
         },
         "0350298314": {
             "details": "30 short cadence sectors (1-4, 6-13, 61-69, 87-90, 93-97); tess-ebs morph 0.002 & period ~47.719 d; Gaia DR3 ruwe 0.893; good SNR; slow variability; eclipses of ~0.30 & ~0.20 mag; possible source of significant L3 nearby; highly eccentric with very early secondary;",
             "notes": "highly eccentric and gives nonsense fits without assistance - particularly sensitive to the initial values of the Poincare elements;",
             "sectors": [[2, 3, 4], [7, 8, 9], [61, 62, 63], [88, 89, 90], [93, 94, 95]],
-            "flatten": true,
             "jktebop_overrides": { "ecosw": -0.38, "esinw": 0.11, "period_fit": 0 }
         },
         "0382067804": {
             "details": "15 short cadence sectors (3-10, 13, 64-67, 87 & 93-95); tess-ebs morph 0.164 & period ~26.131 d; Gaia DR3 ruwe 1.137; good SNR; flat LCs with eclipses of ~0.40 & ~0.35 mag; potential sources of L3 nearby; highly eccentric with late secondary;",
             "notes": "",
-            "sectors": [[5, 6, 7], [64, 65, 66], [93, 94, 95]],
-            "flatten": true
+            "sectors": [[5, 6, 7], [64, 65, 66], [93, 94, 95]]
         },
         "0384031569": {
             "details": "7 short cadence sectors (8-10, 62-63 & 89-90); tess-ebs morph 0.135 & period ~20.822 d; Gaia DR3 ruwe 2.932; excellent SNR; generally flat LCs with eclipses of ~0.62 & ~0.55 mag; S8 distorted after mid-sector break (1534, 1543); potential sources of L3 nearby; slightly eccentric;",
             "notes": "will need to join sectors for good coverage; test fits of S9+10, S62+63 & S89-90 work well with no errors and consistent params;",
-            "sectors":[[8, 9, 10], [62, 63], [89, 90]],
-            "flatten": true
+            "sectors":[[8, 9, 10], [62, 63], [89, 90]]
         }
     }
 }
