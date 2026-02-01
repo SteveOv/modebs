@@ -334,7 +334,7 @@ def fit_target_lightcurve(lc: LightCurve,
                           append_lines: List[str]=None,
                           max_attempts: int=1,
                           timeout: int=None,
-                          stdout_to: TextIOBase=stdout) -> Tuple[Dict[str, UFloat], Path, Path]:
+                          stdout_to: TextIOBase=stdout) -> Dict[str, any]:
     """
     Will use JKTEBOP to fit the passed lightcurve. This sets up all of the necessary input files,
     including clearing down any matching files from a previous fit. Retries are supported in
@@ -351,10 +351,10 @@ def fit_target_lightcurve(lc: LightCurve,
     :max_attempts: the maximum number of attempts to make
     :timeout: the timeout for any individual fit - will raise a TimeoutExpired if not completed
     :stdout_to: where to send JKTEBOP's stdout text output
-    :returns: a tuple containing a dictionary of the read_keys fitted parameters and the paths to
-    the jktebop generated fit and out files
+    :returns: a dictionary of the read_keys fitted parameters and further items containing the paths
+    to the jktebop files used as inputs or the output of the fit (keys having the form ext_fname)
     """
-    output_params = { }
+    best_out_params = { }
     best_attempt = 1
     all_keys = list(jktebop._param_file_line_beginswith.keys()) # pylint: disable=protected-access
 
@@ -367,12 +367,17 @@ def fit_target_lightcurve(lc: LightCurve,
     next_att_in_params = input_params.copy()
     for attempt in range(1, 1 + max(1, int(max_attempts))):
 
-        attempt_fname_stem = file_stem + f".a{attempt:d}"
-        in_fname = fit_dir / (attempt_fname_stem + ".in")
-        dat_fname = fit_dir / (attempt_fname_stem + ".dat")
-        par_fname = fit_dir / (attempt_fname_stem + ".par")
+        att_fname_stem = file_stem + f".a{attempt:d}"
+        att_file_params = {
+            "in_fname": (in_fname := fit_dir / (att_fname_stem + ".in")),
+            "dat_fname": (dat_fname := fit_dir / (att_fname_stem + ".dat")),
+            "par_fname": (par_fname := fit_dir / (att_fname_stem + ".par")),
+            "out_fname": fit_dir / (att_fname_stem + ".out"),
+            "fit_fname": fit_dir / (att_fname_stem + ".fit"),
+        }
+
         next_att_in_params["data_file_name"] = dat_fname.name
-        next_att_in_params["file_name_stem"] = attempt_fname_stem
+        next_att_in_params["file_name_stem"] = att_fname_stem
 
         # Warnings are a mess! I haven't found a way to capture a specific type of warning with
         # specified text and leave everything else to behave normally. This is the nearest I can
@@ -394,9 +399,8 @@ def fit_target_lightcurve(lc: LightCurve,
             if attempt == 1:
                 # Set up the fallback position, being the outputs from the first attempt
                 best_attempt = 1
-                output_params = att_out_params.copy()
-                out_fname = fit_dir / (attempt_fname_stem + ".out")
-                fit_fname = fit_dir / (attempt_fname_stem + ".fit")
+                best_out_params = att_out_params.copy()
+                best_file_params = att_file_params.copy()
 
             if max_attempts > 1:
                 # Handle retries if we've received warnings which trigger a retry
@@ -406,7 +410,8 @@ def fit_target_lightcurve(lc: LightCurve,
                         if stdout_to:
                             stdout_to.write(f"Attempt {attempt} didn't fully converge on a good "
                                             f"fit. Up to {max_attempts} attempt(s) are allowed so "
-                                            "will retry from the final position of this attempt.\n")                           
+                                            "will retry from the final position of this attempt.\n")
+                        # continue
                     else:
                         if stdout_to:
                             stdout_to.write("Failed to fully converge on a good fit after "
@@ -414,11 +419,11 @@ def fit_target_lightcurve(lc: LightCurve,
                                             f"from attempt {best_attempt}.\n")
                         break
                 elif attempt > 1: # A retry fit worked
-                    output_params = att_out_params
-                    out_fname = fit_dir / (attempt_fname_stem + ".out")
-                    fit_fname = fit_dir / (attempt_fname_stem + ".fit")
+                    best_out_params = att_out_params
+                    best_file_params = att_file_params
                     break
                 else: # The initial fit worked - retries not needed
                     break
 
-    return { k: output_params.get(k, None) for k in read_keys }, fit_fname, out_fname
+    return { k: best_out_params.get(k, None) for k in read_keys } | best_file_params
+
