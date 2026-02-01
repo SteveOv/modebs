@@ -2,7 +2,10 @@
 Low level utility functions for light curve ingest, pre-processing, estimation and fitting.
 """
 # pylint: disable=no-member
-from typing import Union, Tuple
+from typing import Union, Tuple, Dict, List
+from pathlib import Path
+from io import TextIOBase
+from sys import stdout
 import warnings
 import re
 from numbers import Number
@@ -15,9 +18,12 @@ import astropy.units as u
 from astropy.coordinates import SkyCoord
 from astroquery.gaia import Gaia
 from astroquery.vizier import Vizier
+from lightkurve import LightCurve
 
 from deblib import limb_darkening
 from deblib.vmath import arccos, arcsin, degrees
+
+from libs import jktebop
 
 _TRIG_MIN = ufloat(-1, 0)
 _TRIG_MAX = ufloat(1, 0)
@@ -319,3 +325,100 @@ def median_fitted_params(fitted_params: ArrayLike,
 
         agg_params[k][0] = ufloat(med, max(np.mean([qlo, qhi]), med * min_uncertainty_pc))
     return agg_params[0]
+
+
+def fit_target_lightcurve(lc: LightCurve,
+                          input_params: dict[str, UFloat],
+                          read_keys: List[str],
+                          file_stem: str,
+                          append_lines: List[str]=None,
+                          max_attempts: int=1,
+                          timeout: int=None,
+                          stdout_to: TextIOBase=stdout) -> Tuple[Dict[str, UFloat], Path, Path]:
+    """
+    Will use JKTEBOP to fit the passed lightcurve. This sets up all of the necessary input files,
+    including clearing down any matching files from a previous fit. Retries are supported in
+    the case of a fit raising a "## Warning: a good fit was not found after ..." warning and
+    are controlled with the max_attempt arg (1 for no retries). Timeouts are supported, with the
+    timeout parameter indicating the maximum number of seconds to allow for a fit (None == forever). 
+
+    :lc: the source lightcurve, which must have the time, delta_mag and delta_mag_err columns
+    :input_params: the initial input params to the fitting process
+    :read_keys: the set of fitted output params to read and return
+    :file_stem: the common stem to use in the filenames read and written during fitting - any
+    existing files within the jktebop directory matching this stem will be deleted prior to fitting
+    :append_lines: any whole lines of fitting instructions to append to the fitting input 'in' file
+    :max_attempts: the maximum number of attempts to make
+    :timeout: the timeout for any individual fit - will raise a TimeoutExpired if not completed
+    :stdout_to: where to send JKTEBOP's stdout text output
+    :returns: a tuple containing a dictionary of the read_keys fitted parameters and the paths to
+    the jktebop generated fit and out files
+    """
+    output_params = { }
+    best_attempt = 1
+    all_keys = list(jktebop._param_file_line_beginswith.keys()) # pylint: disable=protected-access
+
+    # JKTEBOP will fail if it finds files from a previous fitting
+    fit_dir = jktebop.get_jktebop_dir()
+    for file in fit_dir.glob(file_stem + ".*"):
+        file.unlink()
+
+    # Preserve the initial inputs as we'll progressively update the attempt intputs if retries occur
+    next_att_in_params = input_params.copy()
+    for attempt in range(1, 1 + max(1, int(max_attempts))):
+
+        attempt_fname_stem = file_stem + f".a{attempt:d}"
+        in_fname = fit_dir / (attempt_fname_stem + ".in")
+        dat_fname = fit_dir / (attempt_fname_stem + ".dat")
+        par_fname = fit_dir / (attempt_fname_stem + ".par")
+        next_att_in_params["data_file_name"] = dat_fname.name
+        next_att_in_params["file_name_stem"] = attempt_fname_stem
+
+        # Warnings are a mess! I haven't found a way to capture a specific type of warning with
+        # specified text and leave everything else to behave normally. This is the nearest I can
+        # get but it seems to suppress reporting all warnings, which is "sort of" OK as it's a
+        # small block of code and I don't expect anythine except JktebopWarnings to be raised here.
+        with warnings.catch_warnings(record=True, category=jktebop.JktebopTaskWarning) as warn_list:
+            # Context manager will list any JktebopTaskWarning raised in this context. Known issues
+            # with warnings context manager & multi(thread|process)ing so we will need to change
+            # this if needed. Probably just catch & parse the jktebop output before sending it on.
+
+            jktebop.write_in_file(in_fname, append_lines=append_lines, **next_att_in_params)
+            jktebop.write_light_curve_to_dat_file(lc, dat_fname)
+
+            # Blocks on the JKTEBOP task until we can parse the newly written par file contents
+            # to read out the revised values for the superset of potentially fitted parameters.
+            plines_gen = jktebop.run_jktebop_task(in_fname, par_fname, None, stdout_to, timeout)
+            att_out_params = jktebop.read_fitted_params_from_par_lines(plines_gen, all_keys, True)
+
+            if attempt == 1:
+                # Set up the fallback position, being the outputs from the first attempt
+                best_attempt = 1
+                output_params = att_out_params.copy()
+                out_fname = fit_dir / (attempt_fname_stem + ".out")
+                fit_fname = fit_dir / (attempt_fname_stem + ".fit")
+
+            if max_attempts > 1:
+                # Handle retries if we've received warnings which trigger a retry
+                if sum(1 for w in warn_list if "good fit was not found after" in str(w.message)):
+                    if attempt < max_attempts:
+                        next_att_in_params |= att_out_params
+                        if stdout_to:
+                            stdout_to.write(f"Attempt {attempt} didn't fully converge on a good "
+                                            f"fit. Up to {max_attempts} attempt(s) are allowed so "
+                                            "will retry from the final position of this attempt.\n")                           
+                    else:
+                        if stdout_to:
+                            stdout_to.write("Failed to fully converge on a good fit after "
+                                            f"{max_attempts} attempts. Reverting to the results "
+                                            f"from attempt {best_attempt}.\n")
+                        break
+                elif attempt > 1: # A retry fit worked
+                    output_params = att_out_params
+                    out_fname = fit_dir / (attempt_fname_stem + ".out")
+                    fit_fname = fit_dir / (attempt_fname_stem + ".fit")
+                    break
+                else: # The initial fit worked - retries not needed
+                    break
+
+    return { k: output_params.get(k, None) for k in read_keys }, fit_fname, out_fname
