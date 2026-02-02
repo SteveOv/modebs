@@ -17,8 +17,8 @@ KNOWN_TARGETS = {
     "CW Eri": { # Easy light-curves
         "tic": 98853987,
         "sector": 31,
-        "period": 2.7283712677 * u.d,
-        "epoch_time": Time(2152.1428924222, format="btjd", scale="tdb"),
+        "period": 2.728370923 * u.d,
+        "epoch_time": Time(2163.056459177, format="btjd", scale="tdb"),
         "ecosw": 0.00502,
         "esinw": -0.0121,
         "ecc": 0.0131,
@@ -119,8 +119,11 @@ def load_lightcurves(target: str,
             for sector in sorted(sectors)
     )
 
-    if with_mag_columns:
-        for lc in lcs:
+    for lc in lcs:
+        lc.meta["LABEL"] = f"{target} S{lc.meta['SECTOR']:02d}"
+        lc.meta["clip_mask"] = np.ones((len(lc)), dtype=bool)
+        lc.meta["t0"] = params["epoch_time"]
+        if with_mag_columns:
             append_mag_columns(lc)
     return lcs
 

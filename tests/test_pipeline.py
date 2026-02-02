@@ -6,8 +6,11 @@ import astropy.units as u
 from astropy.coordinates import SkyCoord
 
 from deblib.orbital  import phase_of_secondary_eclipse, eclipse_duration
+from tests.helpers.lightcurve_helpers import load_lightcurves, KNOWN_TARGETS
+from libs.lightcurves import find_lightcurve_segments, fit_polynomial
 
 from libs.pipeline import estimate_l3_with_gaia, get_tess_ebs_data
+from libs.pipeline import fit_target_lightcurve, fit_target_lightcurves
 
 
 class Testpipeline(unittest.TestCase):
@@ -95,6 +98,55 @@ class Testpipeline(unittest.TestCase):
 
                 self.assertIn("durS", result)
                 self.assertAlmostEqual(result["durS"].n, exp_durS, 2, f"exoected durS ~= {exp_durS:.3f}")
+
+    #
+    # fit_target_lightcurves():
+    #
+    def test_fit_target_lightcurves_happy_path(self):
+        """ Debuggable test for fit_target_lightcurves() """
+        config = KNOWN_TARGETS["CW Eri"]
+
+        # Get and pre-process some known lightcurves
+        lcs = load_lightcurves("CW Eri", [4, 31], with_mag_columns=True)
+        for lc in lcs:
+            for s in find_lightcurve_segments(lc, threshold=0.5 * u.d):
+                lc[s]["delta_mag"] -= fit_polynomial(lc.time[s], lc[s]["delta_mag"], 1, 3)
+
+        in_params = {
+            "task": 3,
+            "rA_plus_rB": 0.3,      "k": 0.7,
+            "inc": 86.4,            "qphot": 0.836,
+            "ecosw": 0.005,         "esinw": -0.010,
+            "gravA": 0,             "gravB": 0,
+            "J": 0.9,               "L3": 0,
+            "LDA": "pow2",          "LDB": "pow2",
+            "LDA1": 0.64,           "LDB1": 0.65,
+            "LDA2": 0.47,           "LDB2": 0.50,
+            "reflA": 0,             "reflB": 0,
+
+            # primary_epoch is passed in separately as it may vary by sector
+            "period": config["period"].to(u.d).value,
+
+                                    "qphot_fit": 0,
+            "ecosw_fit": 1,         "esinw_fit": 1,
+            "gravA_fit": 0,         "gravB_fit": 0,
+                                    "L3_fit": 1,
+            "LDA1_fit": 1,          "LDB1_fit": 1,
+            "LDA2_fit": 0,          "LDB2_fit": 0,
+            "reflA_fit": 0,         "reflB_fit": 0,
+                                    "sf_fit": 1,
+            "period_fit": 1,        "primary_epoch_fit": 1,
+
+        }
+
+        read_keys = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc", "L3"]
+        pe = config["epoch_time"].value
+        out_params = fit_target_lightcurves(lcs, in_params, read_keys, pe,
+                                            task=3, max_workers=4, file_prefix="test-pipeline")
+
+        for op_dict in out_params:
+            print(f"[{op_dict['in_fname'].stem}]",
+                  ", ".join(f"{k}={op_dict[k]}" for k in read_keys))
 
 
 if __name__ == "__main__":
