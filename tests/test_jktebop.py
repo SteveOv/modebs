@@ -66,7 +66,7 @@ class Testjktebop(unittest.TestCase):
         """ Make sure JKTEBOP_DIR is corrected up as tests may modify it. """
         jktebop._jktebop_directory = Path(os.environ.get("JKTEBOP_DIR", "~/jktebop/")).expanduser().absolute()
         jktebop._jktebop_support_negative_l3 = os.environ.get("JKTEBOP_SUPPORT_NEG_L3", "") == "True"
-        th.TEST_DATA_DIR.mkdir(parents=True, exist_ok=True)
+        th.TEST_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         return super().setUpClass()
 
     @classmethod
@@ -214,12 +214,12 @@ class Testjktebop(unittest.TestCase):
 
     def test_write_in_file_missing_params(self):
         """ Test write_in_file(missing template params) raises KeyError """
-        file_name = th.TEST_DATA_DIR / "any_old_file_will_do.dat"
+        file_name = th.TEST_OUTPUT_DIR / "any_old_file_will_do.dat"
         self.assertRaises(KeyError, write_in_file, file_name, task=3, k=0.5)
 
     def test_write_in_file_param_validation_warnings(self):
         """ Testwrite_in_file(some out of range LD param values) raises Warning """
-        file_name = th.TEST_DATA_DIR / "any_old_file_will_do.dat"
+        file_name = th.TEST_OUTPUT_DIR / "any_old_file_will_do.dat"
         for param,              value,      coerced_value in [
             ("rA_plus_rB",      0.99,       0.8),
             ("k",               0.0099,     0.01),
@@ -241,7 +241,7 @@ class Testjktebop(unittest.TestCase):
 
     def test_write_in_file_ld_validation_warnings(self):
         """ Testwrite_in_file(some out of range LD param values) raises Warning """
-        file_name = th.TEST_DATA_DIR / "any_old_file_will_do.dat"
+        file_name = th.TEST_OUTPUT_DIR / "any_old_file_will_do.dat"
 
         for star in ["A", "B"]:
             for algo, test_values in {
@@ -262,7 +262,7 @@ class Testjktebop(unittest.TestCase):
     def test_write_in_file_full_set_of_task2_params(self):
         """ Test write_in_file(full set of task2 template params) asserts file is written """
         file_stem = "test_write_in_file_full_set_of_params.2"
-        file_name = th.TEST_DATA_DIR / f"{file_stem}.in"
+        file_name = th.TEST_OUTPUT_DIR / f"{file_stem}.in"
         params = { **self._task2_params.copy(), "out_filename": f"{file_name.stem}.out" }
         write_in_file(file_name, task=2, **params)
 
@@ -275,7 +275,7 @@ class Testjktebop(unittest.TestCase):
     def test_write_in_file_full_set_of_task3_params(self):
         """ Test write_in_file(full set of task3 template params) asserts file is written """
         file_stem = "test_write_in_file_full_set_of_params.3"
-        file_name = th.TEST_DATA_DIR / f"{file_stem}.in"
+        file_name = th.TEST_OUTPUT_DIR / f"{file_stem}.in"
         params = { **self._task3_params.copy(), "data_file_name": f"{file_name.stem}.dat"}
         write_in_file(file_name, task=3, **params)
 
@@ -287,7 +287,7 @@ class Testjktebop(unittest.TestCase):
 
     def test_write_in_file_append_lines(self):
         """ Test write_in_file(with append_lines) asserts they are written """
-        file_name = th.TEST_DATA_DIR / "test_write_task3_in_file_append_lines.3.in"
+        file_name = th.TEST_OUTPUT_DIR / "test_write_task3_in_file_append_lines.3.in"
         append_lines = [ "line 1\n\n", "\n\n\nline 2", "line 3" ]
 
         write_in_file(file_name, 3, append_lines, **self._task3_params)
@@ -329,7 +329,7 @@ class Testjktebop(unittest.TestCase):
     def test_write_light_curve_to_dat_file_args_none_or_wrong_type(self):
         """ Test write_light_curve_to_dat_file(arguments wrong type) raises TypeError """
         lc = th.load_lightcurve("CW Eri")
-        file_name = th.TEST_DATA_DIR / "any_old_file_will_do.dat"
+        file_name = th.TEST_OUTPUT_DIR / "any_old_file_will_do.dat"
         self.assertRaises(TypeError, write_light_curve_to_dat_file, None,   file_name)
         self.assertRaises(TypeError, write_light_curve_to_dat_file, lc,     None)
 
@@ -340,7 +340,7 @@ class Testjktebop(unittest.TestCase):
     def test_write_light_curve_to_dat_file_column_args_not_matching(self):
         """ Test write_light_curve_to_dat_file(column args numbers mismatch) raises ValueError """
         lc = th.load_lightcurve("CW Eri")
-        file_name = th.TEST_DATA_DIR / "any_old_file_will_do.dat"
+        file_name = th.TEST_OUTPUT_DIR / "any_old_file_will_do.dat"
         self.assertRaises(ValueError, write_light_curve_to_dat_file, lc, file_name, ["time"], None)
         self.assertRaises(ValueError, write_light_curve_to_dat_file, lc, file_name, ["time"], ["%.6f", "%.6f"])
         self.assertRaises(ValueError, write_light_curve_to_dat_file, lc, file_name, None, ["%.6f"])
@@ -349,7 +349,7 @@ class Testjktebop(unittest.TestCase):
     def test_write_light_curve_to_dat_file_default_columns(self):
         """ Test write_light_curve_to_dat_file(using default column & formats)  writes file"""
         lc = th.load_lightcurve("CW Eri")
-        file_name = th.TEST_DATA_DIR / "test_write_light_curve_to_dat_file_default_columns.dat"
+        file_name = th.TEST_OUTPUT_DIR / "test_write_light_curve_to_dat_file_default_columns.dat"
 
         write_light_curve_to_dat_file(lc, file_name)
 
@@ -362,7 +362,7 @@ class Testjktebop(unittest.TestCase):
     def test_write_light_curve_to_dat_file_explicit_columns(self):
         """ Test write_light_curve_to_dat_file(explicit columns & formats) writes file """
         lc = th.load_lightcurve("CW Eri")
-        file_name = th.TEST_DATA_DIR / "test_write_light_curve_to_dat_file_explicit_columns.dat"
+        file_name = th.TEST_OUTPUT_DIR / "test_write_light_curve_to_dat_file_explicit_columns.dat"
 
         write_light_curve_to_dat_file(lc,
                                       file_name,
