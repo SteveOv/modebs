@@ -152,8 +152,6 @@ def run_jktebop_task(in_filename: Path,
                         if not line:
                             break
                         stdout_to.write(line)
-                        if "warning" in line.casefold():
-                            warnings.warn(message=line, category=JktebopTaskWarning)
                 except ValueError: # Unable to readline - probably timeout
                     if stdout_to is not None:
                         stdout_to.write("The process stdout has been closed\n")

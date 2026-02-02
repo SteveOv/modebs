@@ -10,7 +10,7 @@ from tests.helpers.lightcurve_helpers import load_lightcurves, KNOWN_TARGETS
 from libs.lightcurves import find_lightcurve_segments, fit_polynomial
 
 from libs.pipeline import estimate_l3_with_gaia, get_tess_ebs_data
-from libs.pipeline import fit_target_lightcurve, fit_target_lightcurves
+from libs.pipeline import fit_target_lightcurves
 
 
 class Testpipeline(unittest.TestCase):
