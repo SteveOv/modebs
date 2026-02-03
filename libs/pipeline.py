@@ -73,6 +73,8 @@ def get_tess_ebs_data(search_term: str, radius_as: float=5., clear_cache: bool=F
     """
     Gets a dictionary of ephemeris and morphology data from the TESS-ebs catalogue.
     """
+    warnings.warn("Use the 'offline' catalogues.query_tess_ebs() func", DeprecationWarning)
+
     ebs_key_patterns = ["{0}-2g", "{0}-pf"] # data derived from 2-Gaussian & polyfit algos
     tess_ebs_catalog = Vizier(catalog="J/ApJS/258/16", row_limit=1)
     if clear_cache:
