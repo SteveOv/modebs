@@ -116,6 +116,8 @@
             "notes": "in the 2021ApJ.*..912..123J catalogue;"
         },
         "0260504147": {
+            "exclude": true,
+            "why_exclude": "seems to have dropped off the TESS-ebs catalogue",
             "details": "38 short cadence sectors (1-9, 11-13, 27-39, 61-62, 65-66, 87-89 & 93-96); tess-ebs morph 0.179 & period ~8.418 d; slightly eccentric; some slow variability; not in Gaia DR3; SpT F6V; good snr; eclipses of ~0.20 & ~0.18 mag; likely source of significant L3 nearby;",
             "notes": "",
             "sectors": [[5, 6], [12, 13], [27, 28], [61, 62], [68, 69], [88, 89], [93, 94]],
@@ -129,12 +131,10 @@
         "0278826996": {
             "details": "14 short cadence sectors (6-7, 61, 66-69, 87-89 & 93-96); tess-ebs morph 0.088 & period ~19.169 d; Gaia DR3 ruwe 1.016; good snr; highly eccentric; eclipses of ~0.45 & ~0.30 mag; S67, 69, 87 & 94 likely insufficient coverage for single sector fits; sparce field so may be able to fix L3=0;",
             "notes": "in the 2021ApJ...912..123J catalogue;",
-            "sectors": [[6, 7], [68, 69], [86, 87], [95, 96]],
+            "sectors": [[6, 7], [68, 69], [88, 89], [95, 96]],
             "jktebop_overrides": { "period_fit": 0 }
         },
         "0279741942": {
-            "exclude": false,
-            "why_exclude": "cannot get a fit so will need further investigation and probable intervention",
             "details": "10 short cadence sectors (2-4, 28-30, 68-69 & 95-96); tess-ebs morph 0.091 & period ~14.216 d; Gaia DR3 ruwe 1.025; aka VY Ret; SpT F5V; excellent snr; highly eccentric; eclipses of ~0.58 & ~0.55 mag; potential sources of L3 nearby; S2 & 3 lack complete secondary eclipses, but other sectors generally have at least 1 of each type;",
             "notes": "",
             "durS": 0.4,
@@ -184,7 +184,7 @@
         },
         "0384031569": {
             "details": "7 short cadence sectors (8-10, 62-63 & 89-90); tess-ebs morph 0.135 & period ~20.822 d; Gaia DR3 ruwe 2.932; excellent SNR; generally flat LCs with eclipses of ~0.62 & ~0.55 mag; S8 distorted after mid-sector break (1534, 1543); potential sources of L3 nearby; slightly eccentric;",
-            "notes": "will need to join sectors for good coverage; test fits of S9+10, S62+63 & S89-90 work well with no errors and consistent params;",
+            "notes": "",
             "sectors":[[8, 9, 10], [62, 63], [89, 90]]
         }
     }
