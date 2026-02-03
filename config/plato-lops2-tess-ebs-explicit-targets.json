@@ -116,8 +116,6 @@
             "notes": "in the 2021ApJ.*..912..123J catalogue;"
         },
         "0260504147": {
-            "exclude": true,
-            "why_exclude": "seems to have dropped off the TESS-ebs catalogue",
             "details": "38 short cadence sectors (1-9, 11-13, 27-39, 61-62, 65-66, 87-89 & 93-96); tess-ebs morph 0.179 & period ~8.418 d; slightly eccentric; some slow variability; not in Gaia DR3; SpT F6V; good snr; eclipses of ~0.20 & ~0.18 mag; likely source of significant L3 nearby;",
             "notes": "",
             "sectors": [[5, 6], [12, 13], [27, 28], [61, 62], [68, 69], [88, 89], [93, 94]],
