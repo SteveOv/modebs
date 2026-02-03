@@ -69,12 +69,15 @@ def nominal_value(value: Union[UFloat, Number]) -> Number:
     return value
 
 
-def get_tess_ebs_data(search_term: str, radius_as: float=5.) -> dict:
+def get_tess_ebs_data(search_term: str, radius_as: float=5., clear_cache: bool=False) -> dict:
     """
     Gets a dictionary of ephemeris and morphology data from the TESS-ebs catalogue.
     """
     ebs_key_patterns = ["{0}-2g", "{0}-pf"] # data derived from 2-Gaussian & polyfit algos
     tess_ebs_catalog = Vizier(catalog="J/ApJS/258/16", row_limit=1)
+    if clear_cache:
+        tess_ebs_catalog.clear_cache()
+
     if (tbl := tess_ebs_catalog.query_object(search_term, radius=radius_as * u.arcsec)):
         sub_tbl = tbl[0]
 
