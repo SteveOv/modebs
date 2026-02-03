@@ -1,0 +1,129 @@
+J/ApJ/912/123       TESS EBs in the southern hemisphere       (Justesen+, 2021)
+================================================================================
+Temperature and distance dependence of tidal circularization in close binaries:
+a catalog of eclipsing binaries in the southern hemisphere observed by the
+TESS satellite.
+    Justesen A.B., Albrecht S.
+   <Astrophys. J., 912, 123 (2021)>
+   =2021ApJ...912..123J
+================================================================================
+ADC_Keywords: Binaries, eclipsing; Photometry; Optical; Effective temperatures
+Keywords: Binary stars ; Close binary stars ; Detached binary stars ;
+          Eclipsing binary stars ; Light curves ; Tides ; Tidal interaction
+
+Abstract:
+    Tidal forces are important for understanding how close binary stars
+    and compact exoplanetary systems form and evolve. However, tides are
+    difficult to model, and significant uncertainties exist about the
+    strength of tides. Here, we investigate tidal circularization in close
+    binaries using a large sample of well-characterized eclipsing systems.
+    We searched TESS photometry from the southern hemisphere for eclipsing
+    binaries. We derive best-fit orbital and stellar parameters by jointly
+    modeling light curves and spectral energy distributions. To determine
+    the eccentricity distribution of eclipsing binaries over a wide range
+    of stellar temperatures (3000-50000K) and orbital separations a/R1
+    (2-300), we combine our newly obtained TESS sample with eclipsing
+    binaries observed from the ground and by the Kepler mission. We find a
+    clear dependency of stellar temperature and orbital separation in the
+    eccentricities of close binaries. We compare our observations with
+    predictions of the equilibrium and dynamical tides. We find that while
+    cool binaries agree with the predictions of the equilibrium tide, a
+    large fraction of binaries with temperatures between 6250K and 10000K
+    and orbital separations between a/R1~4 and 10 are found on circular
+    orbits, contrary to the predictions of the dynamical tide. This
+    suggests that some binaries with radiative envelopes may be tidally
+    circularized significantly more efficiently than usually assumed. Our
+    findings on orbital circularization have important implications also
+    in the context of hot Jupiters, where tides have been invoked to
+    explain the observed difference in the spin-orbit alignment between
+    hot and cool host stars.
+
+Description:
+    We have analyzed a total of 247565 single-sector short-cadence TESS
+    light curves from sectors 1-13, covering TESS's first year of
+    observing the ecliptic southern hemisphere. See Section 2.
+
+    We then combine best-fit light-curve solutions with the spectral
+    energy distributions (SEDs; using broadband photometry and Gaia DR2
+    parallaxes).
+
+File Summary:
+--------------------------------------------------------------------------------
+ FileName    Lrecl  Records  Explanations
+--------------------------------------------------------------------------------
+ReadMe          80        .  This file
+table2.dat     121      748  Orbital parameters of TESS eclipsing binaries
+table3.dat     153      349  Orbital and stellar parameters of TESS
+                              eclipsing binaries
+--------------------------------------------------------------------------------
+
+See also:
+ I/347 : Distances to 1.33 billion stars in Gaia DR2 (Bailer-Jones+, 2018)
+ I/345 : Gaia DR2 (Gaia Collaboration, 2018)
+ IV/38 : TESS Input Catalog - v8.0 (TIC-8) (Stassun+, 2019)
+ J/AJ/114/326   : MACHO Variables V. (Alcock+ 1997)
+ J/AcA/48/563   : BVI photometry of OGLE SMC eclipsing binaries (Udalski+, 1998)
+ J/A+A/424/919  : Stellar models grids. Z=0.02, M=0.8 to 125 (Claret, 2004)
+ J/AcA/54/1     : OGLE II SMC eclipsing binaries (Wyrzykowski+, 2004)
+ J/A+A/440/647  : New grids of stellar models. II. (Claret, 2005)
+ J/A+A/446/785  : Catalogue of eclipsing variables (Malkov+, 2006)
+ J/A+A/450/681  : Companions to close spectroscopic binaries (Tokovinin+, 2006)
+ J/A+A/467/1389 : New grids of stellar models. IV. (Claret, 2007)
+ J/ApJ/663/249  : LMC eclipsing binaries in the MACHO database (Derekas+, 2007)
+ J/AJ/135/850   : Properties of eclipsing binaries found in TrES (Devor+, 2008)
+ J/other/A+ARV/18.67 : Accurate masses and radii of normal stars (Torres+, 2010)
+ J/AJ/141/83    : Kepler Mission. I. Eclipsing binaries in DR1 (Prsa+, 2011)
+ J/ApJ/757/18   : RVs for 16 hot Jupiter host stars (Albrecht+, 2012)
+ J/ApJ/826/56   : HST/WFC3 obs. of Cepheids in SN Ia host gal. (Riess+, 2016)
+ J/ApJ/824/15   : Orbital circularization of Kepler EBs (Van Eylen+, 2016)
+ J/A+A/602/A107 : 231 transiting planets eccentricity and mass (Bonomo+, 2017)
+ J/A+A/600/A30  : Limb-darkening for TESS satellite (Claret, 2017)
+ J/AJ/154/105   : 529 Kepler eclipsing binaries (Kjurkchieva+, 2017)
+ J/AJ/155/165   : Exoplanet hosts with tidal spin-up data (Penev+, 2018)
+ J/AJ/156/102   : TESS Input Catalog and Candidate Target List (Stassun+, 2018)
+
+Byte-by-byte Description of file: table2.dat
+--------------------------------------------------------------------------------
+   Bytes Format Units Label  Explanations
+--------------------------------------------------------------------------------
+   1-  9 I9     ---   TIC    [737546/469166137] TESS Input Catalog ID
+  11- 25 E15.9  d     Per    [0.63/19.17] Orbital period (P)
+  27- 41 E15.9  d     t1     [1325.3/1664.5] Time of primary eclipse;
+                               TESS Barycentric Julian Date (BJD-2457000)
+  43- 57 E15.9  d     t2     [1323.2/1666.5] Time of secondary eclipse
+                               TESS Barycentric Julian Date (BJD-2457000)
+  59- 73 E15.9  ---   ecosw  [2.14e-8/0.7] Eccentricity times
+                              cos(longitude of periastron)
+  75- 89 E15.9  ---   d1     [0.01/0.88] Depth of primary eclipse
+  91-105 E15.9  ---   d2     [0.005/0.5] Depth of secondary eclipse
+ 107-121 E15.9  mag   Tmag   [4.2/16.4] TESS apparent magnitude
+--------------------------------------------------------------------------------
+
+Byte-by-byte Description of file: table3.dat
+--------------------------------------------------------------------------------
+   Bytes Format Units   Label  Explanations
+--------------------------------------------------------------------------------
+   1-  9 I9     ---     TIC    [737546/468958384] TESS Input Catalog ID
+  11- 25 E15.9  d       Per    [0.66/19.17] Orbital period (P)
+  27- 41 E15.9  d       t1     [1325.3/1664.5] Time of primary eclipse
+                                (TESS Barycentric Julian Date; BJD-2457000)
+  43- 57 E15.9  ---     rp     [0.2/1.73] Radius ratio (k)
+  59- 73 E15.9  ---     a/R1   [2.38/44.17] Semi-major axis ratio
+  75- 90 E16.9  ---     ecosw  [-0.56/0.61] Eccentricity times
+                                cos(longitude of periastron)
+  92-107 E16.9  ---     esinw  [-0.5/0.35] Eccentricity times
+                                sin(longitude of periastron)
+ 109-123 E15.9  deg     inc    [72.77/90] Orbital inclination
+ 125-139 E15.9  ---     fp     [0.0039/2.08] Light ratio in TESS band
+ 141-145 I5     K       Teff1  [3002/49996] Stellar effective temperature
+                                of primary
+ 147-151 I5     K       Teff2  [2000/42801] Stellar effective temperature
+                                of secondary
+     153 I1     ---   f_Teff   [0/1] Flag on Teff (1=derived from SED fit)
+--------------------------------------------------------------------------------
+
+History:
+    From electronic version of the journal
+
+================================================================================
+(End)                    Prepared by [AAS], Emmanuelle Perret [CDS]  02-Nov-2022
