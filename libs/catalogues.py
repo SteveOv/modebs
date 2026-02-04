@@ -3,6 +3,7 @@ from typing import Union, List, Dict
 from pathlib import Path
 from numbers import Number
 import re
+from functools import lru_cache
 
 from uncertainties import ufloat, UFloat
 import numpy as np
@@ -13,8 +14,9 @@ _tic_num_pattern = re.compile(r"TIC\s*(?P<tic>\d+)", re.IGNORECASE)
 
 def query_tess_ebs_ephemeris(tics: List[Union[int, str]]) -> Dict[str, Union[float, UFloat]]:
     """
-    Gets a dictionary of ephemeris and morphology data from the TESS-ebs catalogue (J/ApJS/258/16).
-    Takes a list of TIC ids and returns the data for the first match, or None if no match.
+    Gets a dict of the ephemeris and morphology data from the TESS-ebs catalogue (J/ApJS/258/16)
+    of Prsa+ (2022ApJS..258...16P). From a list of TIC ids this will return data for the first
+    match, or None if no match.
 
     Previously we queried TESS-ebs with astroquery.Vizier which is more flexible at resolving Ids,
     however the questionable availability of the VizieR service makes it safer to take this offline.
@@ -23,12 +25,8 @@ def query_tess_ebs_ephemeris(tics: List[Union[int, str]]) -> Dict[str, Union[flo
     :returns: dict of the requested data
     """
     # pylint: disable=too-many-locals
-
-    # May move to set this up just once (LRU cache?)
-    table = Table.read(Path("./libs/data/tess-ebs/tess-ebs.dat"),
-                       readme=Path("./libs/data/tess-ebs/ReadMe"),
-                       format="ascii.cds")
-
+    table = _read_table(catalogue="J/ApJS/258/16", table_fname="tess-ebs.dat")
+    data = None
     for tic in _yield_tic_nums(tics):
         if any(tic_mask := table["TIC"] == tic):
             row = table[tic_mask][0]
@@ -83,20 +81,15 @@ def query_tess_ebs_ephemeris(tics: List[Union[int, str]]) -> Dict[str, Union[flo
 
 def query_tess_ebs_in_sh(tics: List[Union[int, str]]) -> dict:
     """
-    Gets a dictionary of ephemeris and physical data from table 3 of the TESS EBs in the
-    southern hemisphere catalogue of Justesen & Albrecht (2021) (J/ApJ/912/123).
+    Gets a dictionary of ephemeris and physical data from table 3 of the 'TESS EBs in the
+    southern hemisphere catalogue' (J/ApJ/912/123) of Justesen & Albrecht (2021ApJ...912..123J).
     Takes a list of TIC ids and returns the data for the first match, or None if no match.
 
     :tics: the potential ids for the target (some may have more than one TIC)
     :returns: dict of the requested data
     """
     # pylint: disable=too-many-locals
-
-    # May move to set this up just once (LRU cache?)
-    table = Table.read(Path("./libs/data/catalogues/J_ApJ_912_123/table3.dat"),
-                       readme=Path("./libs/data/catalogues/J_ApJ_912_123/ReadMe"),
-                       format="ascii.cds")
-
+    table = _read_table(catalogue="J/ApJ/912/123", table_fname="table3.dat")
     data = None
     for tic in _yield_tic_nums(tics):
         if any(tic_mask := table["TIC"] == tic):
@@ -135,3 +128,17 @@ def _yield_tic_nums(tics: List[Union[int, str]]):
                 yield int(tic)
             elif (match := _tic_num_pattern.match(tic)) is not None and "tic" in match.groupdict():
                 yield int(match.group("tic"))
+
+
+@lru_cache
+def _read_table(catalogue: str, table_fname: str, readme_fname: str="ReadMe") -> Table:
+    """
+    Will read the requested CDS format ascii table into an astropy Table
+
+    :catalogue: the CDS identifier for the catalogue
+    :table_fname: the name of the table file to open
+    :readme_fname: the name of the accompanying readme file which contains the table's metadata
+    :returns: the requested Table
+    """
+    cat_dir = Path("./libs/data/catalogues") / catalogue.replace("/", "-")
+    return Table.read(cat_dir / table_fname, readme=cat_dir / readme_fname, format="ascii.cds")
