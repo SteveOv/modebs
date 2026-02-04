@@ -484,6 +484,10 @@ def _fit_target(time: ArrayLike,
                    comment="#",
                    delimiter=" ")
 
+    def write_out(msg):
+        if stdout_to:
+            stdout_to.write(msg)
+
     # Preserve the initial inputs as we'll progressively update the attempt intputs if retries occur
     next_att_in_params = input_params.copy()
     for attempt in range(1, 1 + max(1, int(max_attempts))):
@@ -514,32 +518,28 @@ def _fit_target(time: ArrayLike,
             failed_to_converge = stdout_cap.inspect_flag
 
         if attempt == 1:
-            # Set up the fallback position, being the outputs from the first attempt
+            # The fallback position, being the outputs from the first attempt regardless of success
             best_attempt = 1
             best_out_params = att_out_params.copy()
             best_file_params = att_file_params.copy()
 
-        if max_attempts > 1:
-            # Handle retries if we've received warnings which trigger a retry
-            if failed_to_converge:
+        if failed_to_converge:
+            write_out(f"** Attempt {attempt} of {max_attempts} to fit {file_stem} didn't complete.")
+
+            if max_attempts > 1:
                 if attempt < max_attempts:
                     next_att_in_params |= att_out_params
-                    if stdout_to:
-                        stdout_to.write(f"Attempt {attempt} didn't fully converge on a good "
-                                        f"fit. Up to {max_attempts} attempt(s) are allowed so "
-                                        "will retry from the final position of this attempt.\n")
-                    # continue
+                    write_out(" Will retry from the final position of this attempt.\n")
                 else:
-                    if stdout_to:
-                        stdout_to.write("Failed to fully converge on a good fit after "
-                                        f"{max_attempts} attempts. Reverting to the results "
-                                        f"from attempt {best_attempt}.\n")
-                    break
-            elif attempt > 1: # A retry fit worked
+                    write_out(f" Will revert to the results from attempt {best_attempt}.\n")
+            else:
+                write_out(" Only 1 attempt allowed so will return these results.\n")
+        else:
+            write_out(f"** Attempt {attempt} of {max_attempts} to fit {file_stem} completed.\n")
+
+            if attempt > 1: # A retry fit worked, these become the best params
                 best_out_params = att_out_params
                 best_file_params = att_file_params
-                break
-            else: # The initial fit worked - retries not needed
-                break
+            break
 
     return { k: best_out_params.get(k, None) for k in read_keys } | best_file_params
