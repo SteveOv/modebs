@@ -4,6 +4,7 @@ Low level utility functions for light curve ingest, pre-processing, estimation a
 # pylint: disable=no-member
 from typing import Union, List, Iterable, Tuple, Generator
 from pathlib import Path
+from warnings import warn
 
 import numpy as np
 from scipy.signal import find_peaks
@@ -311,6 +312,10 @@ def get_lightcurve_t0_time(lc: LightCurve,
                 highest_peak_ix = peaks[np.argmax(window_fluxes[peaks])]
                 found_ecl_time = times[mask][highest_peak_ix]
                 break
+
+    if found_ecl_time is None:
+        warn(f"No primary eclipses found in {lc.meta['LABEL']}. Estimating t0 from period & cycles")
+        found_ecl_time = exp_ecl_times[0]
 
     return found_ecl_time
 

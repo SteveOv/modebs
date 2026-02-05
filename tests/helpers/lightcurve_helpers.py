@@ -75,6 +75,17 @@ KNOWN_TARGETS = {
             40: "hlsp_tess-spoc_tess_phot_0000000300000680-s0040_tess_v1_lc.fits",
         }
     },
+    "TIC 255567460": { # S66 has no primary eclipses
+        "tic": 255567460,
+        "sector": 66,
+        "period": 13.79633 * u.d,
+        "epoch_time": Time(1469.208711, format="btjd", scale="tdb"),
+        "expect_phase2": 0.5,
+        "expect_width2": 0.14,
+        "fits": {
+            66: "tess2023153011303-s0066-0000000255567460-0260-s_lc.fits",
+        }
+    },
 }
 
 

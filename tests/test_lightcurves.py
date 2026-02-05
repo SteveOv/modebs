@@ -115,12 +115,22 @@ class Testlightcurves(unittest.TestCase):
         lcs = lightcurve_helpers.load_lightcurves(target, sectors)
         for lc, exp_revised_t0 in zip(lcs, exp_revised_t0s):
             with self.subTest(f"Testing {target} sector {lc.meta['SECTOR']}"):
-                # Replicate the likely masking of poor/unusable fluxes
-                lc = lc[~((np.isnan(lc.flux)) | (lc.flux < 0))].normalize()
-
                 revised_t0 = lightcurves.get_lightcurve_t0_time(lc, t0.n, period.n)
-
                 self.assertAlmostEqual(revised_t0, exp_revised_t0, 2)
+
+    def test_get_lightcurve_t0_time_no_primaries(self):
+        """ Tests get_lightcurve_t0_time(LC with no primaries) assert return estimated t0 & warn """
+        target = "TIC 255567460"
+        sectors = [66]
+        t0 = 1469.20871                         # btjd
+        period = 13.79633                       # d
+        exp_revised_t0 = t0 + (period * 119)    # btjd
+
+        lc = lightcurve_helpers.load_lightcurves(target, sectors)[0]
+
+        with self.assertWarns(UserWarning):
+            revised_t0 = lightcurves.get_lightcurve_t0_time(lc, t0, period)
+            self.assertEqual(revised_t0, exp_revised_t0)
 
 if __name__ == "__main__":
     unittest.main()
