@@ -38,6 +38,8 @@ KNOWN_TARGETS = {
         "expect_width2": 1.2,
         "fits": {
             20: "tess2019357164649-s0020-0000000011491822-0165-s_lc.fits",
+            60: "tess2022357055054-s0060-0000000011491822-0249-s_lc.fits",
+            73: "tess2023341045131-s0073-0000000011491822-0268-s_lc.fits"
         }
     },
     "IT Cas": { # Eccentric, late secondary, primary/secondary similar depths
@@ -54,8 +56,6 @@ KNOWN_TARGETS = {
     "AN Cam": { # Very late secondary eclipses, near phase 0.8
         "tic": 103098373,
         "sector": 25,
-        "author": "TESS-SPOC",
-        "exptime": "long",
         "period": 20.99842 * u.d,
         "epoch_time": Time(1992.007512423, format="btjd", scale="tdb"),
         "expect_phase2": 0.78,
@@ -67,8 +67,6 @@ KNOWN_TARGETS = {
     "V889 Aql": { # Lower (600 s) cadence, highly eccentric and small mid-sector gap
         "tic": 300000680,
         "sector": 40,
-        "author": "TESS-SPOC",
-        "exptime": 600,
         "period": 11.120757 * u.d,
         "epoch_time": Time(2416.259790, format="btjd", scale="tdb"),
         "expect_phase2": 0.35,
@@ -80,10 +78,10 @@ KNOWN_TARGETS = {
 }
 
 
-def load_lightcurve(target: str,
-                    with_mag_columns: bool=True) -> lk.LightCurve:
+def load_default_lightcurve(target: str,
+                            with_mag_columns: bool=True) -> lk.LightCurve:
     """
-    Loads the default sector's LightCurve from file for the requested target.
+    Loads the sector's default (config: sector) LightCurve from file for the requested target.
 
     :target: the name of the target, also the key to the KNOWN_TARGETS dict
     :with_mag_columns: whether or not to create delta_mag and delta_mag_err columns
@@ -112,19 +110,22 @@ def load_lightcurves(target: str,
         sectors = list(params["fits"].keys())
 
     fits_dir = TEST_FITS_DIR / f"{target.lower().replace(' ', '-')}"
-    lcs = lk.LightCurveCollection(
-        lk.read(fits_dir / params["fits"][sector],
-                flux_column=params.get("flux_column", "sap_flux"),
-                quality_bitmask=params.get("quality_bitmask", "hardest"))
-            for sector in sorted(sectors)
-    )
 
-    for lc in lcs:
+    lcs = lk.LightCurveCollection([])
+    for sector in sorted(sectors):
+        lc = lk.read(fits_dir / params["fits"][sector],
+                     flux_column=params.get("flux_column", "sap_flux"),
+                     quality_bitmask=params.get("quality_bitmask", "hardest"))
+
+        lc = lc[~((np.isnan(lc.flux)) | (lc.flux < 0))].normalize()
+        if with_mag_columns:
+            append_mag_columns(lc)
+
         lc.meta["LABEL"] = f"{target} S{lc.meta['SECTOR']:02d}"
         lc.meta["clip_mask"] = np.ones((len(lc)), dtype=bool)
         lc.meta["t0"] = params["epoch_time"]
-        if with_mag_columns:
-            append_mag_columns(lc)
+
+        lcs.append(lc)
     return lcs
 
 

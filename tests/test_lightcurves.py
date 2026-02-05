@@ -11,7 +11,10 @@ import numpy as np
 import astropy.units as u
 import lightkurve as lk
 
-from libs import lightcurves, pipeline
+from tests.helpers import lightcurve_helpers
+
+from libs import lightcurves
+
 
 # pylint: disable=too-many-public-methods, line-too-long
 class Testlightcurves(unittest.TestCase):
@@ -44,13 +47,10 @@ class Testlightcurves(unittest.TestCase):
     #
     def test_get_binned_phase_mags_data_happy_path(self):
         """ Simple happy path test of get_binned_phase_mags_data() for binning """
-        results = lk.search_lightcurve("CW Eri", sector=[31], exptime="short",
-                                       mission="TESS", author="SPOC")
-        lc = lightcurves.load_lightcurves(results, "hardest", "sap_flux")[0]
-        lightcurves.append_magnitude_columns(lc)
+        lc = lightcurve_helpers.load_lightcurves("CW Eri", [31], with_mag_columns=True)[0]
 
-        t0 = lightcurves.to_lc_time(1496.454695, lc)
-        period = 5.5828949 * u.d
+        t0 = lightcurve_helpers.KNOWN_TARGETS["CW Eri"]["epoch_time"]
+        period = lightcurve_helpers.KNOWN_TARGETS["CW Eri"]["period"]
         wrap_phase = u.Quantity(0.75)
         flc = lc.fold(period, t0, wrap_phase=wrap_phase, normalize_phase=True)
 
@@ -65,12 +65,10 @@ class Testlightcurves(unittest.TestCase):
 
     def test_get_binned_phase_mags_data_wrap_phase(self):
         """ Test of get_binned_phase_mags_data() to assert handling of wrapped phase """
-        results = lk.search_lightcurve("CW Eri", sector=[31], exptime="short",
-                                       mission="TESS", author="SPOC")
-        lc = lightcurves.load_lightcurves(results, "hardest", "sap_flux")[0]
-        lightcurves.append_magnitude_columns(lc)
+        lc = lightcurve_helpers.load_lightcurves("CW Eri", [31], with_mag_columns=True)[0]
 
-        t0, period = lightcurves.to_lc_time(1496.454695, lc), 5.5828949 * u.d
+        t0 = lightcurve_helpers.KNOWN_TARGETS["CW Eri"]["epoch_time"]
+        period = lightcurve_helpers.KNOWN_TARGETS["CW Eri"]["period"]
 
         for fold_wrap, bin_wrap, msg in [
             (u.Quantity(0.75), u.Quantity(0.75),    "Both equivalent Quantities"),
@@ -86,12 +84,10 @@ class Testlightcurves(unittest.TestCase):
 
     def test_get_binned_phase_mags_data_fill_gaps(self):
         """ Test of get_binned_phase_mags_data() to assert handling of gaps in source data """
-        results = lk.search_lightcurve("CW Eri", sector=[31], exptime="short",
-                                       mission="TESS", author="SPOC")
-        lc = lightcurves.load_lightcurves(results, "hardest", "sap_flux")[0]
-        lightcurves.append_magnitude_columns(lc)
+        lc = lightcurve_helpers.load_lightcurves("CW Eri", [31], with_mag_columns=True)[0]
 
-        t0, period = lightcurves.to_lc_time(1496.454695, lc), 5.5828949 * u.d
+        t0 = lightcurve_helpers.KNOWN_TARGETS["CW Eri"]["epoch_time"]
+        period = lightcurve_helpers.KNOWN_TARGETS["CW Eri"]["period"]
         wrap_phase = u.Quantity(0.5)
         flc = lc.fold(period, t0, wrap_phase=wrap_phase, normalize_phase=True)
 
@@ -109,18 +105,14 @@ class Testlightcurves(unittest.TestCase):
     #
     def test_get_lightcurve_t0_time_rr_lyn(self):
         """ Tests get_lightcurve_t0_time(RR Lyn) which has a distinct shift on later sectors. """
-        # Ephemeris for RR Lyn in TESS-ebs (works well on S20)
+        # Ephemeris for RR Lyn in TESS-ebs.  OK for S20 but there's significant shift by S60 & 73
         target = "RR Lyn"
+        sectors = [20, 60, 73]
         t0 = ufloat(1851.9277371299124, 0.0006761397339687)     # btjd
         period = ufloat(9.946591112938657, 0.0005646471183542)  # d
-        sectors = [20, 60, 73]
         exp_revised_t0s = [1851.93, 2945.89, 3293.96]           # btjd
 
-        download_dir = Path.cwd() / ".cache" / re.sub(r"[^\w\d]", "-", target.lower())
-
-        # We know there is significant shift between S20 and S60/73
-        results = lk.search_lightcurve(f"V* {target}", sector=sectors, exptime="short")
-        lcs = lightcurves.load_lightcurves(results, "hardest", "sap_flux", download_dir)
+        lcs = lightcurve_helpers.load_lightcurves(target, sectors)
         for lc, exp_revised_t0 in zip(lcs, exp_revised_t0s):
             with self.subTest(f"Testing {target} sector {lc.meta['SECTOR']}"):
                 # Replicate the likely masking of poor/unusable fluxes

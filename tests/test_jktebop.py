@@ -328,7 +328,7 @@ class Testjktebop(unittest.TestCase):
     #
     def test_write_light_curve_to_dat_file_args_none_or_wrong_type(self):
         """ Test write_light_curve_to_dat_file(arguments wrong type) raises TypeError """
-        lc = th.load_lightcurve("CW Eri")
+        lc = th.load_default_lightcurve("CW Eri")
         file_name = th.TEST_OUTPUT_DIR / "any_old_file_will_do.dat"
         self.assertRaises(TypeError, write_light_curve_to_dat_file, None,   file_name)
         self.assertRaises(TypeError, write_light_curve_to_dat_file, lc,     None)
@@ -339,7 +339,7 @@ class Testjktebop(unittest.TestCase):
 
     def test_write_light_curve_to_dat_file_column_args_not_matching(self):
         """ Test write_light_curve_to_dat_file(column args numbers mismatch) raises ValueError """
-        lc = th.load_lightcurve("CW Eri")
+        lc = th.load_default_lightcurve("CW Eri")
         file_name = th.TEST_OUTPUT_DIR / "any_old_file_will_do.dat"
         self.assertRaises(ValueError, write_light_curve_to_dat_file, lc, file_name, ["time"], None)
         self.assertRaises(ValueError, write_light_curve_to_dat_file, lc, file_name, ["time"], ["%.6f", "%.6f"])
@@ -348,7 +348,7 @@ class Testjktebop(unittest.TestCase):
 
     def test_write_light_curve_to_dat_file_default_columns(self):
         """ Test write_light_curve_to_dat_file(using default column & formats)  writes file"""
-        lc = th.load_lightcurve("CW Eri")
+        lc = th.load_default_lightcurve("CW Eri")
         file_name = th.TEST_OUTPUT_DIR / "test_write_light_curve_to_dat_file_default_columns.dat"
 
         write_light_curve_to_dat_file(lc, file_name)
@@ -361,7 +361,7 @@ class Testjktebop(unittest.TestCase):
 
     def test_write_light_curve_to_dat_file_explicit_columns(self):
         """ Test write_light_curve_to_dat_file(explicit columns & formats) writes file """
-        lc = th.load_lightcurve("CW Eri")
+        lc = th.load_default_lightcurve("CW Eri")
         file_name = th.TEST_OUTPUT_DIR / "test_write_light_curve_to_dat_file_explicit_columns.dat"
 
         write_light_curve_to_dat_file(lc,
