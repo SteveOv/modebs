@@ -1,5 +1,5 @@
 """ Module for querying various, hopefully offline, catalogues """
-from typing import Union, List, Dict
+from typing import Union, List, Dict, Tuple
 from pathlib import Path
 from numbers import Number
 import re
@@ -11,6 +11,11 @@ from astropy.table import Table
 
 # Used to read the number from TIC ##### format tics
 _tic_num_pattern = re.compile(r"TIC\s*(?P<tic>\d+)", re.IGNORECASE)
+
+# Used to estimate eclipse widths from morph value.
+# Based on a polyfit() on TESS-ebs morphs vs max(mean(Wp-fp, Ws-fp), mean(Wp-2g, Ws-2g)) which gives
+# coefficients of [ 0.06853865  0.24441437 -0.02218564]. Cannot have negative, so shift up to zero.
+_eclipse_width_poly = np.poly1d([0.06853865,  0.24441437, 0])
 
 def query_tess_ebs_ephemeris(tics: List[Union[int, str]]) -> Dict[str, Union[float, UFloat]]:
     """
@@ -77,6 +82,27 @@ def query_tess_ebs_ephemeris(tics: List[Union[int, str]]) -> Dict[str, Union[flo
             # We have a match to a TIC number
             break
     return data
+
+
+def estimate_eclipse_durations_from_morphology(morph: float,
+                                               period: Union[float, UFloat]=1.0,
+                                               esinw: float=0.0) -> Tuple[float, float]:
+    """
+    Will provide an estimate of the eclipse durations from the morph value and period. The esinw
+    value may be supplied, from which the durations will be modified for effects of eccentricity.
+
+    :morph: the morphology value, expected to be in the range [0, 1]
+    :period: the period - the resulting durations will be in the same units
+    :esinw: the e*sin(omega) Poincare element, if known
+    :returns: the estimated durations of the (primary, secondary) eclipses
+    """
+    base_width = max(0.01, _eclipse_width_poly(morph))
+
+    # Works well enough for the effect of eccentricity. With esinw~=ds-dp/ds+dp and assuming
+    # ds+dp=1, we get ds-dp=esinw for use in a factor to modify the base duration for eccentricity.
+    wp = 1 - esinw / 2
+    ws = 1 + esinw / 2
+    return (base_width * wp * period, base_width * ws * period)
 
 
 def query_tess_ebs_in_sh(tics: List[Union[int, str]]) -> dict:
