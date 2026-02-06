@@ -14,8 +14,9 @@ _tic_num_pattern = re.compile(r"TIC\s*(?P<tic>\d+)", re.IGNORECASE)
 
 # Used to estimate eclipse widths from morph value.
 # Based on a polyfit() on TESS-ebs morphs vs max(mean(Wp-fp, Ws-fp), mean(Wp-2g, Ws-2g)) which gives
-# coefficients of [ 0.06853865  0.24441437 -0.02218564]. Cannot have negative, so shift up to zero.
-_eclipse_width_poly = np.poly1d([0.06853865,  0.24441437, 0])
+# coefficients of [-1.99218228e+00  3.85365374e+00 -1.76590596e+00  3.76940259e-01 -3.43763161e-04].
+# Cannot have negative, so shift up to zero.
+_eclipse_width_poly = np.poly1d([-1.99218228, 3.85365374, -1.76590596, 0.37694026, 0.])
 
 def query_tess_ebs_ephemeris(tics: List[Union[int, str]]) -> Dict[str, Union[float, UFloat]]:
     """
@@ -86,7 +87,8 @@ def query_tess_ebs_ephemeris(tics: List[Union[int, str]]) -> Dict[str, Union[flo
 
 def estimate_eclipse_durations_from_morphology(morph: float,
                                                period: Union[float, UFloat]=1.0,
-                                               esinw: float=0.0) -> Tuple[float, float]:
+                                               esinw: Union[float, UFloat]=0.0) \
+                                                    -> Tuple[float, float]:
     """
     Will provide an estimate of the eclipse durations from the morph value and period. The esinw
     value may be supplied, from which the durations will be modified for effects of eccentricity.
@@ -96,13 +98,12 @@ def estimate_eclipse_durations_from_morphology(morph: float,
     :esinw: the e*sin(omega) Poincare element, if known
     :returns: the estimated durations of the (primary, secondary) eclipses
     """
-    base_width = max(0.01, _eclipse_width_poly(morph))
+    mean_width = max(0.01, _eclipse_width_poly(morph))
 
-    # Works well enough for the effect of eccentricity. With esinw~=ds-dp/ds+dp and assuming
-    # ds+dp=1, we get ds-dp=esinw for use in a factor to modify the base duration for eccentricity.
-    wp = 1 - esinw / 2
-    ws = 1 + esinw / 2
-    return (base_width * wp * period, base_width * ws * period)
+    # Works well enough for the effect of eccentricity.
+    # From esinw = ds-dp/ds+dp, therefore ds-dp = esinw * (ds+dp) = esinw * 2 * mean
+    half_diff = esinw * mean_width
+    return ((mean_width - half_diff) * period, (mean_width + half_diff) * period)
 
 
 def query_tess_ebs_in_sh(tics: List[Union[int, str]]) -> dict:

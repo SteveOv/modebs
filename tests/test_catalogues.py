@@ -66,7 +66,6 @@ class Testcatalogues(unittest.TestCase):
     #
     def test_estimate_eclipse_widths_from_morphology_happy(self):
         """ Interactive tests estimate_eclipse_widths_from_morphology() calculations """
-        print()
         for (target,                esinw,      period) in [
             ("CW Eri",              None,       None),
             ("TIC 0063192395",      None,       None),
@@ -81,6 +80,7 @@ class Testcatalogues(unittest.TestCase):
             ("TIC 0279741942",      None,       None),
         ]:
             with self.subTest(target):
+                print()
                 if target in lightcurve_helpers.KNOWN_TARGETS:
                     config = lightcurve_helpers.KNOWN_TARGETS[target]
                     tess_ebs = query_tess_ebs_ephemeris(config["tic"])
@@ -111,17 +111,20 @@ class Testcatalogues(unittest.TestCase):
 
         mask = mean_widths > 0
 
-        coeffs = np.polyfit(x=morphs[mask], y=mean_widths[mask], deg=2)
+        fit_mask = mask & (morphs <= 0.7)
+        coeffs = np.polyfit(x=morphs[fit_mask], y=mean_widths[fit_mask], deg=4)
         print(f"Fitted coefficients: {coeffs}")
 
         _, ax = plt.subplots(figsize=(6, 4), constrained_layout=True)
-        ax.scatter(morphs[mask], mean_widths[mask], label="TESS-ebs")
-        ax.scatter(morphs[mask], np.poly1d(coeffs)(morphs[mask]), label="original fit")
+        ax.scatter(morphs[mask], mean_widths[mask], marker=".", label="TESS-ebs")
+        ax.scatter(morphs[mask], np.poly1d(coeffs)(morphs[mask]), marker=".", label="initial fit")
         ax.set(xlabel="morph", ylabel="mean eclipse width [phase]")
 
+        # Shift the fit up so it's never negative. This follows the data quite
+        # nicely up to morph 0.6, which is our region of interest, and beyond.
         coeffs[-1] = 0.0
         print(f"Shifted coefficients: {coeffs}")
-        ax.scatter(morphs[mask], np.poly1d(coeffs)(morphs[mask]), label="shifted fit")
+        ax.scatter(morphs[mask], np.poly1d(coeffs)(morphs[mask]), marker=".", label="shifted fit")
 
         ax.legend(loc="best")
         plt.show()
