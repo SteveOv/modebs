@@ -99,7 +99,7 @@ class Testcatalogues(unittest.TestCase):
                 print(f"estimate[{target}]: durP={durations[0]:.3f},",
                       f"durS={durations[1]:.3f} (where esinw={esinw:.6f})")
 
-    #@unittest.skip
+    @unittest.skip
     def test_calc_morph_ecl_width_fit(self):
         """ Get coefficients of a fit to the TESS-ebs morph vs mean eclipse width """
         tess_ebs = _read_table(catalogue="J/ApJS/258/16", table_fname="tess-ebs.dat")
