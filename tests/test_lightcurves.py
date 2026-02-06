@@ -172,7 +172,7 @@ class Testlightcurves(unittest.TestCase):
         """
         self.assertEqual(len(lcs), len(eclipse_dicts))
 
-        def plot_eclipses(ix, ax):
+        def plot_eclipses(ix, ax, _):
             ed = eclipse_dicts[ix]
             for x, completeness, ls, c, label in [
                 (ed["primary_times"], ed["primary_completeness"], "-.", "r", "primary"),

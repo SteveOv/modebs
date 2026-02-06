@@ -227,7 +227,7 @@ def plot_lightcurves(lcs: Union[_LCC, _LC, _FLC],
                      ax_titles: Union[str, Iterable[str]]="LABEL",
                      normalize_lcs: bool=False,
                      cols: int=2,
-                     ax_func: Callable[[int, _Axes], None]=None,
+                     ax_func: Callable[[int, _Axes, _LC], None]=None,
                      **format_kwargs) -> _Figure:
     """
     Creates a matplotlib figure and plots a grid of lightcurves on it, one per Axes.
@@ -237,7 +237,8 @@ def plot_lightcurves(lcs: Union[_LCC, _LC, _FLC],
     :ax_titles: the titles to give each Axes or if a single str a meta key to read for each title
     :normalize_lcs: whether or not to normalize the y-axis data before plotting
     :cols: the number of columns on the grid of Axes
-    :ax_func: callback taking (ax index, ax) called for each Axes prior to applying format_kwargs
+    :ax_func: callback taking (index, ax, LightCurve) called for each Axes/LC
+    prior to applying format_kwargs
     :format_kwargs: kwargs to be passed on to format_axes()
     :returns: the final Figure
     """
@@ -252,7 +253,8 @@ def plot_lightcurves(lcs: Union[_LCC, _LC, _FLC],
 
     # Set up the figure and Axes
     rows = int(np.ceil(count_lcs / cols))
-    fig, axes = plt.subplots(rows, cols, figsize=(4*cols, 3*rows), sharey=True, constrained_layout=True)
+    fig, axes = plt.subplots(rows, cols, figsize=(4*cols, 3*rows),
+                             sharey=True, constrained_layout=True)
     axes = [axes] if isinstance(axes, _Axes) else axes.flatten()
 
     for ix, (ax, lc, title) in enumerate(zip_longest(axes, lcs, ax_titles)):
@@ -263,7 +265,7 @@ def plot_lightcurves(lcs: Union[_LCC, _LC, _FLC],
                 ax.invert_yaxis()
 
             if ax_func is not None:
-                ax_func(ix, ax)
+                ax_func(ix, ax, lc)
 
             # Only want the y-label on the left most column as sharey is in play
             ax.set_ylabel(None if ix % cols else ax.get_ylabel())
