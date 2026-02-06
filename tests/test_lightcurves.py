@@ -1,4 +1,5 @@
 """ Unit tests for the pipeline module. """
+from typing import List, Dict
 from pathlib import Path
 import warnings
 import re
@@ -10,10 +11,10 @@ from uncertainties import ufloat
 import numpy as np
 import astropy.units as u
 import lightkurve as lk
+import matplotlib.pyplot as plt
 
 from tests.helpers import lightcurve_helpers
-
-from libs import lightcurves
+from libs import lightcurves, catalogues, plots
 
 
 # pylint: disable=too-many-public-methods, line-too-long
@@ -131,6 +132,60 @@ class Testlightcurves(unittest.TestCase):
         with self.assertWarns(UserWarning):
             revised_t0 = lightcurves.get_lightcurve_t0_time(lc, t0, period)
             self.assertEqual(revised_t0, exp_revised_t0)
+
+    #
+    #   get_eclipse_times_and_masks(lc, ref_t0, period, durp, durs, phis, max_phase_shift)
+    #
+    def test_find_eclipses_and_completeness_happy(self):
+        """ Tests find_eclipses_and_completeness() correctly finds and identifies eclipses """
+        #  in lightcurve_helpers KNOWN_TARGETS & num_prim, num_sec are #ecl >80% complete
+        for (target,            sectors,        phis,   num_prim,   num_sec) in [
+            ("CW Eri",          [4, 31],        None,   [7, 8],     [9, 9]),    # Easy although S31 ends with incomplete sec
+            ("RR Lyn",          [20, 60],       None,   [2, 2],     [2, 2]),    # 20 has partial sec after break & 60 has sec within break
+            ("IT Cas",          [17],           0.552,  [5],        [5]),       # All sectors complete but some near breaks
+            ("TIC 255567460",   [66],           None,   [0],        [2]),       # No primaries and 2 secondaries
+        ]:
+            target_cfg = lightcurve_helpers.KNOWN_TARGETS[target]
+            tess_ebs = catalogues.query_tess_ebs_ephemeris(target_cfg["tic"])
+
+            lcs = lightcurve_helpers.load_lightcurves(target, sectors)
+            ecl_dicts = [lightcurves.find_eclipses_and_completeness(lc,
+                                                                    target_cfg["epoch_time"],
+                                                                    target_cfg["period"],
+                                                                    tess_ebs["durP"],
+                                                                    tess_ebs["durS"],
+                                                                    phis or tess_ebs["phiS"]) for lc in lcs]
+
+            # self._plot_lcs_and_eclipses(lcs, ecl_dicts)
+
+            for lc, ed, exp_num_prim, exp_num_sec in zip(lcs, ecl_dicts, num_prim, num_sec):
+                with self.subTest(lc.meta["LABEL"]):
+                    self.assertEqual(len(ed["primary_times"]), len(ed["primary_completeness"]))
+                    self.assertEqual(len(ed["secondary_times"]), len(ed["secondary_completeness"]))
+                    self.assertEqual(sum(ed["primary_completeness"] > 0.8), exp_num_prim)
+                    self.assertEqual(sum(ed["secondary_completeness"] > 0.8), exp_num_sec)
+
+
+    def _plot_lcs_and_eclipses(self, lcs, eclipse_dicts: List[Dict]):
+        """
+        Plots lightcurves and corresponding output from get_eclipse_times_and_masks.
+        """
+        self.assertEqual(len(lcs), len(eclipse_dicts))
+
+        def plot_eclipses(ix, ax):
+            ed = eclipse_dicts[ix]
+            for x, completeness, ls, c, label in [
+                (ed["primary_times"], ed["primary_completeness"], "-.", "r", "primary"),
+                (ed["secondary_times"], ed["secondary_completeness"], "--", "g", "secondary")
+            ]:
+                ax.vlines(x, -0.2, 1.0, c, ls, label, alpha=0.33, zorder=-20, transform=ax.get_xaxis_transform())
+                for x, compl in zip(x, completeness):
+                    ax.text(x, 0, f"{compl:.0%}", c=c, rotation=90, va="center", ha="center", zorder=-10, backgroundcolor="w")
+
+        plots.plot_lightcurves(lcs, cols=min(len(lcs), 3), column="delta_mag", ax_func=plot_eclipses, legend_loc="best")
+        plt.show()
+        plt.close()
+
 
 if __name__ == "__main__":
     unittest.main()
