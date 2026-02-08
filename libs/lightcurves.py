@@ -274,7 +274,8 @@ def find_eclipses_and_completeness(lc: LightCurve,
         ecl_width_bins = nominal_value(ecl_dur) * 86400 / lc.meta['FRAMETIM'] / lc.meta['NUM_FRM']
         ecl_min_find_bins = ecl_width_bins * 0.25   # For potential eclipses with find_peaks
 
-        ecl_time = ref_time + (period * np.floor((times.min() - ref_time) / period))
+        # Subtract extra period so that, whatever the offset, we're always before the sector start
+        ecl_time = ref_time - period + (period * int((times.min()-ref_time) / period))
         while ecl_time < times.max() + half_window_dur:
             is_ecl_found = False
             window_mask = (ecl_time-half_window_dur <= times) & (times <= ecl_time+half_window_dur)
@@ -291,7 +292,8 @@ def find_eclipses_and_completeness(lc: LightCurve,
 
             if not is_ecl_found and ecl_time > times.min():
                 ecl_times += [ecl_time]
-                ecl_completeness += [0]
+                ecl_mask = (ecl_time-half_ecl_dur <= times) & (times <= ecl_time+half_ecl_dur)
+                ecl_completeness += [sum(ecl_mask) / ecl_width_bins]
 
             ecl_time += period
 

@@ -138,19 +138,20 @@ class Testlightcurves(unittest.TestCase):
     #
     def test_find_eclipses_and_completeness_happy(self):
         """ Tests find_eclipses_and_completeness() correctly finds and identifies eclipses """
-        #  in lightcurve_helpers KNOWN_TARGETS & num_prim, num_sec are #ecl >80% complete
-        for (target,            sectors,        phis,   num_prim,   num_sec) in [
-            ("CW Eri",          [4, 31],        None,   [7, 8],     [9, 9]),    # Easy although S31 ends with incomplete sec
-            ("RR Lyn",          [20, 60],       None,   [2, 2],     [2, 2]),    # 20 has partial sec after break & 60 has sec within break
-            ("IT Cas",          [17],           0.552,  [5],        [5]),       # All sectors complete but some near breaks
-            ("TIC 255567460",   [66],           None,   [0],        [2]),       # No primaries and 2 secondaries
+        #  in lightcurve_helpers KNOWN_TARGETS & exp_prim, exp_sec are #ecl >80% complete
+        for (target,            sectors,    ref_t0,     phis,   exp_prim,   exp_sec) in [
+            ("CW Eri",          [4, 31],    None,       None,   [7, 8],     [9, 9]),# easy although S31 ends with an incomplete sec
+            ("RR Lyn",          [20],       None,       None,   [2],        [2]),   # S20 partial sec without peak after break; expect 0.4 < compl < 0.5
+            ("RR Lyn",          [60],       3224.555,   None,   [2],        [2]),   # ref_t0 after Sector & a sec within break
+            ("IT Cas",          [17],       None,       0.552,  [5],        [5]),   # all sectors complete but some near breaks
+            ("TIC 255567460",   [66],       None,       None,   [0],        [2]),   # no primaries and 2 secondaries
         ]:
             target_cfg = lightcurve_helpers.KNOWN_TARGETS[target]
             tess_ebs = catalogues.query_tess_ebs_ephemeris(target_cfg["tic"])
 
             lcs = lightcurve_helpers.load_lightcurves(target, sectors)
             ecl_dicts = [lightcurves.find_eclipses_and_completeness(lc,
-                                                                    target_cfg["epoch_time"],
+                                                                    ref_t0 or target_cfg["epoch_time"],
                                                                     target_cfg["period"],
                                                                     tess_ebs["durP"],
                                                                     tess_ebs["durS"],
@@ -158,7 +159,7 @@ class Testlightcurves(unittest.TestCase):
 
             # self._plot_lcs_and_eclipses(lcs, ecl_dicts)
 
-            for lc, ed, exp_num_prim, exp_num_sec in zip(lcs, ecl_dicts, num_prim, num_sec):
+            for lc, ed, exp_num_prim, exp_num_sec in zip(lcs, ecl_dicts, exp_prim, exp_sec):
                 with self.subTest(lc.meta["LABEL"]):
                     self.assertEqual(len(ed["primary_times"]), len(ed["primary_completeness"]))
                     self.assertEqual(len(ed["secondary_times"]), len(ed["secondary_completeness"]))
