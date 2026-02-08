@@ -202,38 +202,6 @@ def fit_polynomial(times: Time,
     return (fit_ydata, coeffs) if include_coeffs else fit_ydata
 
 
-def create_eclipse_mask(lc: LightCurve,
-                        t0: Union[Time, float],
-                        period: Union[u.Quantity[u.d], float],
-                        dur_pri: Union[u.Quantity[u.d], float],
-                        dur_sec: Union[u.Quantity[u.d], float],
-                        phi_sec: float=0.5,
-                        dfactor: float=1.0,
-                        verbose: bool=False) -> np.ndarray[bool]:
-    """
-    Create an eclipse mask for the passed LightCurve based on the accompanying
-    extended ephemeris values.
-
-    :lc: the LightCurve to create the mask for
-    :t0: the reference time of a primary eclipse
-    :period: the orbital period (assumed to be in days if not a Quantity)
-    :dur_pri: the duration of the primary eclipses
-    :dur_sec: the duration of the secondary eclipses
-    :phi_sec: the phase of secondary eclipses (assuming the primary eclipses are at phase 0)
-    :dfactor: an expansion factor applied to the eclipse lengths
-    :returns: the eclipse mask
-    """
-    # pylint: disable=too-many-arguments, too-many-positional-arguments
-    if verbose:
-        print(f"Creating an eclipse mask for t0={t0}, period={period},",
-              f"dur_pri={dur_pri:.6f}, dur_sec={dur_sec:.6f} & phi_sec={phi_sec:.6f}")
-
-    eclipse_times = [to_lc_time(t0, lc), to_lc_time(t0 + period * phi_sec, lc)]
-    durations = [dur_pri * dfactor, dur_sec * dfactor]
-    return lc.create_transit_mask([period] * 2, eclipse_times, durations)
-
-
-
 def find_eclipses_and_completeness(lc: LightCurve,
                                    ref_t0: Union[Time, float, UFloat],
                                    period: Union[u.Quantity, float, UFloat],
@@ -246,6 +214,7 @@ def find_eclipses_and_completeness(lc: LightCurve,
     passed LightCurve. The eclipse timings will be refined by inspecting the LightCurve fluxes.
     For each eclipse a completeness metric will be calculated, which is the ratio of the number
     of fluxes recorded against the maximum possible based on the supplied eclipse duration.
+    Will also return the time of the most complete primary eclipse as a refined reference time (t0).
 
     :lc: the LightCurve to inspect
     :ref_t0: the known reference primary eclipse time
@@ -255,7 +224,7 @@ def find_eclipses_and_completeness(lc: LightCurve,
     :phis: the phase of the secondary eclipses relative to the primary eclipses
     :search_window_phase: size of the window, in units of phase, within which to find each eclipse
     :returns: a dict of ```{ "primary_eclipses": ndarray, "secondary_eclipses": ndarray,
-    "primary_completeness": ndarray, "secondary_completenes": ndarray }```
+    "primary_completeness": ndarray, "secondary_completenes": ndarray, "t0": float }```
     """
     ref_t0 = to_lc_time(ref_t0, lc).value if isinstance(ref_t0, Time) else nominal_value(ref_t0)
     period = period.to(u.d).value if isinstance(period, u.Quantity) else nominal_value(period)
@@ -299,7 +268,7 @@ def find_eclipses_and_completeness(lc: LightCurve,
 
         return np.array(ecl_times), np.array(ecl_completeness)
 
-    data = { }
+    data = { "t0": None }
     data["primary_times"], data["primary_completeness"] = find_eclipses_and_mask(ref_t0, durp)
 
     ref_t0 += period * nominal_value(phis)
@@ -312,63 +281,41 @@ def find_eclipses_and_completeness(lc: LightCurve,
                                                                     - (period * nominal_value(phis))
         data["primary_times"], data["primary_completeness"] = find_eclipses_and_mask(ref_t0, durp)
 
+    if len(data["primary_times"]):
+        data["t0"] = data["primary_times"][np.argmax(data["primary_completeness"])]
     return data
 
 
-def get_lightcurve_t0_time(lc: LightCurve,
-                           t0: Union[Time, float],
-                           period: Union[u.Quantity, float],
-                           max_phase_shift: float=0.1) -> float:
+def create_eclipse_mask(lc: LightCurve,
+                        primary_times: np.ndarray[Time, float],
+                        secondary_times: np.ndarray[Time, float],
+                        durp: Union[u.Quantity[u.d], float],
+                        durs: Union[u.Quantity[u.d], float],
+                        verbose: bool=False) -> np.ndarray[bool]:
     """
-    Will find the time of the first eclipse, equivalent to the reference time,
-    within the passed LightCurve. This can handle moderate shifts, up to
-    max_phase_shift, in eclipse timing compared with the reference ephemeris.
+    Create an eclipse mask for the passed LightCurve based on the accompanying
+    known eclipse times and durations.
 
-    :lc: the LightCurve to inspect
-    :t0: the known reference time of an eclipse
-    :period: the known orbital period (assumed to be in days if not a Quantity)
-    :max_phase_shift: the maximum allowed positive or negative phase shift - increasing this will
-    increase the likelihood of incorrectly selecting an instance of the "other" eclipse type 
-    :returns: the time of the first eclipse found, in the frame/scale of the lightcurve
+    :lc: the LightCurve to create the mask for
+    :primary_times: the times of primary eclipses
+    :secondary_times: the times of secondary eclipses
+    :durp: the duration of the primary eclipses
+    :durs: the duration of the secondary eclipses
+    :returns: the eclipse mask
     """
-    # Get these into the format/scale of the light-curve
-    if isinstance(t0, Time):
-        t0 = to_lc_time(t0, lc).value
-    if isinstance(period, u.Quantity):
-        period = period.to(u.d).value
+    # pylint: disable=too-many-arguments, too-many-positional-arguments
+    if verbose:
+        print(f"Creating an eclipse mask for {len(primary_times)} primary and",
+              f"{len(secondary_times)} secondary eclipse(s).")
 
-    found_ecl_time = None
     times = lc.time.value
+    mask = np.zeros((len(lc)), dtype=bool)
+    for ecl_times, ecl_dur in [(primary_times, durp), (secondary_times, durs)]:
+        if len(ecl_times) > 0:
+            for ecl_time in to_lc_time(ecl_times, lc).value:
+                mask |= (ecl_time - ecl_dur/2 <= times) & (times <= ecl_time + ecl_dur/2)
+    return mask
 
-    # These are the expected t0 timings projected into this lightcurve sector.
-    cycles_offset = int(np.ceil((times.min() - t0) / period))
-    cycles_in_lc = int(np.ceil((times.max() - times.min()) / period))
-    exp_ecl_times = [t0 + p
-                        for p in (period * (cycles_offset + c) for c in range(cycles_in_lc))
-                            if times.min() <= (t0 + p) <= times.max()]
-
-    # Cannot use a periodogram as there may be too few eclipses to derive a period. Instead
-    # we're relying on finding the most prominent dip nearest the expected eclipse timings.
-    # As there may be gaps in the LC at these times, we go through until a shifted eclipse is found.
-    for exp_ecl_time in exp_ecl_times:
-        half_window = period * max_phase_shift
-        mask = (exp_ecl_time - half_window < times) & (times < exp_ecl_time + half_window)
-        if np.any(mask):
-            # Invert the fluxes so we get peaks rather than dips
-            window_fluxes = lc.flux[mask].unmasked.value
-            window_fluxes = window_fluxes.max() - window_fluxes
-
-            peaks, _ = find_peaks(window_fluxes, width=5, distance=100)
-            if len(peaks) > 0:
-                highest_peak_ix = peaks[np.argmax(window_fluxes[peaks])]
-                found_ecl_time = times[mask][highest_peak_ix]
-                break
-
-    if found_ecl_time is None:
-        warn(f"No primary eclipses found in {lc.meta['LABEL']}. Estimating t0 from period & cycles")
-        found_ecl_time = exp_ecl_times[0]
-
-    return found_ecl_time
 
 
 def to_lc_time(value: Union[Time, np.double, Tuple[np.double], List[np.double,]], lc: LightCurve) \
