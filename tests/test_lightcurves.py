@@ -106,13 +106,25 @@ class Testlightcurves(unittest.TestCase):
     #
     def test_find_eclipses_and_completeness_happy(self):
         """ Tests find_eclipses_and_completeness() correctly finds and identifies eclipses """
-        #  in lightcurve_helpers KNOWN_TARGETS & exp_prim, exp_sec are #ecl >80% complete
-        for (target,            sectors,    ref_t0,     phis,   exp_prim,   exp_sec) in [
-            ("CW Eri",          [4, 31],    None,       None,   [7, 8],     [9, 9]),# easy although S31 ends with an incomplete sec
-            ("RR Lyn",          [20],       None,       None,   [2],        [2]),   # S20 partial sec without peak after break; expect 0.4 < compl < 0.5
-            ("RR Lyn",          [60],       3224.555,   None,   [2],        [2]),   # ref_t0 after Sector & a sec within break
-            ("IT Cas",          [17],       None,       0.552,  [5],        [5]),   # all sectors complete but some near breaks
-            ("TIC 255567460",   [66],       None,       None,   [0],        [2]),   # no primaries and 2 secondaries
+        #  in lightcurve_helpers KNOWN_TARGETS & exp_prim, exp_sec are #eclipses >80% complete
+        for (target,            sectors,    ref_t0,     durp,   durs,   phis,   exp_prim,   exp_sec) in [
+            # CW Eri has short period & many good eclipses although S31 ends with an incomplete sec (~70%)
+            ("CW Eri",          [4, 31],    None,       None,   None,   None,   [7, 8],     [9, 9]),
+
+            # RR Lyn/20 has incomplete secondary without peak after break; expect it found, with compl <50%
+            ("RR Lyn",          [20],       None,       None,   None,   None,   [2],        [2]),
+
+            # RR Lyn/60 has secondary with no fluxes falling within the mid-sector break (0% compl)
+            ("RR Lyn",          [60],       3224.555,   None,   None,   None,   [2],        [2]),
+
+            # IT Cas/17; good test of boundary handling with good eclipses v. near start and mid-sector break
+            ("IT Cas",          [17],       None,       None,   None,   0.552,  [5],        [5]),
+
+            # 30034081/64 another boundary test as opens with incomplete sec with peak before start (~35% compl)
+            ("TIC 30034081",    [64],       None,       0.35,   0.35,   0.5,    [4],        [4]),
+
+            # 255567460 has no primaries and 2 secondaries
+            ("TIC 255567460",   [66],       None,       None,   None,   None,   [0],        [2]),
         ]:
             target_cfg = lightcurve_helpers.KNOWN_TARGETS[target]
             tess_ebs = catalogues.query_tess_ebs_ephemeris(target_cfg["tic"])
@@ -121,8 +133,8 @@ class Testlightcurves(unittest.TestCase):
             ecl_dicts = [lightcurves.find_eclipses_and_completeness(lc,
                                                                     ref_t0 or target_cfg["epoch_time"],
                                                                     target_cfg["period"],
-                                                                    tess_ebs["durP"],
-                                                                    tess_ebs["durS"],
+                                                                    durp or tess_ebs["durP"],
+                                                                    durs or tess_ebs["durS"],
                                                                     phis or tess_ebs["phiS"]) for lc in lcs]
 
             # self._plot_lcs_and_eclipses(lcs, ecl_dicts)

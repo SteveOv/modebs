@@ -259,7 +259,7 @@ def find_eclipses_and_completeness(lc: LightCurve,
                     ecl_mask = (ecl_time-half_ecl_dur <= times) & (times <= ecl_time+half_ecl_dur)
                     ecl_completeness += [sum(ecl_mask) / ecl_width_bins]
 
-            if not is_ecl_found and ecl_time > times.min():
+            if not is_ecl_found and times.min()-half_ecl_dur < ecl_time < times.max()+half_ecl_dur:
                 ecl_times += [ecl_time]
                 ecl_mask = (ecl_time-half_ecl_dur <= times) & (times <= ecl_time+half_ecl_dur)
                 ecl_completeness += [sum(ecl_mask) / ecl_width_bins]
