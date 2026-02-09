@@ -37,7 +37,7 @@ class Testpipeline(unittest.TestCase):
 
                 # Read the ephemeris. We need this to find eclipses and set completeness metrics
                 eph = query_tess_ebs_ephemeris(config["tic"]) or {}
-                t0 = eph.get("t0", config.get("t0", config.get("epoch_time", None)))
+                t0 = eph.get("t0", config.get("t0", config.get("t0", None)))
                 period = eph.get("period", config.get("period", None))
                 durp = eph.get("durP", config.get("durP", None))
                 durs = eph.get("durS", config.get("durS", None))
@@ -123,7 +123,7 @@ class Testpipeline(unittest.TestCase):
         }
 
         read_keys = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc", "L3"]
-        pe = config["epoch_time"].value
+        pe = config["t0"].value
         out_params = fit_target_lightcurves(lcs, in_params, read_keys, pe,
                                             task=3, max_workers=4, file_prefix="test-pipeline")
 

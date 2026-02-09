@@ -14,41 +14,31 @@ TEST_OUTPUT_DIR = Path(getsourcefile(lambda:0)).parent / "../../.cache/.test_dat
 
 """ A dictionary of known lightkurve targets with downloaded fits files. """
 KNOWN_TARGETS = {
-    "CW Eri": { # Easy light-curves
+    "CW Eri": {
         "tic": 98853987,
         "sector": 31,
+        # For tests which don't use TESS-ebs
+        "t0": Time(2163.056459177, format="btjd", scale="tdb"),
         "period": 2.728370923 * u.d,
-        "epoch_time": Time(2163.056459177, format="btjd", scale="tdb"),
-        "ecosw": 0.00502,
-        "esinw": -0.0121,
-        "ecc": 0.0131,
-        "expect_phase2": 0.5032,
-        "expect_width2": 0.976,
         "fits": {
             4: "tess2018292075959-s0004-0000000098853987-0124-s_lc.fits",
             31: "tess2020294194027-s0031-0000000098853987-0198-s_lc.fits",
         }
     },
-    "RR Lyn": { # Early secondary eclipses
+    "RR Lyn": {
         "tic": 11491822,
         "sector": 20,
-        "period": 9.946591113 * u.d,
-        "epoch_time": Time(1851.925277662, format="btjd", scale="tdb"),
-        "expect_phase2": 0.45,
-        "expect_width2": 1.2,
         "fits": {
             20: "tess2019357164649-s0020-0000000011491822-0165-s_lc.fits",
             60: "tess2022357055054-s0060-0000000011491822-0249-s_lc.fits",
             73: "tess2023341045131-s0073-0000000011491822-0268-s_lc.fits"
         }
     },
-    "IT Cas": { # Eccentric, late secondary, primary/secondary similar depths
+    "IT Cas": {
         "tic": 26801525,
         "sector": 17,
-        "period": 3.8966513 * u.d,
-        "epoch_time": Time(1778.3091293396, format="btjd", scale="tdb"),
-        "expect_phase2": 0.55,
-        "expect_width": 1.0,
+        # Override TESS-ebs
+        "phiS": 0.552,
         "fits": {
             17: "tess2019279210107-s0017-0000000026801525-0161-s_lc.fits",
         }
@@ -56,8 +46,9 @@ KNOWN_TARGETS = {
     "AN Cam": {
         "tic": 103098373,
         "sector": 25,
+        # Not in TESS-ebs
+        "t0": Time(1992.007512423, format="btjd", scale="tdb"),
         "period": 20.99842 * u.d,
-        "epoch_time": Time(1992.007512423, format="btjd", scale="tdb"),
         "durP": 0.558,
         "durS": 0.711,
         "phiS": 0.779,
@@ -71,8 +62,6 @@ KNOWN_TARGETS = {
     "CM Dra": {
         "tic": 199574208,
         "sector": 24,
-        "period": 1.2683879 * u.d,
-        "epoch_time": Time(1930.187602, format="btjd", scale="tdb"),
         "fits": {
             24: "tess2020106103520-s0024-0000000199574208-0180-s_lc.fits",
             25: "tess2020133194932-s0025-0000000199574208-0182-s_lc.fits",
@@ -82,31 +71,26 @@ KNOWN_TARGETS = {
     "V889 Aql": {
         "tic": 300000680,
         "sector": 40,
-        "period": 11.120757 * u.d,
-        "epoch_time": Time(2416.259790, format="btjd", scale="tdb"),
-        "expect_phase2": 0.35,
-        "expect_width2": 1.9,
         "fits": {
             40: "hlsp_tess-spoc_tess_phot_0000000300000680-s0040_tess_v1_lc.fits",
         }
     },
-    "TIC 30034081": { # S64 starts with a partial secondary
+    "TIC 30034081": {
         "tic": 30034081,
         "sector": 64,
+        # Incorrect period in TESS-ebs (needs doubling)
+        "t0": Time(1411.553116, format="btjd", scale="tdb"),
         "period": 2.34461 * 2 * u.d,
-        "epoch_time": Time(1411.553116, format="btjd", scale="tdb"),
-        "expect_phase2": 0.5,
+        "durP": 0.35,
+        "durS": 0.35,
+        "phiS": 0.5,
         "fits": {
             64: "tess2023096110322-s0064-0000000030034081-0257-s_lc.fits",
         }
     },
-    "TIC 255567460": { # S66 has no primary eclipses
+    "TIC 255567460": {
         "tic": 255567460,
         "sector": 66,
-        "period": 13.79633 * u.d,
-        "epoch_time": Time(1469.208711, format="btjd", scale="tdb"),
-        "expect_phase2": 0.5,
-        "expect_width2": 0.14,
         "fits": {
             66: "tess2023153011303-s0066-0000000255567460-0260-s_lc.fits",
         }
@@ -159,7 +143,6 @@ def load_lightcurves(target: str,
 
         lc.meta["LABEL"] = f"{target} S{lc.meta['SECTOR']:02d}"
         lc.meta["clip_mask"] = np.ones((len(lc)), dtype=bool)
-        lc.meta["t0"] = params["epoch_time"]
 
         lcs.append(lc)
     return lcs

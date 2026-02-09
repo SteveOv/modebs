@@ -1,13 +1,10 @@
 """ Unit tests for the pipeline module. """
 from typing import List, Dict
 from pathlib import Path
-import warnings
 import re
 import unittest
 
 # pylint: disable=no-member, wrong-import-position, line-too-long
-warnings.filterwarnings("ignore", "Using UFloat objects with std_dev==0 may give unexpected results.", category=UserWarning)
-from uncertainties import ufloat
 import numpy as np
 import astropy.units as u
 import lightkurve as lk
@@ -50,7 +47,7 @@ class Testlightcurves(unittest.TestCase):
         """ Simple happy path test of get_binned_phase_mags_data() for binning """
         lc = lightcurve_helpers.load_lightcurves("CW Eri", [31], with_mag_columns=True)[0]
 
-        t0 = lightcurve_helpers.KNOWN_TARGETS["CW Eri"]["epoch_time"]
+        t0 = lightcurve_helpers.KNOWN_TARGETS["CW Eri"]["t0"]
         period = lightcurve_helpers.KNOWN_TARGETS["CW Eri"]["period"]
         wrap_phase = u.Quantity(0.75)
         flc = lc.fold(period, t0, wrap_phase=wrap_phase, normalize_phase=True)
@@ -68,7 +65,7 @@ class Testlightcurves(unittest.TestCase):
         """ Test of get_binned_phase_mags_data() to assert handling of wrapped phase """
         lc = lightcurve_helpers.load_lightcurves("CW Eri", [31], with_mag_columns=True)[0]
 
-        t0 = lightcurve_helpers.KNOWN_TARGETS["CW Eri"]["epoch_time"]
+        t0 = lightcurve_helpers.KNOWN_TARGETS["CW Eri"]["t0"]
         period = lightcurve_helpers.KNOWN_TARGETS["CW Eri"]["period"]
 
         for fold_wrap, bin_wrap, msg in [
@@ -87,7 +84,7 @@ class Testlightcurves(unittest.TestCase):
         """ Test of get_binned_phase_mags_data() to assert handling of gaps in source data """
         lc = lightcurve_helpers.load_lightcurves("CW Eri", [31], with_mag_columns=True)[0]
 
-        t0 = lightcurve_helpers.KNOWN_TARGETS["CW Eri"]["epoch_time"]
+        t0 = lightcurve_helpers.KNOWN_TARGETS["CW Eri"]["t0"]
         period = lightcurve_helpers.KNOWN_TARGETS["CW Eri"]["period"]
         wrap_phase = u.Quantity(0.5)
         flc = lc.fold(period, t0, wrap_phase=wrap_phase, normalize_phase=True)
@@ -107,35 +104,35 @@ class Testlightcurves(unittest.TestCase):
     def test_find_eclipses_and_completeness_happy(self):
         """ Tests find_eclipses_and_completeness() correctly finds and identifies eclipses """
         #  in lightcurve_helpers KNOWN_TARGETS & exp_prim, exp_sec are #eclipses >80% complete
-        for (target,            sectors,    ref_t0,     durp,   durs,   phis,   exp_prim,   exp_sec) in [
+        for (target,            sectors,    exp_prim,   exp_sec) in [
             # CW Eri has short period & many good eclipses although S31 ends with an incomplete sec (~70%)
-            ("CW Eri",          [4, 31],    None,       None,   None,   None,   [7, 8],     [9, 9]),
+            ("CW Eri",          [4, 31],    [7, 8],     [9, 9]),
 
             # RR Lyn/20 has incomplete secondary without peak after break; expect it found, with compl <50%
-            ("RR Lyn",          [20],       None,       None,   None,   None,   [2],        [2]),
+            ("RR Lyn",          [20],       [2],        [2]),
 
             # RR Lyn/60 has secondary with no fluxes falling within the mid-sector break (0% compl)
-            ("RR Lyn",          [60],       3224.555,   None,   None,   None,   [2],        [2]),
+            ("RR Lyn",          [60],       [2],        [2]),
 
             # IT Cas/17; good test of boundary handling with good eclipses v. near start and mid-sector break
-            ("IT Cas",          [17],       None,       None,   None,   0.552,  [5],        [5]),
+            ("IT Cas",          [17],       [5],        [5]),
 
             # 30034081/64 another boundary test as opens with incomplete sec with peak before start (~35% compl)
-            ("TIC 30034081",    [64],       None,       0.35,   0.35,   0.5,    [4],        [4]),
+            ("TIC 30034081",    [64],       [4],        [4]),
 
             # 255567460 has no primaries and 2 secondaries
-            ("TIC 255567460",   [66],       None,       None,   None,   None,   [0],        [2]),
+            ("TIC 255567460",   [66],       [0],        [2]),
         ]:
             target_cfg = lightcurve_helpers.KNOWN_TARGETS[target]
-            tess_ebs = catalogues.query_tess_ebs_ephemeris(target_cfg["tic"])
+            tess_ebs = catalogues.query_tess_ebs_ephemeris(target_cfg["tic"]) or {}
 
             lcs = lightcurve_helpers.load_lightcurves(target, sectors)
             ecl_dicts = [lightcurves.find_eclipses_and_completeness(lc,
-                                                                    ref_t0 or target_cfg["epoch_time"],
-                                                                    target_cfg["period"],
-                                                                    durp or tess_ebs["durP"],
-                                                                    durs or tess_ebs["durS"],
-                                                                    phis or tess_ebs["phiS"]) for lc in lcs]
+                                                                    target_cfg.get("t0", tess_ebs.get("t0", None)),
+                                                                    target_cfg.get("period", tess_ebs.get("period", None)),
+                                                                    target_cfg.get("durP", tess_ebs.get("durP", None)),
+                                                                    target_cfg.get("durS", tess_ebs.get("durS",None)),
+                                                                    target_cfg.get("phiS", tess_ebs.get("phiS", None))) for lc in lcs]
 
             # self._plot_lcs_and_eclipses(lcs, ecl_dicts)
 
