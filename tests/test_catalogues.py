@@ -2,12 +2,12 @@
 # pylint: disable=unused-import, too-many-public-methods, line-too-long, invalid-name, no-member
 import unittest
 
-from tests.helpers import lightcurve_helpers
-
 import numpy as np
 import matplotlib.pyplot as plt
 
 from deblib import orbital
+
+from tests.helpers import lightcurve_helpers
 
 from libs.pipeline import nominal_value
 
@@ -37,6 +37,44 @@ class Testcatalogues(unittest.TestCase):
                 # Expected values for 98853987
                 self.assertAlmostEqual(2.728, data["period"].nominal_value, 3)
                 self.assertAlmostEqual(0.511, data["morph"], 3)
+
+    @unittest.skip
+    def test_query_tess_ebs_ephemeris_specific_targets(self):
+        """ Tests of query_tess_ebs_ephemeris() to see if it returns the expected values """
+
+        # We expect failures on this - it's down to inspection to see whether action is required
+        targets = {
+            # We know the 2g phiS values for IT Cas are incorrect @ phiP=1, phiS=0.448.
+            "V* IT Cas": { "tic": 26801525, "period": 3.896637, "sum_r": 0.215, "inc": 89.68, "ecosw": 0.081, "esinw": -0.037 },
+
+            "V* RR Lyn": { "tic": 11491822, "period": 9.945127, "sum_r": 0.142, "inc": 87.46, "ecosw": -0.078, "esinw": -0.0016 },
+
+            "V* HP Dra": { "tic": 48356677, "period": 10.761544, "sum_r": 0.089, "inc": 87.555, "ecosw": 0.027, "esinw": 0.024 },
+
+            "V* MU Cas": { "tic": 83905462, "period": 9.653, "sum_r": 0.194, "inc": 87.110, "ecosw": 0.187, "esinw": 0.042 },
+        }
+
+        for target, params in targets.items():
+            with self.subTest("Testing " + target):
+                # Get expected phase & eclipse values by calculating them known system parameters
+                e = (params["ecosw"]**2 + params["esinw"]**2)**0.5
+                exp_phiS = orbital.phase_of_secondary_eclipse(params["ecosw"], e)
+                exp_durP = orbital.eclipse_duration(params["period"], params["sum_r"], params["inc"], e, params["esinw"], False)
+                exp_durS = orbital.eclipse_duration(params["period"], params["sum_r"], params["inc"], e, params["esinw"], True)
+
+                result = query_tess_ebs_ephemeris(params["tic"])
+                self.assertIsNotNone(result, "expected results != None")
+                print(f"{target}:", "{" , ", ".join(f"{k}: {v:.3f}" for k, v in result.items()), "}")
+
+                self.assertIn("phiS", result)
+                self.assertAlmostEqual(result["phiS"], exp_phiS, 2, f"expected phiS ~= {exp_phiS:.3f}")
+
+                self.assertIn("durP", result)
+                self.assertAlmostEqual(result["durP"].n, exp_durP, 1, f"expected durP ~= {exp_durP:.3f}")
+
+                self.assertIn("durS", result)
+                self.assertAlmostEqual(result["durS"].n, exp_durS, 1, f"exoected durS ~= {exp_durS:.3f}")
+
 
 
     #
