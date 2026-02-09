@@ -15,8 +15,6 @@ from astropy.time import Time, TimeDelta
 from lightkurve import LightCurve, LightCurveCollection, FoldedLightCurve, SearchResult
 
 
-from libs.pipeline import nominal_value
-
 def load_lightcurves(results: SearchResult,
                      quality_bitmask: Union[Union[str, int], List[Union[str, int]]]="default",
                      flux_column: Union[str, List[str]]="sap_flux",
@@ -226,6 +224,9 @@ def find_eclipses_and_completeness(lc: LightCurve,
     :returns: a dict of ```{ "primary_eclipses": ndarray, "secondary_eclipses": ndarray,
     "primary_completeness": ndarray, "secondary_completenes": ndarray, "t0": float }```
     """
+    def nominal_value(value):
+        return value.nominal_value if isinstance(value, UFloat) else value
+
     ref_t0 = to_lc_time(ref_t0, lc).value if isinstance(ref_t0, Time) else nominal_value(ref_t0)
     period = period.to(u.d).value if isinstance(period, u.Quantity) else nominal_value(period)
 

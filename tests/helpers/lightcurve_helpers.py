@@ -53,18 +53,33 @@ KNOWN_TARGETS = {
             17: "tess2019279210107-s0017-0000000026801525-0161-s_lc.fits",
         }
     },
-    "AN Cam": { # Very late secondary eclipses, near phase 0.8
+    "AN Cam": {
         "tic": 103098373,
         "sector": 25,
         "period": 20.99842 * u.d,
         "epoch_time": Time(1992.007512423, format="btjd", scale="tdb"),
-        "expect_phase2": 0.78,
-        "expect_width2": 1.1,
+        "durP": 0.558,
+        "durS": 0.711,
+        "phiS": 0.779,
         "fits": {
             25: "hlsp_tess-spoc_tess_phot_0000000103098373-s0025_tess_v1_lc.fits",
+            52: "tess2022138205153-s0052-0000000103098373-0224-s_lc.fits",
+            53: "tess2022164095748-s0053-0000000103098373-0226-s_lc.fits",
+            59: "tess2022330142927-s0059-0000000103098373-0248-s_lc.fits"
         }
     },
-    "V889 Aql": { # Lower (600 s) cadence, highly eccentric and small mid-sector gap
+    "CM Dra": {
+        "tic": 199574208,
+        "sector": 24,
+        "period": 1.2683879 * u.d,
+        "epoch_time": Time(1930.187602, format="btjd", scale="tdb"),
+        "fits": {
+            24: "tess2020106103520-s0024-0000000199574208-0180-s_lc.fits",
+            25: "tess2020133194932-s0025-0000000199574208-0182-s_lc.fits",
+            26: "tess2020160202036-s0026-0000000199574208-0188-s_lc.fits"
+        }
+    },
+    "V889 Aql": {
         "tic": 300000680,
         "sector": 40,
         "period": 11.120757 * u.d,
@@ -133,7 +148,7 @@ def load_lightcurves(target: str,
     fits_dir = TEST_FITS_DIR / f"{target.lower().replace(' ', '-')}"
 
     lcs = lk.LightCurveCollection([])
-    for sector in sorted(sectors):
+    for sector in sectors:
         lc = lk.read(fits_dir / params["fits"][sector],
                      flux_column=params.get("flux_column", "sap_flux"),
                      quality_bitmask=params.get("quality_bitmask", "hardest"))

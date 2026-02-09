@@ -9,6 +9,7 @@ import warnings
 import re
 from numbers import Number
 from multiprocessing import Pool
+from itertools import groupby
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -67,6 +68,62 @@ def nominal_value(value: Union[UFloat, Number]) -> Number:
     if isinstance(value, UFloat):
         return value.nominal_value
     return value
+
+
+def arrange_sectors_for_fitting(lcs: LightCurveCollection,
+                                completeness_th: float=0.8) -> List[List[int]]:
+    """
+    Will work out the most effective arrangement of sectors to support JKTEBOP fitting. This will
+    need to balance need for sufficient coverage for each fitting to achieve a reliable output,
+    while running as many fits as possible across the breadth of time in which we have observations.
+
+    :lcs: the LightCurveCollection containing our potential fitting targets
+    :completness_th: threshold percentage of an eclipse we require to consider it complete/usable
+    :returns: the sets of sectors to fit as a list of lists, i.e.: [[13, 14], [15, 16], [17, 18]]
+    indicates that sectors 13 & 14 should be stitched for fitting, as should 15 & 16 and 17 & 18.
+    """
+    def is_usable_set(seg_ecl_counts) -> bool:
+        """ From these eclipse counts, is the corresponding set of sectors suitable for fitting? """
+        ecl_sums = np.sum(seg_ecl_counts, axis=0)
+        return max(ecl_sums) > 2 * completeness_th and min(ecl_sums) > 1 * completeness_th
+
+    # Make sure the sectors are sorted by sector number.
+    lcs = LightCurveCollection(sorted(lcs, key=lambda l: l.sector))
+
+    # Isolating the sectors into contiguous groups, so [1,2,4,5,6,8] becomes [[1,2], [4,5,6], [8]]
+    # By using a key of the sector number minus its list index we have a value which we can
+    # group by, as it will remain unchanged within a group of contiguously incrementing values.
+    sector_sets = []
+    for _, group in groupby(enumerate(lcs.sector),
+                            key=lambda ix_sec: ix_sec[1] - ix_sec[0]):
+        # Now work out how best to use this group of contiguous sectors for JKTEBOP fitting.
+        group_sectors = list(g for _, g in group)
+
+        # Eclipse counts for each seg in the group as array([[#prim0, #sec0], ..., [#primN, #secN]])
+        group_ecl_counts = np.array([
+            list(sum(l.meta[k][l.meta[k] > completeness_th])
+                    for k in ["primary_completeness", "secondary_completeness"])
+                        for l in lcs[np.in1d(lcs.sector, group_sectors)]
+        ])
+
+        group_size = len(group_sectors)
+        if group_size == 1:
+            if is_usable_set(group_ecl_counts):
+                sector_sets.append(group_sectors)
+        else:
+            # Multiple LCs, so find the best combination.
+            # Basic algo, expand sector set until sufficient coverage then start again from
+            # the next, unused sector. Not clever & may leave unused sectors at the end of a group.
+            set_start = 0
+            while set_start < group_size:
+                for set_stop in range(set_start+1, group_size+1):
+                    set_sl = slice(set_start, set_stop)
+                    if is_usable_set(group_ecl_counts[set_sl]):
+                        sector_sets.append(group_sectors[set_sl])
+                        set_start = set_stop
+                        break
+
+    return sector_sets
 
 
 def estimate_l3_with_gaia(centre: SkyCoord, radius_as: float=120,

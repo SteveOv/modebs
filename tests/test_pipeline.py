@@ -7,14 +7,52 @@ from astropy.coordinates import SkyCoord
 
 from deblib.orbital  import phase_of_secondary_eclipse, eclipse_duration
 from tests.helpers.lightcurve_helpers import load_lightcurves, KNOWN_TARGETS
+from libs.catalogues import query_tess_ebs_ephemeris
 from libs.lightcurves import find_lightcurve_segments, fit_polynomial
+from libs.lightcurves import find_eclipses_and_completeness
 
+from libs.pipeline import arrange_sectors_for_fitting
 from libs.pipeline import estimate_l3_with_gaia
 from libs.pipeline import fit_target_lightcurves
 
 
 class Testpipeline(unittest.TestCase):
     """ Unit tests for the pipeline module. """
+
+    #
+    # arrange_sectors_for_fitting(lcs: LightCurveCollection, completeness_th: float) -> List[List[ix]]
+    #
+    def test_arrange_sectors_for_fitting_known_targets(self):
+        """ Test arrange_sectors_for_fitting() assert it produces expected arrangement """
+        for target,             sectors,                exp_sector_sets in[
+            # Sectors not contiguous (so no join) but are fine to use individually do 7+ of each ecl per sector
+            ("CW Eri",          [4, 31],                [[4], [31]]),
+            # Sector are contiguous, but joining not necessary as there are many of each eclipse per sectors
+            ("CM Dra",          [24, 25, 26],           [[24], [25], [26]]),
+            # The only usable combo is 52+53 as eclipses too infrequent to fit any sector individually
+            ("AN Cam",          [53, 59, 52],           [[52, 53]]),
+        ]:
+            with self.subTest(f" {target}; {sectors} -> {exp_sector_sets} "):
+                config = KNOWN_TARGETS[target]
+
+                # Read the ephemeris. We need this to find eclipses and set completeness metrics
+                eph = query_tess_ebs_ephemeris(config["tic"]) or {}
+                t0 = eph.get("t0", config.get("t0", config.get("epoch_time", None)))
+                period = eph.get("period", config.get("period", None))
+                durp = eph.get("durP", config.get("durP", None))
+                durs = eph.get("durS", config.get("durS", None))
+                phis = eph.get("phiS", config.get("phiS", None))
+
+                # Sets primary|secondary _times & _completeness arrays and t0 ('best' primary) to lcs' meta
+                lcs = load_lightcurves(target, sectors)
+                for lc in lcs:
+                    lc.meta |= find_eclipses_and_completeness(lc, t0, period, durp, durs, phis)
+                    t0 = lc.meta.get("t0", None) or t0
+
+                # Test
+                sector_sets = arrange_sectors_for_fitting(lcs, completeness_th=0.8)
+                self.assertListEqual(exp_sector_sets, sector_sets)
+
 
     #
     # estimate_l3_with_gaia(centre: SkyCoord, radius_as: float, target_source_id: int,
