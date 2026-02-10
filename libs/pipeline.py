@@ -79,51 +79,64 @@ def arrange_sectors_for_fitting(lcs: LightCurveCollection,
 
     :lcs: the LightCurveCollection containing our potential fitting targets
     :completness_th: threshold percentage of an eclipse we require to consider it complete/usable
-    :returns: the sets of sectors to fit as a list of lists, i.e.: [[13, 14], [15, 16], [17, 18]]
-    indicates that sectors 13 & 14 should be stitched for fitting, as should 15 & 16 and 17 & 18.
+    :returns: the groups of sectors to fit, as a list of lists. i.e.: [[13, 14], [15, 16], [17, 18]]
+    indicates that sectors 13 & 14 should be grouped for fitting, as should 15 & 16 and 17 & 18.
     """
-    def is_usable_set(seg_ecl_counts) -> bool:
-        """ From these eclipse counts, is the corresponding set of sectors suitable for fitting? """
+    def is_usable_group(seg_ecl_counts) -> bool:
+        """ From these eclipse counts, is the corresponding grp of sectors suitable for fitting? """
         ecl_sums = np.sum(seg_ecl_counts, axis=0)
         return max(ecl_sums) > 2 * completeness_th and min(ecl_sums) > 1 * completeness_th
 
     # Make sure the sectors are sorted by sector number.
     lcs = LightCurveCollection(sorted(lcs, key=lambda l: l.sector))
 
-    # Isolating the sectors into contiguous groups, so [1,2,4,5,6,8] becomes [[1,2], [4,5,6], [8]]
+    # Isolating the sectors into contiguous blocks, so [1,2,4,5,6,8] becomes [[1,2], [4,5,6], [8]]
     # By using a key of the sector number minus its list index we have a value which we can
-    # group by, as it will remain unchanged within a group of contiguously incrementing values.
-    sector_sets = []
-    for _, group in groupby(enumerate(lcs.sector),
+    # group by, as it will remain unchanged within a block of contiguously incrementing values.
+    sector_groups = []
+    for _, block in groupby(enumerate(lcs.sector),
                             key=lambda ix_sec: ix_sec[1] - ix_sec[0]):
-        # Now work out how best to use this group of contiguous sectors for JKTEBOP fitting.
-        group_sectors = list(g for _, g in group)
+        # Now work out how best to use this block of contiguous sectors for JKTEBOP fitting.
+        block_sectors = list(g for _, g in block)
 
-        # Eclipse counts for each seg in the group as array([[#prim0, #sec0], ..., [#primN, #secN]])
-        group_ecl_counts = np.array([
+        # Eclipse counts for each seg in the block as array([[#prim0, #sec0], ..., [#primN, #secN]])
+        block_ecl_counts = np.array([
             list(sum(l.meta[k][l.meta[k] > completeness_th])
                     for k in ["primary_completeness", "secondary_completeness"])
-                        for l in lcs[np.in1d(lcs.sector, group_sectors)]
+                        for l in lcs[np.in1d(lcs.sector, block_sectors)]
         ])
 
-        group_size = len(group_sectors)
-        if group_size == 1:
-            if is_usable_set(group_ecl_counts):
-                sector_sets.append(group_sectors)
-        else:
-            # Multiple LCs, so find the best combination.
-            # Basic algo, expand sector set until sufficient coverage then start again from
-            # the next, unused sector. Not clever & may leave unused sectors at the end of a group.
-            set_start = 0
-            while set_start < group_size:
-                for set_stop in range(set_start+1, group_size+1):
-                    set_sl = slice(set_start, set_stop)
-                    if is_usable_set(group_ecl_counts[set_sl]):
-                        sector_sets.append(group_sectors[set_sl])
-                        set_start = set_stop
-                        break
+        block_size = len(block_sectors)
+        max_ecl_count = np.max(block_ecl_counts) # either primary or secondary
+        min_group_size = max(1, int(np.floor(2*completeness_th / (max_ecl_count+1e-10))))
 
-    return sector_sets
+        if block_size >= min_group_size:
+            if block_size == 1:
+                if is_usable_group(block_ecl_counts):
+                    sector_groups.append(block_sectors)
+            else:
+                # Multiple LCs within this block so build combinations.
+                group_start = 0
+                while group_start < block_size:
+                    next_start_inc = 1
+
+                    # Grow group until it has sufficient coverage or we run out of sectors
+                    for group_stop in range(group_start + min_group_size, block_size + 1):
+                        group_slice = slice(group_start, group_stop)
+                        if is_usable_group(block_ecl_counts[group_slice]):
+                            # Special case. If we cannot to get another group from the remainder
+                            # of the block, we may as well expand this group to make use of it.
+                            if group_stop < block_size <= group_stop + min_group_size \
+                                    and not is_usable_group(block_ecl_counts[group_stop:]):
+                                group_slice = slice(group_start, group_stop := block_size)
+
+                            sector_groups.append(block_sectors[group_slice])
+                            next_start_inc = group_stop - group_start
+                            break
+
+                    group_start += next_start_inc
+
+    return sector_groups
 
 
 def estimate_l3_with_gaia(centre: SkyCoord, radius_as: float=120,
