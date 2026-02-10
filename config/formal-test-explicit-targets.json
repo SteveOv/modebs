@@ -4,36 +4,6 @@
         "quality_bitmask": "hardest"
     },
     "target_configs": {
-        "V436 Per": {
-            "exclude": true,
-            "why_exclude": "unable to achieve good fit without jktebop overide of LD params",
-            "source": "DEBCat and Southworth & Bowman (2022) Table 3. Tess sector 18 SAP data analysed with JKTEBOP. Teffs reproduced from Janik et al. (2003)",
-            "reference": "SouthworthBowman22mnras",
-            "aka": "TIC 403625251, HD 11241",
-            "SpT": "B1.5 V",
-            "details": "2 short cadence sectors (18 & 85); eccentric orbit with eclipse depths of ~0.4 and ~0.15 mag; long period means only one of each eclipse is observed; Star B is both larger (k~1.1) and more luminous (J~1.04) than Star A; Southworth & Bowman found LC solutions where k=0.69(3), 0.84(2) and 1.10(3), with that last adopted;",
-            "notes": "not in TESS-ebs so ephemeris (from SouthworthBowman22mnras) & morph defined here; jktebop_overrides of LD params are from source work & and are key to getting comperable fit; despite the long period using flattening leads to a worse fit; sector 85 is omitted as it has only one eclipse;",
-            "t0": 1813.2011,
-            "period": 25.935953,
-            "phiS": 0.440,
-            "morph": 0.300,
-            "exclude_sectors": [85],
-            "Teff_sys": 20000,
-            "jktebop_overrides": {
-                "LDA": "quad", "LDA1": 0.046, "LDA2": 0.22, "LDA1_fit": 0,
-                "LDB": "quad", "LDB1": 0.046, "LDB2": 0.22, "LDB1_fit": 0
-            },
-            "labels": {
-                "MA": 6.880,            "MA_err": 0.037,
-                "MB": 7.348,            "MB_err": 0.039,
-                "RA": 3.415,            "RA_err": 0.046,
-                "RB": 3.745,            "RB_err": 0.027,
-                "TeffA": 21500,         "TeffA_err": 1000,
-                "TeffB": 22000,         "TeffB_err": 1000,
-                "loggA": 4.209,         "loggA_err": 0.012,
-                "loggB": 4.157,         "loggB_err": 0.006      
-            }
-        },
         "V539 Ara": {
             "source": "DEBCat and Southworth & Bowman (2022) Table 3. Tess sectors 13 and 39 SAP data separately analysed with JKTEBOP (due to apsidal motion). Teffs reproduced from Clausen (1996).",
             "reference": "SouthworthBowman22mnras",
@@ -368,27 +338,6 @@
                 "loggB": 3.8967,        "loggB_err": 0.0017
             }
         },
-        "V570 Per": {
-            "exclude": true,
-            "why_exclude": "reference characterisation uses an lrat to constrain fit",
-            "source": "Rediscussion 14, Table III. TESS sectors 18 and 58 SAP photometry analysed with JKTEBOP version 43.",
-            "reference": "Southworth23obsR14",
-            "aka": "TIC 116991977, HD 19457",
-            "SpT": "F3 V + F5 V",
-            "details": "2 short cadence sectors (18 & 58); an inclined circular orbit with variability due to starspots & evidence of the ellipsoidal effect; shallow eclipses of ~0.11 & ~0.10 mag; the source characterisation used a spectroscopic light ratio to constrain the fit;",
-            "notes": "unable to get the sector fits to agree; S58 has significantly higher pdc_tot (0.871 vs 0.591); Southworth23obsR14 uses an lrat and fixes eccentricity to zero to constrain the fit; Southworth23obsR14 uses E(B-V)=0.05+/-0.02 mag and gives a dist=117.2+/-2.3 pc;",
-            "sectors":[[58]],
-            "labels": {
-                "MA": 1.4489,           "MA_err": 0.0063,
-                "MB": 1.3495,           "MB_err": 0.0062,
-                "RA": 1.538,            "RA_err": 0.035,
-                "RB": 1.349,            "RB_err": 0.032,
-                "TeffA": 6842,          "TeffA_err": 50,
-                "TeffB": 6562,          "TeffB_err": 50,
-                "loggA": 4.225,         "loggA_err": 0.020,
-                "loggB": 4.308,         "loggB_err": 0.021
-            }
-        },
         "AN Cam": {
             "source": "DEBCat and Rediscussion 4, Table III.  TESS sectors 19, 25, and 26 (timeseries data from FFI) analysed with JKTEBOP version 41. ",
             "reference": "Southworth21obsR4",
@@ -528,43 +477,20 @@
                 "loggB": 4.3597,        "loggB_err": 0.0034
             }
         },
-        "QR Hya": {
-            "exclude": true,
-            "why_exclude": "Need flattening and/or fixing L3 for correct fit - need to further refine pipeline",
-            "source": "DEBCat and Graczyk et al. (2022) table 9. WD code used for fitting TESS sector 9 PDCSAP data (omitted sector 36 due to starspots). Sector 63 released subsequent to publication.",
-            "reference": "GraczykPietrzynski+22aa",
-            "aka": "TIC 49003142, HD 94853",
-            "SpT": "G1 V",
-            "details": "3 short cadence sectors (9, 36 & 63); an inclined orbit with partial eclipses of ~0.30 & ~0.28 mag; startspot activity;",
-            "notes": "tess-ebs ephemeris has incorrect (half) period & phiS; none of the fits are currently 'correct', even with L3 fixed at zero, however 'average' fit is in reasonable agreement with published values;",
-            "period_factor": 2,
-            "jktebop_overrides": { "L3": 0, "L3_fit": 0 },
-            "labels": {
-                "MA": 1.1002,           "MA_err": 0.0018,
-                "MB": 1.0673,           "MB_err": 0.0019,
-                "RA": 1.2844,           "RA_err": 0.0040,
-                "RB": 1.2028,           "RB_err": 0.0055,
-                "TeffA": 5925,          "TeffA_err": 75,
-                "TeffB": 5845,          "TeffB_err": 71,
-                "loggA": 4.262,         "loggA_err": 0.003,
-                "loggB": 4.306,         "loggB_err": 0.004
-            }
-        },
         "V530 Ori": {
-            "exclude": true,
-            "why_exclude": "very shallow secondary and without flattening and fixed L3 & LD params the fit is unreliable; flattening helps get a reasonable fit but task 8 MC analysis failures indicate that it's not durable;",
             "source": "DEBCat and Torres et al. (2014) table 10. JKTEBOP was used to analyse various non-TESS photometry sources.",
             "reference": "TorresSandbergLacy+14apj",
             "aka": "TIC 11961096, HD 294598",
             "SpT": "G1 V + M1 V",
             "details": "1 short cadence sector (33); a G+M pair in an eccentric 6.1 d orbit; partial primary partial eclipses of ~0.5 mag and shallow secondary total eclipses of ~0.06 mag; some variability, potentially from star spots;",
-            "notes": "not in TESS-ebs so ephemeris & morph defined here; requires flattening for a fit; TorresSandbergLacy+14apj give E(B-V)=0.045+/-0.020 mag and dist=103+/-6 pc;",
+            "notes": "not in TESS-ebs so ephemeris & morph defined here; TorresSandbergLacy+14apj give E(B-V)=0.045+/-0.020 mag and dist=103+/-6 pc;",
             "t0": 2210.491034996,
             "period": 6.110760760,
             "durP": 0.173,
             "durS": 0.198,
             "phiS": 0.464,
-            "morph": 0.200,
+            "morph": 0.300,
+            "jktebop_overrides": { "L3": 0, "L3_fit": 0 },
             "labels": {
                 "MA": 1.0038,           "MA_err": 0.0066,
                 "MB": 0.5955,           "MB_err": 0.0022,
