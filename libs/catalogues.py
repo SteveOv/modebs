@@ -35,7 +35,9 @@ def query_tess_ebs_ephemeris(tics: List[Union[int, str]]) -> Dict[str, Union[flo
     data = None
     for tic in _yield_tic_nums(tics):
         if any(tic_mask := table["TIC"] == tic):
-            row = table[tic_mask][0]
+            # Reader will mask any non-numeric/missing vals in the dat file (usually empty text).
+            # We want the chosen row, with masked values converted nan, as a single array row.
+            row = np.ma.filled(table[tic_mask], fill_value=np.nan).as_array()[0]
 
             period = ufloat(row["Per"], row["e_Per"])
             data = {
@@ -49,36 +51,31 @@ def query_tess_ebs_ephemeris(tics: List[Union[int, str]]) -> Dict[str, Union[flo
 
             # There are two sets of eclipse data; those based on the polyfit algorithm and those on
             # a 2-Gaussian algorithm. For the best chance of consistent values we use one or other.
-            # We prefer the 2-Gaussian data as the polyfit tends to under value the eclipse widths
-            for k_pattern in ["{0}-2g", "{0}-pf"]: # data derived from 2-Gaussian & polyfit algos
-                k_phip, k_phis = k_pattern.format("Phip"), k_pattern.format("Phis")
-                k_durp, k_durs = k_pattern.format("Wp"), k_pattern.format("Ws")
+            vals = np.array([
+                [row[k + k_algo] for k in ["Phip", "Phis", "Wp", "Ws", "Dp", "Ds"]]
+                    for k_algo in ["-2g", "-pf"]
+            ], dtype=float)
 
-                # We want to get the phases so that the primary is zero and the secondary is
-                # offset from this. Within TESS-ebs these are usually Phip=1 and Phis=offset
-                # which is OK if we wrap 1 to 0. However, some appear shifted so that Phis=1
-                # (i.e. TIC 26801525; phip-pf=0.448 & phis-pf=1.000 rather than phip=0 & phis=0.552)
-                # In this case we need to undo the shift and switch the widths/durations.
-                vals = row[[k_phip, k_phis, k_durp, k_durs]]
-                if all(not np.isnan(v) and isinstance(v, Number) for v in vals):
-                    phip, phis, durp, durs = vals
+            # Prefer the set with the most data, and break a tie in favour of the 2g values (set 0)
+            # as these tend to have wider eclipse widths (we find polyfit tends to under value).
+            is_num = ~np.isnan(vals)
+            row_ix = np.argmax(np.sum(is_num, axis=1))
 
-                    # Get both phases into the range [0, 1)
-                    phip %= 1
-                    phis %= 1
-                    if phis < phip: # The phases have been shifted
-                        phip, phis = 0, 1 - (phip - phis)
-                        durp, durs = durs, durp
-                    else:
-                        phip, phis = 0, phis - phip
+            # We want to get the phases so that the primary is zero and the secondary is
+            # offset from this. Within TESS-ebs Phip is often \sim 1 and Phis < Phip.
+            if all(is_num[row_ix, 0:2]):
+                while vals[row_ix, 0] > vals[row_ix, 1]:
+                    vals[row_ix, 0] -= 1
+                data["phiS"] = vals[row_ix, 1] - vals[row_ix, 0]
+            else:
+                data["phiP"] = 0
+                data["phiS"] = None
 
-                    data["phiP"] = phip
-                    data["phiS"] = phis
-
-                    # The TESS-ebs eclipse widths are in units of phase
-                    data["durP"] = durp * period
-                    data["durS"] = durs * period
-                    break
+            # The TESS-ebs eclipse widths and depths are in units of phase
+            data["durP"] = vals[row_ix, 2] * period if is_num[row_ix, 2] else None
+            data["durS"] = vals[row_ix, 3] * period if is_num[row_ix, 3] else None
+            data["depthP"] = vals[row_ix, 4] if is_num[row_ix, 4] else None
+            data["depthS"] = vals[row_ix, 5] if is_num[row_ix, 5] else None
 
             # We have a match to a TIC number
             break
@@ -168,4 +165,4 @@ def _read_table(catalogue: str, table_fname: str, readme_fname: str="ReadMe") ->
     :returns: the requested Table
     """
     cat_dir = Path("./libs/data/catalogues") / catalogue.replace("/", "-")
-    return Table.read(cat_dir / table_fname, readme=cat_dir / readme_fname, format="ascii.cds")
+    return Table.read(cat_dir / table_fname, readme=cat_dir / readme_fname, format="ascii.cds",)

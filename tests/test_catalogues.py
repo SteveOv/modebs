@@ -21,8 +21,8 @@ class Testcatalogues(unittest.TestCase):
     #
     # query_tess_ebs_ephemeris(tics) -> dict
     #
-    def test_query_tess_ebs_ephemeris_happy_path(self):
-        """ Happy path tests for query_tess_ebs_ephemeris() """
+    def test_query_tess_ebs_ephemeris_argument_handling(self):
+        """ Tests for query_tess_ebs_ephemeris() to assert that it decodes TICs correctly """
         # 98853987 and 30313682 are in catalogue, whereas 0000000 is not
         for tics,                       msg in [
             ("TIC 98853987",            "single valid tic as str"),
@@ -32,49 +32,67 @@ class Testcatalogues(unittest.TestCase):
             ([98853987, 30313682],      "list of tics, first known, expect to use first"),
         ]:
             with self.subTest(msg):
-                data = query_tess_ebs_ephemeris(tics)
-
                 # Expected values for 98853987
+                data = query_tess_ebs_ephemeris(tics)
                 self.assertAlmostEqual(2.728, data["period"].nominal_value, 3)
                 self.assertAlmostEqual(0.511, data["morph"], 3)
 
+    def test_query_tess_ebs_ephemeris_known_target(self):
+        """ Tests for query_tess_ebs_ephemeris(known TICs) to assert it returns expected data """
+        for (tic,           exp_t0,         exp_per,    exp_morph,  exp_phis,   exp_durp,   exp_durs) in [
+            # TIC 26801525 is known that the 2g & pf phip & phis are switched (phis should be 0.551)
+            (26801525,      1766.61882,     3.89665,    0.250,      0.449,      0.27,       0.29),
+            # TIC 26801525 actual durS is nearer 0.42
+            (118313102,     1518.556197,    9.255727,   0.180,      0.400,      0.37,       0.48),
+            (350298314,     1358.040315,    47.719114,  0.002,      0.262,      0.28,       0.35),
+            # ZZ Boo which is missing eclipse data for the secondary phiS, durS & depthS
+            (357358259,     1932.31308,     2.49616,    0.523,      None,      0.406,       None),
+        ]:
+            with self.subTest(f"Target: {tic}"):
+                data = query_tess_ebs_ephemeris(tic)
+
+                self.assertAlmostEqual(data["t0"].n, exp_t0, 5, f"Expected {tic} t0 ~= {exp_t0}")
+                self.assertAlmostEqual(data["period"].n, exp_per, 5, f"Expected {tic} period ~= {exp_per}")
+
+                self.assertAlmostEqual(data["morph"], exp_morph, 3, f"Expected {tic} morph ~= {exp_morph}")
+                self.assertAlmostEqual(data["phiS"], exp_phis, 3, f"Expected {tic} phiS ~= {exp_phis}")
+
+                # Duration in TESS-ebs are in units of phase whereas these are in days
+                if exp_durp is None:
+                    self.assertIsNone(data["durP"], f"Expected {tic} durP is None")
+                else:
+                    self.assertAlmostEqual(data["durP"].n, exp_durp, 2, f"Expected {tic} durP ~= {exp_durp}")
+                if exp_durs is None:
+                    self.assertIsNone(data["durS"], f"Expected {tic} durS is None")
+                else:
+                    self.assertAlmostEqual(data["durS"].n, exp_durs, 2, f"Expected {tic} durS ~= {exp_durs}")
+
     @unittest.skip
-    def test_query_tess_ebs_ephemeris_specific_targets(self):
-        """ Tests of query_tess_ebs_ephemeris() to see if it returns the expected values """
-
+    def test_query_tess_ebs_ephemeris_known_orbital_params(self):
+        """ Tests of query_tess_ebs_ephemeris() to assert it returns usable orbital values """
         # We expect failures on this - it's down to inspection to see whether action is required
-        targets = {
-            # We know the 2g phiS values for IT Cas are incorrect @ phiP=1, phiS=0.448.
-            "V* IT Cas": { "tic": 26801525, "period": 3.896637, "sum_r": 0.215, "inc": 89.68, "ecosw": 0.081, "esinw": -0.037 },
-
-            "V* RR Lyn": { "tic": 11491822, "period": 9.945127, "sum_r": 0.142, "inc": 87.46, "ecosw": -0.078, "esinw": -0.0016 },
-
-            "V* HP Dra": { "tic": 48356677, "period": 10.761544, "sum_r": 0.089, "inc": 87.555, "ecosw": 0.027, "esinw": 0.024 },
-
-            "V* MU Cas": { "tic": 83905462, "period": 9.653, "sum_r": 0.194, "inc": 87.110, "ecosw": 0.187, "esinw": 0.042 },
-        }
-
-        for target, params in targets.items():
+        for (target,        tic,        period,     sum_r,      inc,        ecosw,      esinw) in [
+            # IT Cas know the 2g & pf phiS values are incorrect at 0.448 when expected to be 0.552.
+            ( "IT Cas",     26801525,   3.896637,   0.215,      89.68,      0.081,      -0.037),
+            ( "RR Lyn",     11491822,   9.945127,   0.142,      87.46,      -0.078,     -0.0016),
+            ( "HP Dra",     48356677,   10.761544,  0.089,      87.555,     0.027,      0.024),
+            ( "MU Cas",     83905462,   9.653,      0.194,      87.110,     0.187,      0.042),
+        ]:
             with self.subTest("Testing " + target):
-                # Get expected phase & eclipse values by calculating them known system parameters
-                e = (params["ecosw"]**2 + params["esinw"]**2)**0.5
-                exp_phiS = orbital.phase_of_secondary_eclipse(params["ecosw"], e)
-                exp_durP = orbital.eclipse_duration(params["period"], params["sum_r"], params["inc"], e, params["esinw"], False)
-                exp_durS = orbital.eclipse_duration(params["period"], params["sum_r"], params["inc"], e, params["esinw"], True)
+                # Calculate expected approx eclipse phase & duration values from known system params
+                e = (ecosw**2 + esinw**2)**0.5
+                exp_phiS = orbital.phase_of_secondary_eclipse(ecosw, e)
+                exp_durP = orbital.eclipse_duration(period, sum_r, inc, e, esinw, False)
+                exp_durS = orbital.eclipse_duration(period, sum_r, inc, e, esinw, True)
 
-                result = query_tess_ebs_ephemeris(params["tic"])
-                self.assertIsNotNone(result, "expected results != None")
-                print(f"{target}:", "{" , ", ".join(f"{k}: {v:.3f}" for k, v in result.items()), "}")
+                data = query_tess_ebs_ephemeris(tic)
+                self.assertIsNotNone(data, f"expected {target} data != None")
 
-                self.assertIn("phiS", result)
-                self.assertAlmostEqual(result["phiS"], exp_phiS, 2, f"expected phiS ~= {exp_phiS:.3f}")
+                print(f"{target}:", "{" , ", ".join(f"{k}: {v:.3f}" for k, v in data.items()), "}")
 
-                self.assertIn("durP", result)
-                self.assertAlmostEqual(result["durP"].n, exp_durP, 1, f"expected durP ~= {exp_durP:.3f}")
-
-                self.assertIn("durS", result)
-                self.assertAlmostEqual(result["durS"].n, exp_durS, 1, f"exoected durS ~= {exp_durS:.3f}")
-
+                self.assertAlmostEqual(data["phiS"], exp_phiS, 2, f"Expected {target} phiS ~= {exp_phiS:.3f}")
+                self.assertAlmostEqual(data["durP"].n, exp_durP, 1, f"Expected {target} durP ~= {exp_durP:.3f}")
+                self.assertAlmostEqual(data["durS"].n, exp_durS, 1, f"Expected {target} durS ~= {exp_durS:.3f}")
 
 
     #
