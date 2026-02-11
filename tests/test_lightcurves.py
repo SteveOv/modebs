@@ -101,8 +101,8 @@ class Testlightcurves(unittest.TestCase):
     #
     #   get_eclipse_times_and_masks(lc, ref_t0, period, durp, durs, phis, max_phase_shift)
     #
-    def test_find_eclipses_and_completeness_happy(self):
-        """ Tests find_eclipses_and_completeness() correctly finds and identifies eclipses """
+    def test_find_eclipses_and_completeness_known_targets(self):
+        """ Tests find_eclipses_and_completeness(known target) correctly finds and identifies eclipses """
         #  in lightcurve_helpers KNOWN_TARGETS & exp_prim, exp_sec are #eclipses >80% complete
         for (target,            sectors,    exp_prim,   exp_sec) in [
             # CW Eri has short period & many good eclipses although S31 ends with an incomplete sec (~70%)
@@ -120,9 +120,21 @@ class Testlightcurves(unittest.TestCase):
             # 30034081/64 another boundary test as opens with incomplete sec with peak before start (~35% compl)
             ("TIC 30034081",    [64],       [4],        [4]),
 
+            # 118313102/9 has pulsations which may trick find_peaks(). Without logic to mitigate for pulsations this
+            # will find a false "good" primary in sector 9 (a pulsation) which is expected in the mid-sector interval.
+            ("TIC 118313102",    [8, 9],     [3, 2],    [2, 2]),
+
             # 255567460 has no primaries and 2 secondaries
             ("TIC 255567460",   [66],       [0],        [2]),
+
+            # These targets are for checking that pulsations/variation is not being incorrectly selected as eclipses
+            # V889 Aql/40 possible false primary nr 2406 which should be in the mid-sector break (~2405) and 0% complete
+            ("V889 Aql",        [40],       [2],        [2]),
+
+            # 118313102/63 can find false primary nr 3029 which then leads to another in 65 nr 3077
+            ("TIC 350298314",   [63, 65],   [0, 0],     [0, 1]),
         ]:
+            completeness_th = 0.8
             target_cfg = lightcurve_helpers.KNOWN_TARGETS[target]
             tess_ebs = catalogues.query_tess_ebs_ephemeris(target_cfg["tic"]) or {}
 
@@ -132,19 +144,21 @@ class Testlightcurves(unittest.TestCase):
                                                                     target_cfg.get("period", tess_ebs.get("period", None)),
                                                                     target_cfg.get("durP", tess_ebs.get("durP", None)),
                                                                     target_cfg.get("durS", tess_ebs.get("durS",None)),
+                                                                    target_cfg.get("depthP", tess_ebs.get("deptP", None)),
+                                                                    target_cfg.get("depthS", tess_ebs.get("depthS", None)),
                                                                     target_cfg.get("phiS", tess_ebs.get("phiS", None))) for lc in lcs]
 
-            # self._plot_lcs_and_eclipses(lcs, ecl_dicts)
+            # self._plot_lcs_and_eclipses(lcs, ecl_dicts, completeness_th)
 
             for lc, ed, exp_num_prim, exp_num_sec in zip(lcs, ecl_dicts, exp_prim, exp_sec):
                 with self.subTest(lc.meta["LABEL"]):
                     self.assertEqual(len(ed["primary_times"]), len(ed["primary_completeness"]))
                     self.assertEqual(len(ed["secondary_times"]), len(ed["secondary_completeness"]))
-                    self.assertEqual(sum(ed["primary_completeness"] > 0.8), exp_num_prim)
-                    self.assertEqual(sum(ed["secondary_completeness"] > 0.8), exp_num_sec)
+                    self.assertEqual(sum(ed["primary_completeness"] > completeness_th), exp_num_prim)
+                    self.assertEqual(sum(ed["secondary_completeness"] > completeness_th), exp_num_sec)
 
 
-    def _plot_lcs_and_eclipses(self, lcs, eclipse_dicts: List[Dict]):
+    def _plot_lcs_and_eclipses(self, lcs, eclipse_dicts: List[Dict], completeness_th):
         """
         Plots lightcurves and corresponding output from get_eclipse_times_and_masks.
         """
@@ -156,9 +170,11 @@ class Testlightcurves(unittest.TestCase):
                 (ed["primary_times"], ed["primary_completeness"], "-.", "r", "primary"),
                 (ed["secondary_times"], ed["secondary_completeness"], "--", "g", "secondary")
             ]:
-                ax.vlines(x, -0.2, 1.0, c, ls, label, alpha=0.33, zorder=-20, transform=ax.get_xaxis_transform())
-                for x, compl in zip(x, completeness):
-                    ax.text(x, 0, f"{compl:.0%}", c=c, rotation=90, va="center", ha="center", zorder=-10, backgroundcolor="w")
+                alphas = [0.66 if c > completeness_th else 0.20 for c in completeness]
+                ax.vlines(x, -0.2, 1.0, c, ls, label, alpha=alphas, zorder=-20, transform=ax.get_xaxis_transform())
+                for x, compl, a in zip(x, completeness, alphas):
+                    ax.text(x, 0, f"{compl:.0%}", c=c, rotation=90, alpha=a + 0.3,
+                            va="center", ha="center", zorder=-10, backgroundcolor="w")
 
         plots.plot_lightcurves(lcs, cols=min(len(lcs), 3), column="delta_mag", ax_func=plot_eclipses, legend_loc="best")
         plt.show()
