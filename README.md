@@ -37,6 +37,11 @@ $ export JKTEBOP_DIR=~/jktebop/
 ```
 Set this to match the location where JKTEBOP has been set up.
 
+#### MIST Isochrones
+MIST pre-build model grids are required to support stellar MASS fitting.
+The instructions on downloading these data are documented in the
+[readme.txt](../main/libs/data/mist/MIST_v1.2_vvcrit0.4_basic_isos/readme.txt) file.
+
 #### Alternative, conda virtual environment
 To set up an `platodebcat` conda environment, from the root of the local repo run the
 following command;
