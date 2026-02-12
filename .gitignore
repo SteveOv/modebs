@@ -174,7 +174,7 @@ cython_debug/
 .vscode
 
 # Ignore the venv
-.platodebcat
+.modebs
 
 # Ignore any bulk data carriers - we'll manually add anything we want
 **/data/**/*.zip

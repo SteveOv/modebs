@@ -1,4 +1,4 @@
-name: platodebcat
+name: modebs
 channels:
   - conda-forge
   - defaults
