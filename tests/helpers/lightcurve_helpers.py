@@ -168,7 +168,7 @@ def load_lightcurves(target: str,
             append_mag_columns(lc)
 
         lc.meta["LABEL"] = f"{target} S{lc.meta['SECTOR']:02d}"
-        lc.meta["clip_mask"] = np.ones((len(lc)), dtype=bool)
+        lc.meta["target"] = target
 
         lcs.append(lc)
     return lcs

@@ -70,9 +70,9 @@ def nominal_value(value: Union[UFloat, Number]) -> Number:
     return value
 
 
-def arrange_sectors_for_fitting(lcs: LightCurveCollection,
-                                completeness_th: float=0.8,
-                                verbose: bool=False) -> List[List[int]]:
+def group_sectors_for_fitting(lcs: LightCurveCollection,
+                              completeness_th: float=0.8,
+                              verbose: bool=False) -> List[List[int]]:
     """
     Will work out the most effective arrangement of sectors to support JKTEBOP fitting. This will
     need to balance need for sufficient coverage for each fitting to achieve a reliable output,
@@ -116,8 +116,11 @@ def arrange_sectors_for_fitting(lcs: LightCurveCollection,
             if blk_size == 1:
                 if is_usable_group(blk_ecl_counts):
                     sector_groups.append(blk_sectors)
+                    if verbose:
+                        print(f"Created a group of sector(s) {blk_sectors}.")
                 elif verbose:
-                    print(f"Dropped solo sector {blk_sectors[0]} as it has insufficient coverage.")
+                    print(f"Dropped the solitary sector {blk_sectors[0]}",
+                          "as it has insufficient orbital coverage.")
             else:
                 # Multiple LCs within this block so build combinations.
                 grp_start = 0
@@ -137,7 +140,7 @@ def arrange_sectors_for_fitting(lcs: LightCurveCollection,
                             sector_groups.append(blk_sectors[grp_slice])
                             next_start_inc = grp_stop - grp_start
                             if verbose:
-                                print(f"Created a group with sector(s) {blk_sectors[grp_slice]}.")
+                                print(f"Created a group of sector(s) {blk_sectors[grp_slice]}.")
                             break
 
                     grp_start += next_start_inc
@@ -146,6 +149,59 @@ def arrange_sectors_for_fitting(lcs: LightCurveCollection,
                   "orbital coverage, either singularly or when combined.")
 
     return sector_groups
+
+
+def stitch_group_lightcurves(lcs: LightCurveCollection,
+                             sector_groups: List[List[int]],
+                             verbose: bool=False) -> LightCurveCollection:
+    """
+    Will create a new LightCurveCollection containing single and/or stitched LightCurves from the
+    source collection passed in, based on the groups listed in the sector_groups argument.
+
+    The sector_groups argument will have the form [[group0], [group1], ... , [groupN]] where each
+    group is a list of one or more sector numbers which indicate the source LightCurves which are
+    to be stitched to form the group's LightCurve in the output collection. This list can be
+    generated with the group_sectors_for_fitting() func, also in this module.
+    
+    :lcs: the original LightCurveCollection from which to create the stitched copies
+    :sector_groups: the list of groups which controls the stitching to be carried out
+    :verbose: whether or not to send messages to stdout with details of the actions taken
+    :returns: a new LightCurveCollection containing the newly grouped/stitched LightCurves
+    """
+    grp_lcs = []
+    for sector_group in (s for s in sector_groups if len(s) > 0):
+        mask = np.in1d(lcs.sector, sector_group)
+        if sum(mask) == 0:
+            warnings.warn(f"No LCs found for the grouped sector(s) {sector_group}")
+        else:
+            if sum(mask) != len(sector_group):
+                missing = [s for s in sector_group if s not in lcs.sector]
+                msg = f"The LC(s) {missing} not found for the grouped sector(s) {sector_group}"
+                warnings.warn(msg)
+
+            target = lcs[mask][0].meta.get("target", lcs[mask][0].meta["OBJECT"])
+            if verbose and sum(mask) > 1:
+                print(f"The {target} LCs for grouped sectors {lcs[mask].sector} will be stitched.")
+
+            # Normalize + combine the sectors in the grouping (also if there's only 1)
+            grp_lcs += [lcs[mask].stitch(lambda lc: lc.normalize())]
+
+            # Update/combine metadata where appropriate. From fits tends to be UCASE, ours are lcase
+            grp_lcs[-1].meta["LABEL"] = f"{target} S{'+'.join(f'{s:02d}' for s in sector_group)}"
+            grp_lcs[-1].meta["sectors"] = lcs[mask].sector
+            if sum(mask) > 1:
+                # lightkurve's stitch appears smart enough to concat ndarray & list meta values.
+                # However, some of the singular values seem to be from the last sector, when it is
+                # useful if it were from the first sector (i.e.: t0, TSTART). Fix where necessary.
+                for k in ["t0", "TSTART", "DATE-OBS"]:
+                    if k in lcs[mask][0].meta:
+                        grp_lcs[-1].meta[k] = lcs[mask][0].meta[k]
+
+                for k in ["LIVETIME", "TELAPSE"]:
+                    if all(k in lc.meta for lc in lcs[mask]):
+                        grp_lcs[-1].meta[k] = sum(lc.meta[k] for lc in lcs[mask])
+
+    return LightCurveCollection(grp_lcs)
 
 
 def estimate_l3_with_gaia(centre: SkyCoord, radius_as: float=120,
