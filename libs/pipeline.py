@@ -309,34 +309,38 @@ def pop_and_complete_ld_config(source_cfg: dict[str, any],
     return params
 
 
-def median_fitted_params(fitted_params: ArrayLike,
-                         quantiles: Tuple[float, float]=(0.16, 0.84),
-                         min_uncertainty_pc: float=0.) -> ArrayLike:
+def median_params(input_params: ArrayLike,
+                  quant_size: float=0.5,
+                  exclude_outliers: bool=False,
+                  min_uncertainty_pc: float=0.) -> ArrayLike:
     """
-    Produce aggregated values for the passed structured array of fitted params.
-    The values are based on the median of the nominal values of the fitted params
-    with uncertainties from the corresponding scatter in the fitted values.
+    Produce aggregated values for the input structured array of param values.
+    The returned values are the median of the nominal values of the input with
+    uncertainties derived from the mean extent of requested quantile range.
 
-    This approach makes the assumption that any inidividual uncertainties in the source
-    fitted params are negligible when compared with the scatter in the values.
-    
+    This approach makes the assumption that any inidividual uncertainties in the
+    input params are negligible when compared with the scatter in the values,
+    with the scatter approximating a normal distribution.
+
     :fitted_params: a structured array containing the source fitted parameter values
-    :quantiles: quantiles used to derive uncertainties with the default value equivalent to 1-sigma
-    :min_uncertainty_pc: optional minimum uncertainty as a percentage of the nominal
-    :return: a single row of a corresponding structured array
+    :quant_size: the size of the inter-quantile range used to derive uncertainties
+    :exclude_outliers: whether to exclude any outliers before calculating the median and
+    uncertainties, with outliers being values outside the inter-quartile range (IQR) +/- 1.5*IQR
+    :min_uncertainty_pc: optional minimum uncertainty as a percentage of the median
+    :return: a single row of a corresponding structured array containing UFloats
     """
-    if sum(quantiles) != 1.:
-        warnings.warn("Quantiles are not balanced; they do not total 1.0", UserWarning)
+    quantiles = (0.5 - quant_size/2, 0.5, 0.5 + quant_size/2)
+    agg_params = np.empty((1,), dtype=input_params.dtype)
+    for k in input_params.dtype.names:
+        noms = nominal_values(input_params[k])
 
-    agg_params = np.empty_like(fitted_params)
-    for k in fitted_params.dtype.names:
-        noms = nominal_values(fitted_params[k])
+        if exclude_outliers:
+            q1, q3 = np.quantile(noms, q=(0.25, 0.75))
+            whisker_len = 1.5 * (q3 - q1)
+            noms = noms[(q1 - whisker_len <= noms) & (noms <= q3 + whisker_len)]
 
-        med = np.median(noms)
-        qlo = med - np.quantile(noms, min(quantiles))
-        qhi = np.quantile(noms, max(quantiles)) - med
-
-        agg_params[k][0] = ufloat(med, max(np.mean([qlo, qhi]), med * min_uncertainty_pc))
+        lo, med, hi = np.quantile(noms, q=quantiles)
+        agg_params[k][0] = ufloat(med, max(np.mean([med-lo, hi-med]), med * min_uncertainty_pc))
     return agg_params[0]
 
 
