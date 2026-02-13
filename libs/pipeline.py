@@ -71,7 +71,8 @@ def nominal_value(value: Union[UFloat, Number]) -> Number:
 
 
 def arrange_sectors_for_fitting(lcs: LightCurveCollection,
-                                completeness_th: float=0.8) -> List[List[int]]:
+                                completeness_th: float=0.8,
+                                verbose: bool=False) -> List[List[int]]:
     """
     Will work out the most effective arrangement of sectors to support JKTEBOP fitting. This will
     need to balance need for sufficient coverage for each fitting to achieve a reliable output,
@@ -79,6 +80,7 @@ def arrange_sectors_for_fitting(lcs: LightCurveCollection,
 
     :lcs: the LightCurveCollection containing our potential fitting targets
     :completness_th: threshold percentage of an eclipse we require to consider it complete/usable
+    :verbose: whether or not to send messages to stdout with details of the group decisions made
     :returns: the groups of sectors to fit, as a list of lists. i.e.: [[13, 14], [15, 16], [17, 18]]
     indicates that sectors 13 & 14 should be grouped for fitting, as should 15 & 16 and 17 & 18.
     """
@@ -97,44 +99,51 @@ def arrange_sectors_for_fitting(lcs: LightCurveCollection,
     for _, block in groupby(enumerate(lcs.sector),
                             key=lambda ix_sec: ix_sec[1] - ix_sec[0]):
         # Now work out how best to use this block of contiguous sectors for JKTEBOP fitting.
-        block_sectors = list(g for _, g in block)
+        blk_sectors = list(g for _, g in block)
 
         # Eclipse counts for each seg in the block as array([[#prim0, #sec0], ..., [#primN, #secN]])
-        block_ecl_counts = np.array([
+        blk_ecl_counts = np.array([
             list(sum(l.meta[k][l.meta[k] > completeness_th])
                     for k in ["primary_completeness", "secondary_completeness"])
-                        for l in lcs[np.in1d(lcs.sector, block_sectors)]
+                        for l in lcs[np.in1d(lcs.sector, blk_sectors)]
         ])
 
-        block_size = len(block_sectors)
-        max_ecl_count = np.max(block_ecl_counts) # either primary or secondary
-        min_group_size = max(1, int(np.floor(2*completeness_th / (max_ecl_count+1e-10))))
+        blk_size = len(blk_sectors)
+        max_ecl_count = np.max(blk_ecl_counts) # either primary or secondary
+        min_grp_size = max(1, int(np.floor(2*completeness_th / (max_ecl_count+1e-10))))
 
-        if block_size >= min_group_size:
-            if block_size == 1:
-                if is_usable_group(block_ecl_counts):
-                    sector_groups.append(block_sectors)
+        if blk_size >= min_grp_size:
+            if blk_size == 1:
+                if is_usable_group(blk_ecl_counts):
+                    sector_groups.append(blk_sectors)
+                elif verbose:
+                    print(f"Dropped solo sector {blk_sectors[0]} as it has insufficient coverage.")
             else:
                 # Multiple LCs within this block so build combinations.
-                group_start = 0
-                while group_start < block_size:
+                grp_start = 0
+                while grp_start < blk_size:
                     next_start_inc = 1
 
                     # Grow group until it has sufficient coverage or we run out of sectors
-                    for group_stop in range(group_start + min_group_size, block_size + 1):
-                        group_slice = slice(group_start, group_stop)
-                        if is_usable_group(block_ecl_counts[group_slice]):
+                    for grp_stop in range(grp_start + min_grp_size, blk_size + 1):
+                        grp_slice = slice(grp_start, grp_stop)
+                        if is_usable_group(blk_ecl_counts[grp_slice]):
                             # Special case. If we cannot to get another group from the remainder
                             # of the block, we may as well expand this group to make use of it.
-                            if group_stop < block_size <= group_stop + min_group_size \
-                                    and not is_usable_group(block_ecl_counts[group_stop:]):
-                                group_slice = slice(group_start, group_stop := block_size)
+                            if grp_stop < blk_size <= grp_stop + min_grp_size \
+                                    and not is_usable_group(blk_ecl_counts[grp_stop:]):
+                                grp_slice = slice(grp_start, grp_stop := blk_size)
 
-                            sector_groups.append(block_sectors[group_slice])
-                            next_start_inc = group_stop - group_start
+                            sector_groups.append(blk_sectors[grp_slice])
+                            next_start_inc = grp_stop - grp_start
+                            if verbose:
+                                print(f"Created a group with sector(s) {blk_sectors[grp_slice]}.")
                             break
 
-                    group_start += next_start_inc
+                    grp_start += next_start_inc
+        elif verbose:
+            print(f"Dropped the block of sectors {blk_sectors} as they have insufficient",
+                  "orbital coverage, either singularly or when combined.")
 
     return sector_groups
 

@@ -207,7 +207,8 @@ def find_eclipses_and_completeness(lc: LightCurve,
                                    depthp: Union[float, UFloat]=None,
                                    depths: Union[float, UFloat]=None,
                                    phis: Union[float, UFloat]=0.5,
-                                   search_window_phase: float=0.05):
+                                   search_window_phase: float=0.05,
+                                   verbose: bool=False):
     """
     Will find the times of all primary and secondary eclipses within the bounds of the
     passed LightCurve. The eclipse timings will be refined by inspecting the LightCurve fluxes.
@@ -228,6 +229,7 @@ def find_eclipses_and_completeness(lc: LightCurve,
     :depths: the expected depth of the secondary eclipse in units of normalized flux
     :phis: the phase of the secondary eclipses relative to the primary eclipses
     :search_window_phase: size of the window, in units of phase, within which to find each eclipse
+    :verbose: whether or not to send messages to stdout with details the search
     :returns: a dict of ```{ "primary_eclipses": ndarray, "secondary_eclipses": ndarray,
     "primary_completeness": ndarray, "secondary_completenes": ndarray, "t0": float }```
     """
@@ -284,13 +286,19 @@ def find_eclipses_and_completeness(lc: LightCurve,
         return np.array(ecl_times), np.array(ecl_completeness)
 
     t0 = ref_t0
-    min_promp = None if depthp is None else nominal_value(depthp) * 0.66
-    min_proms = None if depths is None else nominal_value(depths) * 0.66
-    for _ in range(2):
+    min_promp = None if depthp is None else round(nominal_value(depthp) * 0.66, 3)
+    min_proms = None if depths is None else round(nominal_value(depths) * 0.66, 3)
+    if verbose:
+        print(f"Finding (pri, sec) eclipses in sector {lc.sector} with min duration {durp:.3f} &",
+              f"{durs:.3f} [d] and min depth {min_promp} & {min_proms} [norm flux]", end="...")
+    for p in range(1, 3):
         pri_times, pri_compl = find_eclipses_and_mask(t0, durp, min_promp)
 
         t0 += period * nominal_value(phis)
         sec_times, sec_compl = find_eclipses_and_mask(t0, durs, min_proms)
+
+        if verbose and p == 2:
+            print(f"found {sum(pri_compl>0)} & {sum(sec_compl>0)} eclipse(s) with fluxes.")
 
         # Refine the reference time (completeness > 0.5 implies enough of a peak to find a time)
         if len(pri_compl) > 0 and any(pri_compl > 0.5):
