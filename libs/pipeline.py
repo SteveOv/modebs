@@ -3,7 +3,7 @@ Low level utility functions for light curve ingest, pre-processing, estimation a
 """
 # pylint: disable=no-member, too-many-arguments, too-many-positional-arguments
 from typing import Union, Tuple, Dict, List
-from io import TextIOBase, StringIO
+from io import TextIOBase
 from sys import stdout
 import warnings
 import re
@@ -16,16 +16,16 @@ from numpy.typing import ArrayLike
 from uncertainties import UFloat, ufloat
 from uncertainties.unumpy import nominal_values
 import astropy.units as u
+from astropy.time import Time
 from astropy.coordinates import SkyCoord
 from astropy.io import ascii as io_ascii
 from astroquery.gaia import Gaia
-from astroquery.vizier import Vizier
 from lightkurve import LightCurve, LightCurveCollection
 
 from deblib import limb_darkening
-from deblib.vmath import arccos, arcsin, degrees
+from deblib.vmath import arccos, degrees
 
-from libs import jktebop
+from libs import jktebop, lightcurves
 from libs.iohelpers import PassthroughTextWriter
 
 _TRIG_MIN = ufloat(-1, 0)
@@ -70,22 +70,101 @@ def nominal_value(value: Union[UFloat, Number]) -> Number:
     return value
 
 
-def group_sectors_for_fitting(lcs: LightCurveCollection,
-                              completeness_th: float=0.8,
-                              verbose: bool=False) -> List[List[int]]:
+def mask_lightcurves_unusable_fluxes(lcs: LightCurveCollection,
+                                     quality_masks: List[Union[List, Tuple]]=None,
+                                     min_section_gap_bins: int=60,
+                                     min_section_dur: Union[u.Quantity[u.d], float]= 2 * u.d):
     """
-    Will work out the most effective arrangement of sectors to support JKTEBOP fitting. This will
-    need to balance need for sufficient coverage for each fitting to achieve a reliable output,
+    Mask out invalid fluxes, known distorted sections and any short, isolated sections
+    of observations found across the passed collection of LightCurves.
+    
+    :lcs: the LightCurveCollection containing our potential fitting targets
+    :quality_masks: an optional list of (from, to) time tuples of sections to be masked
+    :min_section_gap_bins: the minimum gap size in time bins, when finding sections of observations
+    :min_section_dur: the minimum duration of isolated LightCurve sections to retain
+    """
+    # pylint: disable=consider-using-enumerate (cannot enumerate lcs as we're changing its content)
+    for ix in range(len(lcs)):
+        _mask = lightcurves.create_invalid_flux_mask(lcs[ix])
+
+        # The configured quality masks are clipped because they're known to be they're distorted.
+        if quality_masks is not None and len(quality_masks) > 0:
+            for mask_times in (lightcurves.to_lc_time(t, lcs[ix]) for t in quality_masks):
+                _mask &= (lcs[ix].time < np.min(mask_times)) | (np.max(mask_times) < lcs[ix].time)
+
+        # We also look to clip any short isolated regions of the LCs, as they often contain little
+        # useful information and often have a detrimental affect on the effectiveness of detrending.
+        seg_gap_th = min_section_gap_bins * lcs[ix].meta['FRAMETIM'] * lcs[ix].meta['NUM_FRM'] * u.s
+        for seg in lightcurves.find_lightcurve_segments(lcs[ix], seg_gap_th, yield_times=True):
+            if max(seg) - min(seg) < min_section_dur:
+                _mask &= (lcs[ix].time < min(seg)) | (lcs[ix].time > max(seg))
+
+        lcs[ix] = lcs[ix][_mask]
+
+
+def add_eclipse_meta_to_lightcurves(lcs: LightCurveCollection,
+                                    ref_t0: Union[Time, float, UFloat],
+                                    period: Union[u.Quantity, float, UFloat],
+                                    durp: Union[float, UFloat],
+                                    durs: Union[float, UFloat],
+                                    depthp: Union[float, UFloat]=None,
+                                    depths: Union[float, UFloat]=None,
+                                    phis: Union[float, UFloat]=0.5,
+                                    search_window_phase: float=0.05,
+                                    verbose: bool=False):
+    """
+    Will find the times of all primary and secondary eclipses within the bounds of each
+    passed LightCurve sector and the corresponding completeness metrics. These data will
+    be added/updated in each LightCurves meta dictionary with the following keys:
+    - t0: a sector specific reference primary eclipse time based on the eclipses within sector
+    - primary_times: an array of the times of any primary eclipses that fall within the sector
+    - primary_completeness: an array of completeness values, each the proportion of fluxes
+    found vs number of fluxes expected for a complete eclipse
+    - secondary_times: as for primary_times, but for secondary eclipses
+    - secondary_completeness: as for primary_completeness, but for secondary eclipses
+    
+    :lcs: the LightCurveCollection containing our potential fitting targets
+    :ref_t0: the known reference primary eclipse time
+    :period: the known orbital period
+    :durp: the duration of the primary eclipses
+    :durs: the duration of the secondary eclipses
+    :depthp: the expected depth of the primary eclipse in units of normalized flux
+    :depths: the expected depth of the secondary eclipse in units of normalized flux
+    :phis: the phase of the secondary eclipses relative to the primary eclipses
+    :search_window_phase: size of the window, in units of phase, within which to find each eclipse
+    :verbose: whether or not to send messages to stdout with details of the eclipse search
+    """
+    for lc in lcs:
+        sector_times = lightcurves.find_eclipses_and_completeness(lc, ref_t0, period,
+                                                                  durp, durs, depthp, depths,
+                                                                  phis, search_window_phase,
+                                                                  verbose)
+
+        # We will use the revised/refined reference time as a starting position for the next sector
+        ref_t0 = lc.meta["t0"] = sector_times[0] or ref_t0
+        lc.meta |= dict(zip(
+            ["primary_times", "primary_completeness", "secondary_times", "secondary_completeness"],
+            sector_times[1:]
+        ))
+
+
+def choose_lightcurve_groups_for_fitting(lcs: LightCurveCollection,
+                                         completeness_th: float=0.8,
+                                         verbose: bool=False) -> List[List[int]]:
+    """
+    Will work out the most effective arrangement of LightCurves to support JKTEBOP fitting. This
+    will need to balance need for sufficient coverage for each fitting to achieve a reliable output,
     while running as many fits as possible across the breadth of time in which we have observations.
+    This uses the eclipse timing & completeness metadata added by add_eclipse_meta_to_lightcurves().
 
     :lcs: the LightCurveCollection containing our potential fitting targets
     :completness_th: threshold percentage of an eclipse we require to consider it complete/usable
     :verbose: whether or not to send messages to stdout with details of the group decisions made
-    :returns: the groups of sectors to fit, as a list of lists. i.e.: [[13, 14], [15, 16], [17, 18]]
-    indicates that sectors 13 & 14 should be grouped for fitting, as should 15 & 16 and 17 & 18.
+    :returns: the groups to fit, as a list of lists of sector numbers. i.e.: [[13, 14], [15, 16]]
+    indicates the LightCurves for sectors 13 & 14 should be grouped for fitting, as should 15 & 16.
     """
     def is_usable_group(seg_ecl_counts) -> bool:
-        """ From these eclipse counts, is the corresponding grp of sectors suitable for fitting? """
+        """ On the eclipse counts, is the corresponding grp of LCs/sectors suitable for fitting? """
         ecl_sums = np.sum(seg_ecl_counts, axis=0)
         return max(ecl_sums) > 2 * completeness_th and min(ecl_sums) > 1 * completeness_th
 
@@ -98,10 +177,10 @@ def group_sectors_for_fitting(lcs: LightCurveCollection,
     sector_groups = []
     for _, block in groupby(enumerate(lcs.sector),
                             key=lambda ix_sec: ix_sec[1] - ix_sec[0]):
-        # Now work out how best to use this block of contiguous sectors for JKTEBOP fitting.
+        # Now work out how best to use this block of contiguous sectors/LCs for JKTEBOP fitting.
         blk_sectors = list(g for _, g in block)
 
-        # Eclipse counts for each seg in the block as array([[#prim0, #sec0], ..., [#primN, #secN]])
+        # Eclipse counts for each block member as an array([[#prim0, #sec0], ..., [#primN, #secN]])
         blk_ecl_counts = np.array([
             list(sum(l.meta[k][l.meta[k] > completeness_th])
                     for k in ["primary_completeness", "secondary_completeness"])
@@ -122,7 +201,7 @@ def group_sectors_for_fitting(lcs: LightCurveCollection,
                     print(f"Dropped the solitary sector {blk_sectors[0]}",
                           "as it has insufficient orbital coverage.")
             else:
-                # Multiple LCs within this block so build combinations.
+                # Multiple sectors/LCs within this block so build combinations.
                 grp_start = 0
                 while grp_start < blk_size:
                     next_start_inc = 1
@@ -151,7 +230,7 @@ def group_sectors_for_fitting(lcs: LightCurveCollection,
     return sector_groups
 
 
-def stitch_group_lightcurves(lcs: LightCurveCollection,
+def stitch_lightcurve_groups(lcs: LightCurveCollection,
                              sector_groups: List[List[int]],
                              verbose: bool=False) -> LightCurveCollection:
     """
@@ -202,6 +281,62 @@ def stitch_group_lightcurves(lcs: LightCurveCollection,
                         grp_lcs[-1].meta[k] = sum(lc.meta[k] for lc in lcs[mask])
 
     return LightCurveCollection(grp_lcs)
+
+
+def append_mags_to_lightcurves_and_detrend(lcs: LightCurveCollection,
+                                           detrend_gap_th: Union[u.Quantity[u.d], float]=2,
+                                           detrend_poly_degree: int=2,
+                                           detrend_iterations: int=3,
+                                           flatten: bool=False,
+                                           durp: Union[float, UFloat]=None,
+                                           durs: Union[float, UFloat]=None,
+                                           verbose: bool=False):
+    """
+    Append delta_mag and delta_mag_err columns calculated from normalized fluxes to each
+    LightCurve, then detrend the delta_mag column by subtracting a fitted polynomial.
+    Optionally the fluxes may be flattened outside of any previously detected eclipses,
+    prior to calculating the magnitude columns.
+
+    :lcs: the LightCurveCollection containing our potential fitting targets
+    :detrend_gap_th: the threshold gap time beyond which a detrending section break is triggered
+    :detrend_poly_degree: the degree of the detrending polynomial to fit
+    :detrend_iterations: number of iterations to run during detrending to fit a polynomial
+    :flatten: whether or not to flatten the LightCurve fluxes prior to calculating the magnitudes
+    :durp: the duration of the primary eclipses required for flattening
+    :durs: the duration of the secondary eclipses required for flattening
+    :verbose: whether or not to send messages to stdout with details of the actions taken
+    """
+    if flatten and (durp is None or durs is None):
+        raise ValueError("durp and durs required if flatten == True")
+    if flatten:
+        durp = nominal_value(durp) * 1.1
+        durs = nominal_value(durs) * 1.1
+    if not isinstance(detrend_gap_th, u.Quantity):
+        detrend_gap_th = detrend_gap_th * u.d
+
+    # Cannot enumerate lcs as we're changing its content. pylint: disable=consider-using-enumerate
+    for ix in range(len(lcs)):
+        label = lcs[ix].meta["LABEL"]
+
+        if flatten:
+            pri_times = lcs[ix].meta.get("primary_times", [])
+            sec_times = lcs[ix].meta.get("secondary_times", [])
+            mask = lcs[ix].meta["flat_mask"] = lightcurves.create_eclipse_mask(lcs[ix],
+                                                                               pri_times, sec_times,
+                                                                               durp, durs)
+
+            if verbose:
+                num_ecl = len(np.ma.clump_masked(np.ma.masked_where(mask, mask)))
+                print(f"Flattening the {label} LC outside of {num_ecl} masked eclipse(s).")
+            lcs[ix] = lcs[ix].flatten(mask=mask)
+
+        # Create detrended & rectified delta_mag and delta_mag err columns
+        lightcurves.append_magnitude_columns(lcs[ix], "delta_mag", "delta_mag_err")
+        for s in lightcurves.find_lightcurve_segments(lcs[ix], threshold=detrend_gap_th):
+            lcs[ix][s]["delta_mag"] -= lightcurves.fit_polynomial(lcs[ix].time[s],
+                                                                  lcs[ix][s]["delta_mag"],
+                                                                  detrend_poly_degree,
+                                                                  detrend_iterations)
 
 
 def estimate_l3_with_gaia(centre: SkyCoord, radius_as: float=120,

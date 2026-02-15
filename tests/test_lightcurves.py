@@ -161,41 +161,42 @@ class Testlightcurves(unittest.TestCase):
             tess_ebs = catalogues.query_tess_ebs_ephemeris(target_cfg["tic"]) or {}
 
             lcs = lightcurve_helpers.load_lightcurves(target, sectors)
-            ecl_dicts = [lightcurves.find_eclipses_and_completeness(lc,
-                                                                    target_cfg.get("t0", tess_ebs.get("t0", None)),
-                                                                    target_cfg.get("period", tess_ebs.get("period", None)),
-                                                                    target_cfg.get("durP", tess_ebs.get("durP", None)),
-                                                                    target_cfg.get("durS", tess_ebs.get("durS",None)),
-                                                                    target_cfg.get("depthP", tess_ebs.get("deptP", None)),
-                                                                    target_cfg.get("depthS", tess_ebs.get("depthS", None)),
-                                                                    target_cfg.get("phiS", tess_ebs.get("phiS", None))) for lc in lcs]
+            ret_vals = [lightcurves.find_eclipses_and_completeness(lc,
+                                                                   target_cfg.get("t0", tess_ebs.get("t0", None)),
+                                                                   target_cfg.get("period", tess_ebs.get("period", None)),
+                                                                   target_cfg.get("durP", tess_ebs.get("durP", None)),
+                                                                   target_cfg.get("durS", tess_ebs.get("durS",None)),
+                                                                   target_cfg.get("depthP", tess_ebs.get("deptP", None)),
+                                                                   target_cfg.get("depthS", tess_ebs.get("depthS", None)),
+                                                                   target_cfg.get("phiS", tess_ebs.get("phiS", None)))
+                        for lc in lcs]
 
-            # self._plot_lcs_and_eclipses(lcs, ecl_dicts, completeness_th)
+            # self._plot_lcs_and_eclipses(lcs, ret_vals, completeness_th)
 
-            for lc, ed, exp_num_prim, exp_num_sec in zip(lcs, ecl_dicts, exp_prim, exp_sec):
+            for lc, (t0, pri_times, pri_compl, sec_times, sec_compl), exp_num_prim, exp_num_sec in zip(lcs, ret_vals, exp_prim, exp_sec):
                 with self.subTest(lc.meta["LABEL"]):
-                    self.assertEqual(len(ed["primary_times"]), len(ed["primary_completeness"]))
-                    self.assertEqual(len(ed["secondary_times"]), len(ed["secondary_completeness"]))
-                    self.assertEqual(sum(ed["primary_completeness"] > completeness_th), exp_num_prim)
-                    self.assertEqual(sum(ed["secondary_completeness"] > completeness_th), exp_num_sec)
+                    if exp_num_prim > 0:
+                        self.assertTrue(lc.time.value.min() <= t0 <= lc.time.value.max())
+                    self.assertEqual(len(pri_times), len(pri_compl))
+                    self.assertEqual(len(sec_times), len(sec_compl))
+                    self.assertEqual(sum(pri_compl > completeness_th), exp_num_prim)
+                    self.assertEqual(sum(sec_compl > completeness_th), exp_num_sec)
 
 
-    def _plot_lcs_and_eclipses(self, lcs, eclipse_dicts: List[Dict], completeness_th):
+    def _plot_lcs_and_eclipses(self, lcs, data: List[tuple], completeness_th):
         """
         Plots lightcurves and corresponding output from get_eclipse_times_and_masks.
         """
-        self.assertEqual(len(lcs), len(eclipse_dicts))
+        self.assertEqual(len(lcs), len(data))
 
         def plot_eclipses(ix, ax, _):
-            ed = eclipse_dicts[ix]
-            for x, completeness, ls, c, label in [
-                (ed["primary_times"], ed["primary_completeness"], "-.", "r", "primary"),
-                (ed["secondary_times"], ed["secondary_completeness"], "--", "g", "secondary")
-            ]:
-                alphas = [0.66 if c > completeness_th else 0.20 for c in completeness]
-                ax.vlines(x, -0.2, 1.0, c, ls, label, alpha=alphas, zorder=-20, transform=ax.get_xaxis_transform())
-                for x, compl, a in zip(x, completeness, alphas):
-                    ax.text(x, 0, f"{compl:.0%}", c=c, rotation=90, alpha=a + 0.3,
+            ed = data[ix]
+            ax.plot(ed[0], -0.1, marker="*", markersize=10, color="r")
+            for times, compl, ls, c, label in [(ed[1], ed[2], "-.", "r", "primary"), (ed[3], ed[4], "--", "g", "secondary")]:
+                alphas = [0.66 if c > completeness_th else 0.20 for c in compl]
+                ax.vlines(times, -0.2, 1.0, c, ls, label, alpha=alphas, zorder=-20, transform=ax.get_xaxis_transform())
+                for times, compl, a in zip(times, compl, alphas):
+                    ax.text(times, 0, f"{compl:.0%}", c=c, rotation=90, alpha=a + 0.3,
                             va="center", ha="center", zorder=-10, backgroundcolor="w")
 
         plots.plot_lightcurves(lcs, cols=min(len(lcs), 3), column="delta_mag", ax_func=plot_eclipses, legend_loc="best")

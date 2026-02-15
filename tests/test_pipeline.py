@@ -6,13 +6,14 @@ import numpy as np
 import astropy.units as u
 from astropy.coordinates import SkyCoord
 
-from deblib.orbital  import phase_of_secondary_eclipse, eclipse_duration
 from tests.helpers.lightcurve_helpers import load_lightcurves, KNOWN_TARGETS
 from libs.catalogues import query_tess_ebs_ephemeris
 from libs.lightcurves import find_lightcurve_segments, fit_polynomial
-from libs.lightcurves import find_eclipses_and_completeness
 
-from libs.pipeline import group_sectors_for_fitting, stitch_group_lightcurves
+from libs.pipeline import add_eclipse_meta_to_lightcurves
+from libs.pipeline import choose_lightcurve_groups_for_fitting
+from libs.pipeline import stitch_lightcurve_groups
+from libs.pipeline import append_mags_to_lightcurves_and_detrend
 from libs.pipeline import estimate_l3_with_gaia
 from libs.pipeline import fit_target_lightcurves
 
@@ -21,11 +22,43 @@ class Testpipeline(unittest.TestCase):
     """ Unit tests for the pipeline module. """
 
     #
-    # group_sectors_for_fitting(lcs: LightCurveCollection, completeness_th: float) -> List[List[ix]]
+    # add_eclipse_meta_to_lightcurves(lcs: LightCurveCollection)
     #
-    def test_group_sectors_for_fitting_known_targets(self):
-        """ Test group_sectors_for_fitting() assert it produces expected arrangement """
-        for target,             sectors,                exp_sector_groups in[
+    def test_add_eclipse_meta_to_lightcurves_happy_path(self):
+        """ Test add_eclipse_meta_to_lightcurves() assert it adds the expected lc.meta items """        
+        target = "CW Eri"
+        sectors = [4, 31]
+
+        # Read the ephemeris. We need this to find eclipses and set completeness metrics
+        config = KNOWN_TARGETS[target]
+        eph = query_tess_ebs_ephemeris(config["tic"]) or {}
+        t0 = eph.get("t0", config.get("t0", config.get("t0", None)))
+        period = eph.get("period", config.get("period", None))
+        durp = eph.get("durP", config.get("durP", None))
+        durs = eph.get("durS", config.get("durS", None))
+        depthp = eph.get("depthP", config.get("depthP", None))
+        depths = eph.get("depthS", config.get("depthS", None))
+        phis = eph.get("phiS", config.get("phiS", None))
+        lcs = load_lightcurves(target, sectors)
+
+        # Test
+        add_eclipse_meta_to_lightcurves(lcs, t0, period, durp, durs, depthp, depths, phis)
+
+        for lc in lcs:
+            # See test_lightcurves.test_find_eclipses_and_completeness_known_targets
+            # for test which address the values
+            self.assertIn("t0", lc.meta)
+            self.assertIn("primary_times", lc.meta)
+            self.assertIn("primary_completeness", lc.meta)
+            self.assertIn("secondary_times", lc.meta)
+            self.assertIn("secondary_completeness", lc.meta)
+
+    #
+    # choose_lightcurve_groups_for_fitting(lcs: LightCurveCollection, completeness_th: float) -> List[List[ix]]
+    #
+    def test_choose_lightcurve_groups_for_fitting_known_targets(self):
+        """ Test choose_lightcurve_groups_for_fitting() assert it produces expected arrangement """
+        for target,             sectors,                exp_groups in[
             # Sectors not contiguous (so no join) but are fine to use individually do 7+ of each ecl per sector
             ("CW Eri",          [4, 31],                [[4], [31]]),
             # Sector are contiguous, but joining not necessary as there are many of each eclipse per sectors
@@ -33,7 +66,7 @@ class Testpipeline(unittest.TestCase):
             # The only usable combo is 52+53 as eclipses too infrequent to fit any sector individually
             ("AN Cam",          [53, 59, 52],           [[52, 53]]),
         ]:
-            with self.subTest(f" {target}; {sectors} -> {exp_sector_groups} "):
+            with self.subTest(f" {target}; {sectors} -> {exp_groups} "):
                 config = KNOWN_TARGETS[target]
 
                 # Read the ephemeris. We need this to find eclipses and set completeness metrics
@@ -42,24 +75,25 @@ class Testpipeline(unittest.TestCase):
                 period = eph.get("period", config.get("period", None))
                 durp = eph.get("durP", config.get("durP", None))
                 durs = eph.get("durS", config.get("durS", None))
+                depthp = eph.get("depthP", config.get("depthP", None))
+                depths = eph.get("depthS", config.get("depthS", None))
                 phis = eph.get("phiS", config.get("phiS", None))
-
-                # Sets primary|secondary _times & _completeness arrays and t0 ('best' primary) to lcs' meta
                 lcs = load_lightcurves(target, sectors)
-                for lc in lcs:
-                    lc.meta |= find_eclipses_and_completeness(lc, t0, period, durp, durs, phis)
-                    t0 = lc.meta.get("t0", None) or t0
+
+                # Prior steps in the pipeline where we have a dependency
+                # Sets primary|secondary _times & _completeness arrays and t0 ('best' primary) to lcs' meta
+                add_eclipse_meta_to_lightcurves(lcs, t0, period, durp, durs, depthp, depths, phis)
 
                 # Test
-                sector_groups = group_sectors_for_fitting(lcs, completeness_th=0.8)
-                self.assertListEqual(exp_sector_groups, sector_groups)
+                sector_groups = choose_lightcurve_groups_for_fitting(lcs, completeness_th=0.8)
+                self.assertListEqual(exp_groups, sector_groups)
 
     #
-    # stitch_group_lightcurves(lcs: LightCurveCollection, completeness_th: float) -> List[List[ix]]
+    # stitch_lightcurve_groups(lcs: LightCurveCollection, completeness_th: float) -> LightCurveCollection:
     #
-    def test_stitch_group_lightcurves(self):
-        """ Test stitch_group_lightcurves() assert it produces expected set of output LCs """
-        for target,             sectors,                sector_groups in[
+    def test_stitch_lightcurve_groups_known_targets(self):
+        """ Test stitch_lightcurve_groups() assert it produces expected set of output LCs """
+        for target,             sectors,                exp_groups in[
             ("CM Dra",          [24, 25, 26],           [[24, 25, 26]]),
             ("CM Dra",          [24, 25, 26],           [[24, 25], [26]]),
             ("CM Dra",          [24, 25, 26],           [[24], [25, 26]]),
@@ -69,31 +103,16 @@ class Testpipeline(unittest.TestCase):
             ("CM Dra",          [24, 25, 26],           [[25, 26]]),
             ("CM Dra",          [24, 25, 26],           [[25], [26]]),
         ]:
-            with self.subTest(f" {target}; {sectors} grouped as {sector_groups} "):
-                config = KNOWN_TARGETS[target]
-
-                # Read the ephemeris. We need this to find eclipses and set completeness metrics
-                eph = query_tess_ebs_ephemeris(config["tic"]) or {}
-                t0 = eph.get("t0", config.get("t0", config.get("t0", None)))
-                period = eph.get("period", config.get("period", None))
-                durp = eph.get("durP", config.get("durP", None))
-                durs = eph.get("durS", config.get("durS", None))
-                phis = eph.get("phiS", config.get("phiS", None))
-
+            with self.subTest(f" {target}; {sectors} grouped as {exp_groups} "):
                 lcs = load_lightcurves(target, sectors)
-                for lc in lcs:
-                    # These would be present in a real pipeline and we see they've been copied over.
-                    # Sets primary|secondary _times & _completeness and t0 ('best' primary) to meta.
-                    lc.meta |= find_eclipses_and_completeness(lc, t0, period, durp, durs, phis)
-                    t0 = lc.meta.get("t0", None) or t0
 
                 # Test
-                grp_lcs = stitch_group_lightcurves(lcs, sector_groups, verbose=True)
-                for ix, exp_group_sectors in enumerate(sector_groups):
+                grp_lcs = stitch_lightcurve_groups(lcs, exp_groups, verbose=True)
+                for ix, exp_group_sectors in enumerate(exp_groups):
                     self.assertListEqual(list(grp_lcs[ix].meta["sectors"]), exp_group_sectors)
 
-    def test_stitch_group_lightcurves_missing_group_members(self):
-        """ Test stitch_group_lightcurves(missing LCs) assert raised appropriate warnings """
+    def test_stitch_lightcurve_groups_missing_group_members(self):
+        """ Test stitch_lightcurve_groups(missing LCs) assert raised appropriate warnings """
         for (target,        sectors,        sector_groups,      exp_sectors,    warn_msg) in[
             ("CM Dra",      [25, 26],       [[25], [26], [27]], [[25], [26]],   "No LCs found"),
             ("CM Dra",      [25, 26],       [[25, 26, 27]],     [[25, 26]],     "The LC(s) [27] not found"),
@@ -101,9 +120,49 @@ class Testpipeline(unittest.TestCase):
             with self.subTest(f" {target}; {sectors} grouped as {sector_groups} "):
                 lcs = load_lightcurves(target, sectors)
                 with self.assertWarns(UserWarning, msg=warn_msg):
-                    grp_lcs = stitch_group_lightcurves(lcs, sector_groups, verbose=True)
+                    grp_lcs = stitch_lightcurve_groups(lcs, sector_groups, verbose=True)
                     for ix, exp_group_sectors in enumerate(exp_sectors):
                         self.assertListEqual(list(grp_lcs[ix].meta["sectors"]), exp_group_sectors)
+
+    #
+    # append_mags_to_lightcurves_and_detrend(lcs: LightCurveCollection, ...)
+    #
+    def test_append_mags_to_lightcurves_and_detrend_happy_path(self):
+        """ Test append_mags_to_lightcurves_and_detrend() simple happy path test """        
+        target = "AN Cam"
+        config = KNOWN_TARGETS[target]
+        sectors = list(config["fits"].keys())
+
+        # Read the ephemeris. We need this to find eclipses and set completeness metrics
+        eph = query_tess_ebs_ephemeris(config["tic"]) or {}
+        t0 = eph.get("t0", config.get("t0", config.get("t0", None)))
+        period = eph.get("period", config.get("period", None))
+        durp = eph.get("durP", config.get("durP", None))
+        durs = eph.get("durS", config.get("durS", None))
+        depthp = eph.get("depthP", config.get("depthP", None))
+        depths = eph.get("depthS", config.get("depthS", None))
+        phis = eph.get("phiS", config.get("phiS", None))
+        lcs = load_lightcurves(target, sectors)
+
+        # Prior step(s) in pipeline that test subject is dependent on.
+        # The eclipse meta items will be used if flattening invoked
+        add_eclipse_meta_to_lightcurves(lcs, t0, period, durp, durs, depthp, depths, phis)
+
+        # Test
+        append_mags_to_lightcurves_and_detrend(lcs,
+                                               detrend_gap_th=2,
+                                               detrend_poly_degree=2,
+                                               detrend_iterations=3,
+                                               flatten=True,
+                                               durp=durp,
+                                               durs=durs,
+                                               verbose=True)
+
+        for lc in lcs:
+            # See test_lightcurves for tests covering the calculations
+            self.assertIn("delta_mag", lc.colnames)
+            self.assertIn("delta_mag_err", lc.colnames)
+
 
     #
     # estimate_l3_with_gaia(centre: SkyCoord, radius_as: float, target_source_id: int,

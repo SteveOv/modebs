@@ -213,7 +213,8 @@ def find_eclipses_and_completeness(lc: LightCurve,
                                    depths: Union[float, UFloat]=None,
                                    phis: Union[float, UFloat]=0.5,
                                    search_window_phase: float=0.05,
-                                   verbose: bool=False):
+                                   verbose: bool=False) \
+        -> Tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Will find the times of all primary and secondary eclipses within the bounds of the
     passed LightCurve. The eclipse timings will be refined by inspecting the LightCurve fluxes.
@@ -235,8 +236,7 @@ def find_eclipses_and_completeness(lc: LightCurve,
     :phis: the phase of the secondary eclipses relative to the primary eclipses
     :search_window_phase: size of the window, in units of phase, within which to find each eclipse
     :verbose: whether or not to send messages to stdout with details the search
-    :returns: a dict of ```{ "primary_eclipses": ndarray, "secondary_eclipses": ndarray,
-    "primary_completeness": ndarray, "secondary_completenes": ndarray, "t0": float }```
+    :returns: a tuple of (t0, prim_times, prim_completeness, sec_times, sec_completeness)
     """
     def nominal_value(value):
         return value.nominal_value if isinstance(value, UFloat) else value
@@ -310,14 +310,12 @@ def find_eclipses_and_completeness(lc: LightCurve,
             t0 = pri_times[np.argmax(pri_compl)]
         elif len(sec_times) > 0 and any(sec_compl > 0.5):
             t0 = sec_times[np.argmax(sec_compl)] - (period * nominal_value(phis))
+            while t0 < times.min():
+                t0 += period
         else:
             t0 = ref_t0
 
-    return {
-        "t0": t0,
-        "primary_times": pri_times, "primary_completeness": pri_compl,
-        "secondary_times": sec_times, "secondary_completeness": sec_compl
-    }
+    return (t0, pri_times, pri_compl, sec_times, sec_compl)
 
 
 def create_eclipse_mask(lc: LightCurve,
