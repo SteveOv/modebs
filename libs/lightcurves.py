@@ -84,14 +84,19 @@ def append_magnitude_columns(lc: LightCurve,
     :name: the name of the new magnitude column
     :err_name: the name of the corresponding magnitude error column
     """
-    lc[name] = u.Quantity(-2.5 * np.log10(lc.flux.value) * u.mag)
+    if lc.flux.unit == u.dimensionless_unscaled:
+        fluxes = lc.flux.value
+    else:
+        fluxes = lc.normalize().flux.value
+
+    lc[name] = u.Quantity(-2.5 * np.log10(fluxes) * u.mag)
     lc[err_name] = u.Quantity(
         2.5
         * 0.5
         * np.abs(
             np.subtract(
-                np.log10(np.add(lc.flux.value, lc.flux_err.value)),
-                np.log10(np.subtract(lc.flux.value, lc.flux_err.value))
+                np.log10(np.add(fluxes, lc.flux_err.value)),
+                np.log10(np.subtract(fluxes, lc.flux_err.value))
             )
         )
         * u.mag)

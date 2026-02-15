@@ -41,6 +41,28 @@ class Testlightcurves(unittest.TestCase):
 
 
     #
+    #   append_magnitude_columns(LightCurve, name: str, err_name: str)
+    #
+    def test_append_magnitude_columns_happy_path(self):
+        """ Happy path tests for append_magnitude_columns(LC) """
+        exp_name = "delta_mag"
+        exp_err_name = "delta_mag_err"
+        exp_max_mag = 0.467 * u.mag
+
+        # Test with/without the LC's fluxes having been normalized()
+        for normalized in [True, False]:
+            lc = lightcurve_helpers.load_default_lightcurve("CW Eri",
+                                                            normalized=normalized,
+                                                            with_mag_columns=False)
+
+            lightcurves.append_magnitude_columns(lc, exp_name, exp_err_name)
+
+            self.assertIn(exp_name, lc.colnames)
+            self.assertIn(exp_err_name, lc.colnames)
+            self.assertAlmostEqual(exp_max_mag, lc[exp_name].max(), 3)
+
+
+    #
     #   get_binned_phase_mags_data(flc, num_bins, phase_pivot) -> (phases, mags)
     #
     def test_get_binned_phase_mags_data_happy_path(self):

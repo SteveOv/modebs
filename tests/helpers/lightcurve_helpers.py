@@ -125,20 +125,23 @@ KNOWN_TARGETS = {
 
 
 def load_default_lightcurve(target: str,
+                            normalized: bool=True,
                             with_mag_columns: bool=True) -> lk.LightCurve:
     """
     Loads the sector's default (config: sector) LightCurve from file for the requested target.
 
     :target: the name of the target, also the key to the KNOWN_TARGETS dict
+    :normalized: whether or not to normalize the fluxes
     :with_mag_columns: whether or not to create delta_mag and delta_mag_err columns
     :returns: the requested LightCurve
     """
     params = KNOWN_TARGETS[target]
-    return load_lightcurves(target, [params["sector"]], with_mag_columns)[0]
+    return load_lightcurves(target, [params["sector"]], normalized, with_mag_columns)[0]
 
 
 def load_lightcurves(target: str,
                      sectors: List[int]=None,
+                     normalized: bool=True,
                      with_mag_columns: bool=True) -> lk.LightCurveCollection:
     """
     Load lightcurves from file for the configured target
@@ -148,6 +151,7 @@ def load_lightcurves(target: str,
 
     :target: the name of the target, also the key to the KNOWN_TARGETS dict
     :sectors: the known sector(s) to load, or if None all configured sectors
+    :normalized: whether or not to normalize the fluxes
     :with_mag_columns: whether or not to create delta_mag and delta_mag_err columns
     :returns: a LightCurveCollection with the requested LightCurves
     """
@@ -163,7 +167,9 @@ def load_lightcurves(target: str,
                      flux_column=params.get("flux_column", "sap_flux"),
                      quality_bitmask=params.get("quality_bitmask", "hardest"))
 
-        lc = lc[~((np.isnan(lc.flux)) | (lc.flux < 0))].normalize()
+        lc = lc[~((np.isnan(lc.flux)) | (lc.flux < 0))]
+        if normalized:
+            lc = lc.normalize()
         if with_mag_columns:
             append_mag_columns(lc)
 
