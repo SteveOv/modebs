@@ -1,13 +1,13 @@
 """ Unit tests for the pipeline module. """
-from typing import List, Dict
+from typing import List
 from pathlib import Path
-import re
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
 
 # pylint: disable=no-member, wrong-import-position, line-too-long
 import numpy as np
 import astropy.units as u
-import lightkurve as lk
 import matplotlib.pyplot as plt
 
 from tests.helpers import lightcurve_helpers
@@ -17,27 +17,71 @@ from libs import lightcurves, catalogues, plots
 # pylint: disable=too-many-public-methods, line-too-long
 class Testlightcurves(unittest.TestCase):
     """ Unit tests for the lightcurves module. """
+    cache_dir = Path.cwd() / ".cache/.test_data/lightcurves"
 
-    def test_happy_path_tess_mission(self):
-        """ Simple happy path test of load_lightcurves() while reading through an explicit cache dir """
-        target = "CW Eri"
-        results = lk.search_lightcurve(target, exptime="short", mission="TESS", author="SPOC")
+    @classmethod
+    def setUpClass(cls):
+        """ Make sure JKTEBOP_DIR is corrected up as tests may modify it. """
+        cls.cache_dir.mkdir(parents=True, exist_ok=True)
+        return super().setUpClass()
 
-        download_dir = Path.cwd() / ".cache" / re.sub(r"[^\w\d]", "-", target.lower())
+    @classmethod
+    def tearDownClass(cls):
+        """ Make sure JKTEBOP_DIR is corrected up as tests may modify it. """
+        return super().tearDownClass()
 
-        lcs = lightcurves.load_lightcurves(results, "hardest", ["sap_flux", "pdcsap_flux"], download_dir)
-        self.assertEqual(len(lcs), 2)
-        self.assertEqual(lcs[0].meta["FLUX_ORIGIN"], "sap_flux")
-        self.assertEqual(lcs[1].meta["FLUX_ORIGIN"], "pdcsap_flux")
 
-    def test_happy_path_default_cache(self):
-        """ Simple happy path test of load_lightcurves() while reading through the default lk cache """
-        target = "CW Eri"
-        results = lk.search_lightcurve(target, exptime="short", mission="TESS", author="SPOC")
+    def test_load_lightcurves_mast_download(self):
+        """ Simple happy path test of load_lightcurves() for forces mast queries """
+        # Don't push this too hard otherwise we may get throttled by MAST
+        for target,     sectors,        mission,            author,                 exptime,        exp_sectors in [
+            ("CW Eri",  None,           "TESS",             "SPOC",                 None,           [4, 31]),
+            # ("CW Eri",  4,              "TESS",             "SPOC",                 None,           [4]),
+            # ("CW Eri",  [31, 4],        "TESS",             "SPOC",                 None,           [4, 31]),
+            # ("CW Eri",  4,              ["TESS","HLSP"],    "SPOC",                 None,           [4]),
+            # ("CW Eri",  4,              "TESS",             ["SPOC", "TESS-SPOC"],  None,           [4, 4]),
 
-        # Fits files should be cached under ~/.lightkurve/cache
-        lcs = lightcurves.load_lightcurves(results, "hardest", "sap_flux")
-        self.assertEqual(len(lcs), 2)
+            # S40 & 54 @ 600 s and S80 @ 200 s - will accept up to 2 exptime values (seems to ignore rest)
+            ("V889 Aql",  [40, 54, 80],   "TESS",           ["SPOC","TESS-SPOC"],   [200, 600],     [40, 54, 80]),
+        ]:
+
+            with self.subTest(f"{target} {sectors}/{mission}/{author}/{exptime}"):
+                lcs = lightcurves.load_lightcurves(target,
+                                                   sectors=sectors,
+                                                   mission=mission,
+                                                   author=author,
+                                                   exptime=exptime,
+                                                   force_mast=True,
+                                                   cache_dir=self.cache_dir,
+                                                   verbose=True)
+
+                self.assertEqual(len(exp_sectors), len(lcs))
+                self.assertListEqual(exp_sectors, list(lcs.sector))
+
+
+    def test_load_lightcurves_service_locally(self):
+        """ Simple happy path test of load_lightcurves() for locally serviced respose """
+        for target,     sectors,        mission,            author,                 exptime,        exp_sectors in [
+            ("CW Eri",  None,           "TESS",             "SPOC",                 None,           [4, 31]),
+        ]:
+
+            with self.subTest(f"{target} {sectors}/{mission}/{author}/{exptime}"):
+
+                # Ensure we have a locally cached search result
+                lcs = lightcurves.load_lightcurves(target, target,
+                                                   sectors, mission, author, exptime,
+                                                   cache_dir=self.cache_dir)
+
+                # Now test - the same query should be serviced from the local cache
+                with redirect_stdout(StringIO()) as stdout_cap:
+                    lcs = lightcurves.load_lightcurves(target, target,
+                                                       sectors, mission, author, exptime,
+                                                       force_mast=False, cache_dir=self.cache_dir,
+                                                       verbose=True)
+                    stdout_text = stdout_cap.getvalue()
+                self.assertIn("Loaded previously cached search results", stdout_text)
+                self.assertEqual(len(exp_sectors), len(lcs))
+                self.assertListEqual(exp_sectors, list(lcs.sector))
 
 
     #

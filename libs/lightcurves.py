@@ -4,6 +4,8 @@ Low level utility functions for light curve ingest, pre-processing, estimation a
 # pylint: disable=no-member
 from typing import Union, List, Iterable, Tuple, Generator
 from pathlib import Path
+import re
+from sys import stdout
 
 import numpy as np
 from scipy.signal import find_peaks
@@ -11,53 +13,89 @@ from scipy.signal import find_peaks
 from uncertainties import unumpy, UFloat
 import astropy.units as u
 from astropy.time import Time, TimeDelta
+from astropy.table import Table
 from lightkurve import LightCurve, LightCurveCollection, FoldedLightCurve, SearchResult
+import lightkurve as lk
 
 
-def load_lightcurves(results: SearchResult,
-                     quality_bitmask: Union[Union[str, int], List[Union[str, int]]]="default",
-                     flux_column: Union[str, List[str]]="sap_flux",
-                     cache_dir: Path=None) -> LightCurveCollection:
+def load_lightcurves(target: str,
+                     search_term: any=None,
+                     sectors: Union[int, List[int]]=None,
+                     mission: Union[str, List[str]]=None,
+                     author: Union[str, List[str]]=None,
+                     exptime: Union[str, float, List[float]]=None,
+                     quality_bitmask: Union[str, int]="default",
+                     flux_column: str="sap_flux",
+                     force_mast: bool=False,
+                     cache_dir: Path=Path("./.cache"),
+                     verbose: bool=False) -> LightCurveCollection:
     """
-    This is a wrapper for SearchResults.download_all() which allows for the quality_bitmask
-    and flux_column to be varied across the lightcurve assets to be opened. Will load the
-    lightcurves for the requested SearchResult through the requested local cache. Both
-    quality_bitmask and flux_column can be set for all results (single value) or as separate
-    values for each result item (as list or array). The cache_dir may be set to a specific
-    location within which the MAST assets are cached, or left as None in which case the default
-    lightkurve caching configuration is used.
+    This is a wrapper for lightkurve's search_lightcurves and SearchResults download_all funcs
+    which query MAST for assets matching the search criteria (search_term, sectors, mission,
+    author and exptime) and then download and open them (with quality_bitmask, flux_column).
 
-    :results: the SearchResult to load
-    :quality_bitmask: either a single value ("hardest", "hard", "default" or bitmask) or a list
-    of these values (of the same length as results)
-    :flux_column: either a single value ("sap_flux" or "pdcsap_flux") or a list of these values
-    (of the same length as results)
-    :cache_dir: Path to directory where we want the assets to be locally cached. If None then
-    any caching will be under the control of the lightkurve config (see
-    https://lightkurve.github.io/lightkurve/reference/config.html)
+    This attempts to avoid MAST queries by caching SearchResults locally following a successful
+    query. Subsequent requests for the same query will be based on the cached search results.
+    This approach avoids the sometimes costly overhead of a MAST query, however it does risk
+    missing out on newly released assets. The behaviour can be overriden by setting the force_mast
+    arg to True, in which case a MAST query will always be made.
+    
+    See https://lightkurve.github.io/lightkurve/reference/api/lightkurve.search_lightcurve.html
+    for documentation covering supported values for search_term, mission, author and exptime
 
-    :returns: a LightCurveCollection of the downloaded lightcurves, ordered by sector
+    See
+    https://lightkurve.github.io/lightkurve/reference/api/lightkurve.SearchResult.download_all.html
+    for documentation covering supported values for flux_column and quality_bitmask
+
+    :target: the target name
+    :search_term: the target's search term, if different to its name
+    :sectors: the sector or sectors search term
+    :mission: the mission search term
+    :author: the author search term
+    :exptime: the exposure time criterion; None, text ("long", "short" or "fast") or numeric seconds
+    :quality_bitmask: applied to the Quality col; text ("default", "hard" or "hardest") or bit mask
+    :flux_column: the flux column to select when loading the assets
+    :force_mast: if True will always bypass local files and search/download from MAST
+    :cache_dir: the local directory under which the assets are/will be stored
+    :verbose: if True will output some diagnostics text to the console
     """
-    # Make sure the results & flags have same dimensions so we can iterate on them
-    rcount = len(results)
+    # pylint: disable=too-many-locals, too-many-arguments, too-many-positional-arguments
+    search_term = search_term or target
+    if sectors and not isinstance(sectors, Iterable):
+        sectors = [sectors]
 
-    if isinstance(quality_bitmask, (str, int)):
-        quality_bitmask = [quality_bitmask] * rcount
-    elif len(quality_bitmask) != rcount:
-        raise ValueError("The len(quality_bitmask) does not match len(results)")
+    # Set up the local cache and the query's result file name
+    targ_dir = cache_dir / re.sub(r"[^\w\d]", "-", target.lower())
+    targ_dir.mkdir(parents=True, exist_ok=True)
+    result_file = targ_dir / re.sub(r"[^\w\d\[\].]", "-",
+                                    f"search-{sectors}-{mission}-{author}-{exptime}.result".lower())
+    result_format = "ascii.csv"
 
-    if isinstance(flux_column, str):
-        flux_column = [flux_column] * rcount
-    elif len(flux_column) != rcount:
-        raise ValueError("The len(flux_column) does not match len(results)")
+    if verbose:
+        print(f"Searching for light curves for search term='{search_term}', sectors={sectors},",
+              f"mission={mission}, author={author} and exptime={exptime}")
 
-    # As lk doesn't like taking Path objects directly
-    download_dir = f"{cache_dir}" if cache_dir else None
+    if not force_mast and result_file.exists():
+        result = SearchResult(Table.read(result_file, format=result_format))
+        if verbose:
+            print("Loaded previously cached search results matching these criteria.")
+    else:
+        if verbose:
+            print("Performing a MAST query based on these criteria.")
+        result = lk.search_lightcurve(search_term, sector=sectors, mission=mission,
+                                      author=author, exptime=exptime)
+        result.table.write(result_file, format=result_format, overwrite=True)
 
-    # Now, load them all individually so we support varying quality_bitmask & flux_column values
-    lcs = [res.download(quality_bitmask=qbm, download_dir=download_dir, flux_column=fcol)
-            for res, qbm, fcol in zip(results, quality_bitmask, flux_column)]
-    return LightCurveCollection(sorted(lcs, key=lambda lc: lc.sector))
+    # Work around a recent issues with DL assets - suggested by Pierre Maxted
+    if "dataUrl" not in result.table.colnames and "dataURI" in result.table.colnames:
+        result.table["dataURL"] = result.table["dataURI"]
+
+    # A hack but ensures that anything sent to print/stdout above is seen before quality warnings
+    stdout.flush()
+
+    # Sorted how we want; by sector then exptime fast to slow
+    lcs = result.download_all(quality_bitmask, f"{targ_dir}", flux_column=flux_column, cache=True)
+    return LightCurveCollection(sorted(lcs, key=lambda lc: lc.sector + (1 / lc.meta['FRAMETIM'])))
 
 
 def create_invalid_flux_mask(lc: LightCurve) -> np.ndarray:
