@@ -18,7 +18,8 @@ _tic_num_pattern = re.compile(r"TIC\s*(?P<tic>\d+)", re.IGNORECASE)
 # Cannot have negative, so shift up to zero.
 _eclipse_width_poly = np.poly1d([-1.99218228, 3.85365374, -1.76590596, 0.37694026, 0.])
 
-def query_tess_ebs_ephemeris(tics: List[Union[int, str]]) -> Dict[str, Union[float, UFloat]]:
+def query_tess_ebs_ephemeris(tics: List[Union[int, str]],
+                             period_factor: float=1.) -> Dict[str, Union[float, UFloat]]:
     """
     Gets a dict of the ephemeris and morphology data from the TESS-ebs catalogue (J/ApJS/258/16)
     of Prsa+ (2022ApJS..258...16P). From a list of TIC ids this will return data for the first
@@ -28,6 +29,7 @@ def query_tess_ebs_ephemeris(tics: List[Union[int, str]]) -> Dict[str, Union[flo
     however the questionable availability of the VizieR service makes it safer to take this offline.
 
     :tics: the potential ids for the target (some may have more than one TIC)
+    :duration_factor: multiplier for the period & durations to correct for under/over reporting
     :returns: dict of the requested data
     """
     # pylint: disable=too-many-locals
@@ -39,7 +41,7 @@ def query_tess_ebs_ephemeris(tics: List[Union[int, str]]) -> Dict[str, Union[flo
             # We want the chosen row, with masked values converted nan, as a single array row.
             row = np.ma.filled(table[tic_mask], fill_value=np.nan).as_array()[0]
 
-            period = ufloat(row["Per"], row["e_Per"])
+            period = ufloat(row["Per"], row["e_Per"]) * period_factor
             data = {
                 "t0": ufloat(row["BJD0"], row["e_BJD0"]),
                 "period": period,
