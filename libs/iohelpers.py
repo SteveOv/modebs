@@ -1,9 +1,10 @@
 """ Useful IO helper classes. """
-from typing import Callable
-from io import TextIOBase
-from contextlib import AbstractContextManager
+from typing import Callable as _Callable
+from sys import stdout as _stdout
+from io import TextIOBase as _TextIOBase
+from contextlib import AbstractContextManager as _AbstractContextManager
 
-class PassthroughTextWriter(AbstractContextManager):
+class PassthroughTextWriter(_AbstractContextManager):
     """
     A TextWriter which acts as a passthrough for writing to an existing TextIO
     class while allowing each line written to first be inspected and/or modified.
@@ -11,10 +12,10 @@ class PassthroughTextWriter(AbstractContextManager):
     """
 
     def __init__(self,
-                 output: TextIOBase,
+                 output: _TextIOBase,
                  hold_output: bool=False,
-                 inspect_func: Callable[[str], bool]=None,
-                 modify_func: Callable[[str], str]=None):
+                 inspect_func: _Callable[[str], bool]=None,
+                 modify_func: _Callable[[str], str]=None):
         """
         A TextWriter which acts as a passthrough for writing to an existing TextIO
         class while allowing each line written to first be inspected and/or modified.
@@ -74,3 +75,38 @@ class PassthroughTextWriter(AbstractContextManager):
         """ Context management """
         self.flush()
         return super().__exit__(exc_type, exc_value, traceback)
+
+class Tee:
+    """
+    Python equivalent of the tee command.
+    Allows print / stdout text to be written to a file and echoed to stdout
+
+    In use:
+
+    from contextlib import redirect_stdout
+    
+    with redirect_stdout(Tee(open("./process.log", "w", encoding="utf8"))):
+        print("hello world")
+    """
+    def __init__(self, output1: _TextIOBase, output2: _TextIOBase = _stdout):
+        """
+        Initialize a new instance.
+        """
+        self.output1 = output1
+        self.output2 = output2
+
+    def write(self, s):
+        """
+        Write the passed text and, if present, echo to the second output.
+        """
+        if self.output2 is not None:
+            self.output2.write(s)
+        self.output1.write(s)
+
+    def flush(self):
+        """
+        Flush the output and, if present, the second output.
+        """
+        if self.output2 is not None:
+            self.output2.flush()
+        self.output1.flush()
