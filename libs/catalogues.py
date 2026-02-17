@@ -73,9 +73,18 @@ def query_tess_ebs_ephemeris(tics: List[Union[int, str]],
                 data["phiP"] = 0
                 data["phiS"] = None
 
-            # The TESS-ebs eclipse widths and depths are in units of phase
-            data["durP"] = vals[row_ix, 2] * period if is_num[row_ix, 2] else None
-            data["durS"] = vals[row_ix, 3] * period if is_num[row_ix, 3] else None
+            # TESS-ebs eclipse widths are in units of phase and depth in units of normalized flux
+            if is_num[row_ix, 2]:
+                data["widthP"] = vals[row_ix, 2]
+                data["durP"] = vals[row_ix, 2] * period
+            else:
+                data["widthP"] = data["durP"] = None
+            if is_num[row_ix, 3]:
+                data["widthS"] = vals[row_ix, 3]
+                data["durS"] = vals[row_ix, 3] * period
+            else:
+                data["widthS"] = data["durS"] = None
+
             data["depthP"] = vals[row_ix, 4] if is_num[row_ix, 4] else None
             data["depthS"] = vals[row_ix, 5] if is_num[row_ix, 5] else None
 
@@ -167,4 +176,4 @@ def _read_table(catalogue: str, table_fname: str, readme_fname: str="ReadMe") ->
     :returns: the requested Table
     """
     cat_dir = Path("./libs/data/catalogues") / catalogue.replace("/", "-")
-    return Table.read(cat_dir / table_fname, readme=cat_dir / readme_fname, format="ascii.cds",)
+    return Table.read(cat_dir / table_fname, readme=cat_dir / readme_fname, format="ascii.cds")
