@@ -95,6 +95,19 @@ class Targets():
             **targets_config.get("target_config_defaults", {})
         }
 
+    def count(self, omit_excluded: bool=True) -> int:
+        """
+        Gets the number of targets configured.
+        
+        :omit_excluded: if true, will omit targets with the excluded flag set to True
+        """
+        count = 0
+        exclude_default = self._target_config_defaults["exclude"]
+        for target_config in self._target_configs.values():
+            if not omit_excluded or not target_config.get("exclude", exclude_default):
+                count += 1
+        return count
+
     def iterate_known_targets(self, omit_excluded: bool=True) -> Generator[TargetConfig, any, any]:
         """
         Iterates over the known TargetConfigs.
