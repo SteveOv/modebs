@@ -3,10 +3,12 @@
 # pylint: disable=too-many-locals, too-many-branches, too-many-statements
 from typing import Union, Tuple, Iterable, Generator, Callable, List
 from itertools import zip_longest, cycle
+from pathlib import Path
+from inspect import getsourcefile
 
 import numpy as np
 from numpy.typing import ArrayLike
-
+from scipy.interpolate import make_interp_spline
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure as _Figure
 from matplotlib.axes import Axes as _Axes
@@ -21,6 +23,11 @@ from lightkurve import LightCurve as _LC, FoldedLightCurve as _FLC, LightCurveCo
 
 from sed_fit.stellar_grids import StellarGrid
 from sed_fit.fitter import model_func, iterate_theta
+
+from .data.mist.read_mist_models import ISO
+
+
+_this_dir = Path(getsourcefile(lambda:0)).parent
 
 # Formatted equivalent of various param names for use in plot labels/captions
 all_param_captions = {
@@ -45,124 +52,6 @@ all_param_captions = {
     "MA":           r"$M_{\rm A}~[\text{M}_{\odot}]$",
     "MB":           r"$M_{\rm B}~[\text{M}_{\odot}]$",
 }
-
-def plot_sed(x: u.Quantity,
-             fluxes: List[u.Quantity],
-             flux_errs: List[u.Quantity]=None,
-             fmts: List[str]=None,
-             labels: List[str]=None,
-             figsize: Tuple[float, float]=(6, 4),
-             **format_kwargs) -> _Figure:
-    """
-    Will create a new figure with a single set of axes and will plot one or more sets of SED flux
-    datapoints.
-
-    The data and axes will be coerced to units of x=wavelength [um] and y=nu*F(nu) [W / m^2].
-    The axes will be set to log-log scale.
-
-    :x: the x-axis/wavelength datapoints
-    :fluxes: one or more sets of flux values at frequencies/wavelengths x
-    :flux_errs: optional corresponding flux error bars
-    :fmts: fmt options for each set of fluxes or leave as None for default (see the matplotlib docs
-    https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.plot.html#matplotlib.pyplot.plot)
-    :labels: optional labels for the fluxes
-    :title: optional title for the plot
-    :figsize: optional size for the figure
-    :format_kwargs: kwargs to be passed on to format_axes()
-    :returns: the final Figure
-    """
-    if isinstance(fluxes, u.Quantity):
-        fluxes = [fluxes]
-    if isinstance(flux_errs, u.Quantity):
-        flux_errs = [flux_errs]
-    if isinstance(fmts, str):
-        fmts = [fmts]
-    if isinstance(labels, str):
-        labels = [labels] + [None] * len(fluxes)-1
-
-    fig, ax = plt.subplots(1, 1, figsize=figsize, constrained_layout=True)
-
-    vfv_unit = u.W / u.m**2
-    lam = x.to(u.um, equivalencies=u.spectral())
-    freq = x.to(u.Hz, equivalencies=u.spectral())
-
-    for flux, flux_err, fmt, label in zip(fluxes, flux_errs, fmts, labels):
-        vfv, vfv_err = None, None
-        if flux is not None:
-            if flux.unit.is_equivalent(vfv_unit):
-                vfv = flux.to(vfv_unit).to(vfv_unit , equivalencies=u.spectral_density(freq))
-            else:
-                vfv = (flux * freq).to(vfv_unit , equivalencies=u.spectral_density(freq))
-        if flux_err is not None:
-            if flux_err.unit.is_equivalent(vfv_unit):
-                vfv_err = flux_err.to(vfv_unit , equivalencies=u.spectral_density(freq))
-            else:
-                vfv_err = (freq * flux_err).to(vfv_unit, equivalencies=u.spectral_density(freq))
-
-        if vfv is not None:
-            ax.errorbar(lam, vfv, vfv_err, fmt=fmt, alpha=0.5, label=label)
-
-    ax.set(xscale="log", xlabel=f"Wavelength [{u.um:latex_inline}]",
-           yscale="log", ylabel=f"${{\\rm \\nu F(\\nu)}}$ [{u.W/u.m**2:latex_inline}]")
-    ax.grid(True, which="both", axis="both", alpha=0.33, color="lightgray")
-    legend_loc = "best" if labels is not None and any(l is not None for l in labels) else None
-    format_axes(ax, legend_loc=legend_loc, **format_kwargs)
-    return fig
-
-
-def plot_fitted_model(sed: Table,
-                      theta: ArrayLike,
-                      model_grid: StellarGrid,
-                      sed_flux_colname: str="sed_der_flux",
-                      sed_flux_err_colname: str="sed_eflux",
-                      sed_filter_colname: str="sed_filter",
-                      sed_lambda_colname: str="sed_wl",
-                      **format_kwargs):
-    """
-    Wraps and extends plot_sed() so that the observed SED points are plotted plus the equivalent
-    combined model SED data points from the fitted model. Additionally, the model SED points and
-    full spectrum of each component star will be plotted.
-
-    The data and axes will be coerced to units of x=wavelength [um] and y=nu*F(nu) [W / m^2].
-    The axes will be set to log-log scale.
-
-    :sed: the x-axis/wavelength datapoints
-    :theta: the fitting parameters as passed to sed_fit model_func
-    :model_grid: the StellarGrid supplying the model fluxes to the fitting
-    :sed_flux_colname:
-    :sed_flux_err_colname:
-    :sed_filter_colname:
-    :sed_lambda_colname:
-    :format_kwargs: kwargs to be passed on to format_axes()
-    :returns: the final Figure
-    """
-    # Generate model SED fluxes at points x for each set of component star params in theta
-    x = model_grid.get_filter_indices(sed[sed_filter_colname])
-    theta_noms = nominal_values(theta)
-    comp_fluxes = model_func(theta_noms, x, model_grid, combine=False) * model_grid.flux_unit
-
-    # Need a set of plot formats/colours to cover reasonable number of components
-    comp_fmts = ["*m", "+c", "xy", "2r"]
-    comp_colors = ["m", "c", "y", "r"]
-
-    # Plot the fitted model against the derredened SED + show each star's contribution
-    nstars = comp_fluxes.shape[0]
-    fig = plot_sed(sed[sed_lambda_colname].to(u.um),
-                   [sed[sed_flux_colname].quantity, np.sum(comp_fluxes, axis=0)] +list(comp_fluxes),
-                   [sed[sed_flux_err_colname].quantity, None] + [None]*nstars,
-                   ["ob", ".k"] + list(_cycle_for(comp_fmts, nstars)),
-                   ["dereddened SED", "fitted pair"] +[f"fitted star {i+1}" for i in range(nstars)],
-                   **format_kwargs)
-
-    # Plot the raw spectra for each component as a background
-    spec_lams = model_grid.wavelengths * model_grid.wavelength_unit
-    mask = spec_lams >= sed[sed_lambda_colname].quantity.min()
-    mask &= spec_lams <= sed[sed_lambda_colname].quantity.max()
-    for (teff, logg, rad, dist, av), c in zip(iterate_theta(theta_noms),
-                                              _cycle_for(comp_colors, nstars)):
-        spec_flux = model_grid.get_fluxes(teff, logg, 0, rad, dist, av) * model_grid.flux_unit
-        fig.gca().plot(spec_lams[mask], spec_flux[mask], c=c, alpha=0.15, zorder=-100)
-    return fig
 
 
 def plot_parameter_scatter(params: ArrayLike,
@@ -293,6 +182,168 @@ def plot_lightcurve_on_axes(ax: _Axes, lc: Union[_LC, _FLC],
             ax.set_ylabel("differential magnitude [mag]")
 
 
+def plot_sed(x: u.Quantity,
+             fluxes: List[u.Quantity],
+             flux_errs: List[u.Quantity]=None,
+             fmts: List[str]=None,
+             labels: List[str]=None,
+             figsize: Tuple[float, float]=(6, 4),
+             **format_kwargs) -> _Figure:
+    """
+    Will create a new figure with a single set of axes and will plot one or more sets of SED flux
+    datapoints.
+
+    The data and axes will be coerced to units of x=wavelength [um] and y=nu*F(nu) [W / m^2].
+    The axes will be set to log-log scale.
+
+    :x: the x-axis/wavelength datapoints
+    :fluxes: one or more sets of flux values at frequencies/wavelengths x
+    :flux_errs: optional corresponding flux error bars
+    :fmts: fmt options for each set of fluxes or leave as None for default (see the matplotlib docs
+    https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.plot.html#matplotlib.pyplot.plot)
+    :labels: optional labels for the fluxes
+    :title: optional title for the plot
+    :figsize: optional size for the figure
+    :format_kwargs: kwargs to be passed on to format_axes()
+    :returns: the final Figure
+    """
+    if isinstance(fluxes, u.Quantity):
+        fluxes = [fluxes]
+    if isinstance(flux_errs, u.Quantity):
+        flux_errs = [flux_errs]
+    if isinstance(fmts, str):
+        fmts = [fmts]
+    if isinstance(labels, str):
+        labels = [labels] + [None] * len(fluxes)-1
+
+    fig, ax = plt.subplots(1, 1, figsize=figsize, constrained_layout=True)
+
+    vfv_unit = u.W / u.m**2
+    lam = x.to(u.um, equivalencies=u.spectral())
+    freq = x.to(u.Hz, equivalencies=u.spectral())
+
+    for flux, flux_err, fmt, label in zip(fluxes, flux_errs, fmts, labels):
+        vfv, vfv_err = None, None
+        if flux is not None:
+            if flux.unit.is_equivalent(vfv_unit):
+                vfv = flux.to(vfv_unit).to(vfv_unit , equivalencies=u.spectral_density(freq))
+            else:
+                vfv = (flux * freq).to(vfv_unit , equivalencies=u.spectral_density(freq))
+        if flux_err is not None:
+            if flux_err.unit.is_equivalent(vfv_unit):
+                vfv_err = flux_err.to(vfv_unit , equivalencies=u.spectral_density(freq))
+            else:
+                vfv_err = (freq * flux_err).to(vfv_unit, equivalencies=u.spectral_density(freq))
+
+        if vfv is not None:
+            ax.errorbar(lam, vfv, vfv_err, fmt=fmt, alpha=0.5, label=label)
+
+    ax.set(xscale="log", xlabel=f"Wavelength [{u.um:latex_inline}]",
+           yscale="log", ylabel=f"${{\\rm \\nu F(\\nu)}}$ [{u.W/u.m**2:latex_inline}]")
+    ax.grid(True, which="both", axis="both", alpha=0.33, color="lightgray")
+    legend_loc = "best" if labels is not None and any(l is not None for l in labels) else None
+    format_axes(ax, legend_loc=legend_loc, **format_kwargs)
+    return fig
+
+
+def plot_fitted_model_sed(sed: Table,
+                          theta: ArrayLike,
+                          model_grid: StellarGrid,
+                          sed_flux_colname: str="sed_der_flux",
+                          sed_flux_err_colname: str="sed_eflux",
+                          sed_filter_colname: str="sed_filter",
+                          sed_lambda_colname: str="sed_wl",
+                          **format_kwargs) -> _Figure:
+    """
+    Wraps and extends plot_sed() so that the observed SED points are plotted plus the equivalent
+    combined model SED data points from the fitted model. Additionally, the model SED points and
+    full spectrum of each component star will be plotted.
+
+    The data and axes will be coerced to units of x=wavelength [um] and y=nu*F(nu) [W / m^2].
+    The axes will be set to log-log scale.
+
+    :sed: the x-axis/wavelength datapoints
+    :theta: the fitted parameters, as passed to sed_fit model_func, for which model fluxes are shown
+    :model_grid: the StellarGrid from which the fitted fluxes are taken
+    :sed_flux_colname: the name of the flux column in the sed table
+    :sed_flux_err_colname: the name of the flux uncertainty column in the sed table
+    :sed_filter_colname: the name of the filter column in the sed table
+    :sed_lambda_colname: the name of the wavelength column in the sed table
+    :format_kwargs: kwargs to be passed on to format_axes()
+    :returns: the final Figure
+    """
+    # Generate model SED fluxes at points x for each set of component star params in theta
+    x = model_grid.get_filter_indices(sed[sed_filter_colname])
+    theta_noms = nominal_values(theta)
+    comp_fluxes = model_func(theta_noms, x, model_grid, combine=False) * model_grid.flux_unit
+
+    # Need a set of plot formats/colours to cover reasonable number of components
+    comp_fmts = ["*m", "+c", "xy", "2r"]
+    comp_colors = ["m", "c", "y", "r"]
+
+    # Plot the fitted model against the derredened SED + show each star's contribution
+    nstars = comp_fluxes.shape[0]
+    fig = plot_sed(sed[sed_lambda_colname].to(u.um),
+                   [sed[sed_flux_colname].quantity, np.sum(comp_fluxes, axis=0)] +list(comp_fluxes),
+                   [sed[sed_flux_err_colname].quantity, None] + [None]*nstars,
+                   ["ob", ".k"] + list(_cycle_for(comp_fmts, nstars)),
+                   ["dereddened SED", "fitted pair"] +[f"fitted star {i+1}" for i in range(nstars)],
+                   **format_kwargs)
+
+    # Plot the raw spectra for each component as a background
+    spec_lams = model_grid.wavelengths * model_grid.wavelength_unit
+    mask = spec_lams >= sed[sed_lambda_colname].quantity.min()
+    mask &= spec_lams <= sed[sed_lambda_colname].quantity.max()
+    for (teff, logg, rad, dist, av), c in zip(iterate_theta(theta_noms),
+                                              _cycle_for(comp_colors, nstars)):
+        spec_flux = model_grid.get_fluxes(teff, logg, 0, rad, dist, av) * model_grid.flux_unit
+        fig.gca().plot(spec_lams[mask], spec_flux[mask], c=c, alpha=0.15, zorder=-100)
+    return fig
+
+
+def plot_mass_radius_hr_diagram(masses: ArrayLike,
+                                radii: ArrayLike,
+                                labels: ArrayLike=None,
+                                plot_zams: bool=False,
+                                **format_kwargs) -> _Figure:
+    """
+    Plots a log(R) vs log(M) diagram with an optional ZAMS line.
+    Returns the figure of the plot for the calling code to show or save.
+
+    :masses: the mass values to plot on the x-axis in shape (#sets, #masses) or (#masses) for 1 set
+    :radii: the radius values to plot on the y-axis in shape (#sets, #radii) or (#radii) for 1 set
+    :labels: optional labels text for each set (if multiple sets) or item (if a single set)
+    :plot_zams: whether or not to include a zero age main-sequence line on the figure
+    :format_kwargs: kwargs to be passed on to format_axes()
+    :returns: the Figure
+    """
+    # Masses & radii both support multiple sets, but they must be the same shape
+    if masses.shape != radii.shape:
+        raise ValueError("masses and radii are not of the same shape")
+    if labels is not None and len(labels) != masses.shape[0]:
+        raise ValueError("labels do not match the masses or radii")
+
+    fig, ax = plt.subplots(1, 1, figsize=(6, 4), constrained_layout=True)
+    ax.set(xlabel= r"$\log{(M\,/\,{\rm M_{\odot}})}$", xscale="log", xlim=(0.1, 30),
+           ylabel=r"$\log{(R\,/\,{\rm R_{\odot}})}$", yscale="log", ylim=(0.05, 100))
+
+    labels = labels or [None] * masses.shape[0]
+    for ix, (mass_vals, rad_vals, label) in enumerate(zip(masses, radii, labels)):
+        ax.errorbar(x=nominal_values(mass_vals), xerr=std_devs(mass_vals),
+                    y=nominal_values(rad_vals), yerr=std_devs(rad_vals),
+                    fmt="o", ms=5, markeredgewidth=1.5, fillstyle="full", zorder=-ix, label=label)
+
+    if plot_zams:
+        zams = _get_solar_isochrone_eep_values(eep=202, phase=0.0, cols=["star_mass", "log_R"])
+        zmass = np.linspace(zams[0].min(), zams[0].max(), 250)
+        zsort = np.argsort(zams[0])
+        zrad = make_interp_spline(zams[0, zsort], zams[1, zsort], k=1)(zmass) # smoothing
+        ax.plot(zmass, 10**zrad, ls="--", lw=1, c="k", zorder=-100, alpha=0.5, label="ZAMS")
+
+    format_axes(ax, **format_kwargs)
+    return fig
+
+
 def format_axes(ax: _Axes, title: str=None,
                 xlabel: str=None, ylabel: str=None,
                 xticklable_top: bool=False, yticklabel_right: bool=False,
@@ -360,3 +411,23 @@ def _cycle_for(init_list: List, num_items: int):
         if i == num_items:
             break
         yield v
+
+def _get_solar_isochrone_eep_values(eep: int, phase: int, cols: List[str]) -> ArrayLike:
+    """
+    Gets the requested column values from the solar metallicity MIST isochrone,
+    searching by eep and phase.
+
+    Common eep values are 202 (ZAMS) & 453 (TAMS) with phase 0.0
+
+    :iso: the MIST ISO to search
+    :eep: the eep (equivalent evolutionary point) to find across the iso
+    :phase: the phase to find across the iso, where 0.0 is main-sequence
+    :cols: the columns to return the values for
+    :returns: the requested data
+    """
+    iso_file = _this_dir / "data/mist/MIST_v1.2_vvcrit0.4_basic_isos" \
+                        / "MIST_v1.2_feh_p0.00_afe_p0.0_vvcrit0.4_basic.iso"
+    iso = ISO(str(iso_file), verbose=False)
+
+    rows = (ab[(ab["EEP"]==eep) & (ab["phase"]==phase)] for ab in iso.isos if eep in ab["EEP"])
+    return np.array([list(row[0][cols]) for row in rows if len(row) > 0]).transpose()
