@@ -61,6 +61,10 @@ class TargetConfig():
         """ Return the value if the key is in this config, else return the default"""
         return self._config.get(key, default)
 
+    def has_value(self, key) -> bool:
+        """ Returns whether or not a value (and not None) is held for this key """
+        return self._config.get(key, None) is not None
+
     @classmethod
     def _yield_recursive(cls, values: List[any]):
         """ Recursively yield values from a List which may contain Lists """
