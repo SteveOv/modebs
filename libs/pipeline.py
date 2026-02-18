@@ -601,12 +601,13 @@ def fit_target_lightcurves(lcs: LightCurveCollection,
 
     # Create the args for each lc/call to _fit_target.
     # Can't have func take an lc or masked columns as they do not pickle.
-    iter_params = ((lc[lc.meta["clip_mask"]]["time"].unmasked.value,
-                    lc[lc.meta["clip_mask"]]["delta_mag"].unmasked.value,
-                    lc[lc.meta["clip_mask"]]["delta_mag_err"].unmasked.value,
+    iter_params = ((lc["time"].unmasked.value,
+                    lc["delta_mag"].unmasked.value,
+                    lc["delta_mag_err"].unmasked.value,
                     in_params,
                     read_keys,
                     fit_stem,
+                    lc.meta.get("clip_mask", None),
                     _create_lc_std_further_process_cmds(lc, input_params["period"]),
                     max_attempts,
                     timeout,
@@ -649,6 +650,7 @@ def _fit_target(time: ArrayLike,
                 input_params: dict[str, UFloat],
                 read_keys: List[str],
                 file_stem: str,
+                clip_mask: np.ndarray[bool]=None,
                 append_lines: List[str]=None,
                 max_attempts: int=1,
                 timeout: int=None,
@@ -665,6 +667,7 @@ def _fit_target(time: ArrayLike,
     :input_params: the input params dictionary used to populate the fitting 'in' file
     :read_keys: the set of fitted output params to read and return for each fit
     :file_stem: the body of the filenames to write/read excluding the attempt counter & extention
+    :clip_mask: optional mask to apply to time, delta_mag and delta_mag_err data prior to writing
     :append_lines: optional processing instructions to append to the fitting 'in' file
     :max_attempts: the maximum number of attempts to make
     :timeout: the timeout for any individual fit - will raise a TimeoutExpired if not completed
@@ -685,7 +688,11 @@ def _fit_target(time: ArrayLike,
     # The contents of the lightcurve data file are fixed across fitting attempts.
     # jktebop.write_light_curve_to_dat_file(lc, dat_fname)
     dat_fname = fit_dir / (file_stem + ".dat")
-    io_ascii.write([time, delta_mag, delta_mag_err],
+    if clip_mask is not None:
+        table = [time[clip_mask], delta_mag[clip_mask], delta_mag_err[clip_mask]]
+    else:
+        table = [time, delta_mag, delta_mag_err]
+    io_ascii.write(table,
                    output=dat_fname,
                    format="no_header",
                    names=["time", "delta_mag", "delta_mag_err"],
