@@ -245,8 +245,8 @@ def fit_polynomial(times: Time,
 def find_eclipses_and_completeness(lc: LightCurve,
                                    ref_t0: Union[Time, float, UFloat],
                                    period: Union[u.Quantity, float, UFloat],
-                                   durp: Union[float, UFloat],
-                                   durs: Union[float, UFloat],
+                                   widthp: Union[float, UFloat],
+                                   widths: Union[float, UFloat],
                                    depthp: Union[float, UFloat]=None,
                                    depths: Union[float, UFloat]=None,
                                    phis: Union[float, UFloat]=0.5,
@@ -267,8 +267,8 @@ def find_eclipses_and_completeness(lc: LightCurve,
     :lc: the LightCurve to inspect
     :ref_t0: the known reference primary eclipse time
     :period: the known orbital period
-    :durp: the duration of the primary eclipses
-    :durs: the duration of the secondary eclipses
+    :widthp: the width of the primary eclipses in units of normalized phase
+    :widths: the width of the secondary eclipses in units of normalized phase
     :depthp: the expected depth of the primary eclipse in units of normalized flux
     :depths: the expected depth of the secondary eclipse in units of normalized flux
     :phis: the phase of the secondary eclipses relative to the primary eclipses
@@ -281,14 +281,14 @@ def find_eclipses_and_completeness(lc: LightCurve,
 
     ref_t0 = to_lc_time(ref_t0, lc).value if isinstance(ref_t0, Time) else nominal_value(ref_t0)
     period = period.to(u.d).value if isinstance(period, u.Quantity) else nominal_value(period)
-    durp = nominal_value(durp)
-    durs = nominal_value(durs)
+    widthp = nominal_value(widthp)
+    widths = nominal_value(widths)
 
     # Invert the fluxes so that eclipses are peaks
     times = lc.time.value
     fluxes = lc.normalize().flux.unmasked.value
     fluxes = fluxes.max() - fluxes
-    half_window_dur = max(period * search_window_phase / 2, durp, durs)
+    half_window_dur = period * max(search_window_phase / 2, widthp, widths)
 
     def find_eclipses_and_mask(ref_time, ecl_dur, min_ecl_prom) -> Tuple[np.ndarray, np.ndarray]:
         """
@@ -332,13 +332,13 @@ def find_eclipses_and_completeness(lc: LightCurve,
     min_promp = None if depthp is None else round(nominal_value(depthp) * 0.66, 3)
     min_proms = None if depths is None else round(nominal_value(depths) * 0.66, 3)
     if verbose:
-        print(f"Finding (pri, sec) eclipses in sector {lc.sector} with min duration {durp:.3f} &",
-              f"{durs:.3f} [d] and min depth {min_promp} & {min_proms} [norm flux]", end="...")
+        print(f"Finding (pri, sec) eclipses in sector {lc.sector} with min width {widthp:.3f} &",
+              f"{widths:.3f} [phase] and min depth {min_promp} & {min_proms} [flux]", end="...")
     for p in range(1, 3):
-        pri_times, pri_compl = find_eclipses_and_mask(t0, durp, min_promp)
+        pri_times, pri_compl = find_eclipses_and_mask(t0, widthp * period, min_promp)
 
         t0 += period * nominal_value(phis)
-        sec_times, sec_compl = find_eclipses_and_mask(t0, durs, min_proms)
+        sec_times, sec_compl = find_eclipses_and_mask(t0, widths * period, min_proms)
 
         if verbose and p == 2:
             print(f"found {sum(pri_compl>0)} & {sum(sec_compl>0)} eclipse(s) with fluxes.")
@@ -378,7 +378,11 @@ def create_eclipse_mask(lc: LightCurve,
         print(f"Creating an eclipse mask for {len(primary_times)} primary and",
               f"{len(secondary_times)} secondary eclipse(s).")
 
+    # Ensure everything is in scalar values of days
+    durp = durp.to(u.d).value if isinstance(durp, u.Quantity) else durp
+    durs = durs.to(u.d).value if isinstance(durs, u.Quantity) else durs
     times = lc.time.value
+
     mask = np.zeros((len(lc)), dtype=bool)
     for ecl_times, ecl_dur in [(primary_times, durp), (secondary_times, durs)]:
         if len(ecl_times) > 0:

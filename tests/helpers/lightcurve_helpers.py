@@ -49,8 +49,8 @@ KNOWN_TARGETS = {
         # Not in TESS-ebs
         "t0": Time(1992.007512423, format="btjd", scale="tdb"),
         "period": 20.99842 * u.d,
-        "durP": 0.558,
-        "durS": 0.711,
+        "widthP": 0.027,
+        "widthS": 0.037,
         "phiS": 0.779,
         "fits": {
             25: "hlsp_tess-spoc_tess_phot_0000000103098373-s0025_tess_v1_lc.fits",
@@ -74,8 +74,8 @@ KNOWN_TARGETS = {
         # Not in TESS-ebs
         "t0": 2772.124954368,
         "period": 11.120757,
-        "durP": 0.271,
-        "durS": 0.507,
+        "widthP": 0.024,
+        "widthS": 0.046,
         "depthP": 0.5,
         "depthS": 0.43,
         "phiS": 0.354,
@@ -90,8 +90,8 @@ KNOWN_TARGETS = {
         # Incorrect period in TESS-ebs (needs doubling)
         "t0": Time(1411.553116, format="btjd", scale="tdb"),
         "period": 2.34461 * 2 * u.d,
-        "durP": 0.35,
-        "durS": 0.35,
+        "widthP": 0.075,
+        "widthS": 0.075,
         "phiS": 0.5,
         "fits": {
             64: "tess2023096110322-s0064-0000000030034081-0257-s_lc.fits",

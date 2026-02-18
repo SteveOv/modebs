@@ -105,8 +105,8 @@ def mask_lightcurves_unusable_fluxes(lcs: LightCurveCollection,
 def add_eclipse_meta_to_lightcurves(lcs: LightCurveCollection,
                                     ref_t0: Union[Time, float, UFloat],
                                     period: Union[u.Quantity, float, UFloat],
-                                    durp: Union[float, UFloat],
-                                    durs: Union[float, UFloat],
+                                    widthp: Union[float, UFloat],
+                                    widths: Union[float, UFloat],
                                     depthp: Union[float, UFloat]=None,
                                     depths: Union[float, UFloat]=None,
                                     phis: Union[float, UFloat]=0.5,
@@ -126,8 +126,8 @@ def add_eclipse_meta_to_lightcurves(lcs: LightCurveCollection,
     :lcs: the LightCurveCollection containing our potential fitting targets
     :ref_t0: the known reference primary eclipse time
     :period: the known orbital period
-    :durp: the duration of the primary eclipses
-    :durs: the duration of the secondary eclipses
+    :widthp: the width of the primary eclipses in units of normalized phase
+    :widths: the width of the secondary eclipses in units of normalized phase
     :depthp: the expected depth of the primary eclipse in units of normalized flux
     :depths: the expected depth of the secondary eclipse in units of normalized flux
     :phis: the phase of the secondary eclipses relative to the primary eclipses
@@ -135,16 +135,15 @@ def add_eclipse_meta_to_lightcurves(lcs: LightCurveCollection,
     :verbose: whether or not to send messages to stdout with details of the eclipse search
     """
     for lc in lcs:
-        sector_times = lightcurves.find_eclipses_and_completeness(lc, ref_t0, period,
-                                                                  durp, durs, depthp, depths,
-                                                                  phis, search_window_phase,
-                                                                  verbose)
+        ecl_data = lightcurves.find_eclipses_and_completeness(lc, ref_t0, period,
+                                                              widthp, widths, depthp, depths,
+                                                              phis, search_window_phase, verbose)
 
         # We will use the revised/refined reference time as a starting position for the next sector
-        ref_t0 = lc.meta["t0"] = sector_times[0] or ref_t0
+        ref_t0 = lc.meta["t0"] = ecl_data[0] or ref_t0
         lc.meta |= dict(zip(
             ["primary_times", "primary_completeness", "secondary_times", "secondary_completeness"],
-            sector_times[1:]
+            ecl_data[1:]
         ))
 
 

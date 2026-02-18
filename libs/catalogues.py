@@ -74,17 +74,8 @@ def query_tess_ebs_ephemeris(tics: List[Union[int, str]],
                 data["phiS"] = None
 
             # TESS-ebs eclipse widths are in units of phase and depth in units of normalized flux
-            if is_num[row_ix, 2]:
-                data["widthP"] = vals[row_ix, 2]
-                data["durP"] = vals[row_ix, 2] * period
-            else:
-                data["widthP"] = data["durP"] = None
-            if is_num[row_ix, 3]:
-                data["widthS"] = vals[row_ix, 3]
-                data["durS"] = vals[row_ix, 3] * period
-            else:
-                data["widthS"] = data["durS"] = None
-
+            data["widthP"] = vals[row_ix, 2] if is_num[row_ix, 2] else None
+            data["widthS"] = vals[row_ix, 3] if is_num[row_ix, 3] else None
             data["depthP"] = vals[row_ix, 4] if is_num[row_ix, 4] else None
             data["depthS"] = vals[row_ix, 5] if is_num[row_ix, 5] else None
 
@@ -93,25 +84,23 @@ def query_tess_ebs_ephemeris(tics: List[Union[int, str]],
     return data
 
 
-def estimate_eclipse_durations_from_morphology(morph: float,
-                                               period: Union[float, UFloat]=1.0,
-                                               esinw: Union[float, UFloat]=0.0) \
+def estimate_eclipse_widths_from_morphology(morph: float,
+                                            esinw: Union[float, UFloat]=0.0) \
                                                     -> Tuple[float, float]:
     """
-    Will provide an estimate of the eclipse durations from the morph value and period. The esinw
-    value may be supplied, from which the durations will be modified for effects of eccentricity.
+    Will provide an estimate of the eclipse widths from the morph value. The esinw value
+    may be supplied, from which the durations will be modified for effects of eccentricity.
 
     :morph: the morphology value, expected to be in the range [0, 1]
-    :period: the period - the resulting durations will be in the same units
     :esinw: the e*sin(omega) Poincare element, if known
-    :returns: the estimated durations of the (primary, secondary) eclipses
+    :returns: the estimated widths of the (primary, secondary) eclipses
     """
     mean_width = max(0.01, _eclipse_width_poly(morph))
 
     # Works well enough for the effect of eccentricity.
     # From esinw = ds-dp/ds+dp, therefore ds-dp = esinw * (ds+dp) = esinw * 2 * mean
     half_diff = esinw * mean_width
-    return ((mean_width - half_diff) * period, (mean_width + half_diff) * period)
+    return (mean_width - half_diff, mean_width + half_diff)
 
 
 def query_tess_ebs_in_sh(tics: List[Union[int, str]]) -> dict:

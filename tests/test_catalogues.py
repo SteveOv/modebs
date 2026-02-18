@@ -12,7 +12,7 @@ from tests.helpers import lightcurve_helpers
 from libs.pipeline import nominal_value
 
 from libs.catalogues import query_tess_ebs_ephemeris, query_tess_ebs_in_sh
-from libs.catalogues import estimate_eclipse_durations_from_morphology
+from libs.catalogues import estimate_eclipse_widths_from_morphology
 from libs.catalogues import _read_table # pylint: disable=protected-access
 
 class Testcatalogues(unittest.TestCase):
@@ -39,14 +39,14 @@ class Testcatalogues(unittest.TestCase):
 
     def test_query_tess_ebs_ephemeris_known_target(self):
         """ Tests for query_tess_ebs_ephemeris(known TICs) to assert it returns expected data """
-        for (tic,           exp_t0,         exp_per,    exp_morph,  exp_phis,   exp_durp,   exp_durs) in [
+        for (tic,           exp_t0,         exp_per,    exp_morph,  exp_phis,   exp_widthp, exp_widths) in [
             # TIC 26801525 is known that the 2g & pf phip & phis are switched (phis should be 0.551)
-            (26801525,      1766.61882,     3.89665,    0.250,      0.449,      0.27,       0.29),
+            (26801525,      1766.61882,     3.89665,    0.250,      0.449,      0.070,      0.075),
             # TIC 26801525 actual durS is nearer 0.42
-            (118313102,     1518.556197,    9.255727,   0.180,      0.400,      0.37,       0.48),
-            (350298314,     1358.040315,    47.719114,  0.002,      0.262,      0.28,       0.35),
+            (118313102,     1518.556197,    9.255727,   0.180,      0.400,      0.040,      0.052),
+            (350298314,     1358.040315,    47.719114,  0.002,      0.262,      0.0059,     0.0073),
             # ZZ Boo which is missing eclipse data for the secondary phiS, durS & depthS
-            (357358259,     1932.31308,     2.49616,    0.523,      None,      0.406,       None),
+            (357358259,     1932.31308,     2.49616,    0.523,      None,       0.163,      None),
         ]:
             with self.subTest(f"Target: {tic}"):
                 data = query_tess_ebs_ephemeris(tic)
@@ -58,14 +58,14 @@ class Testcatalogues(unittest.TestCase):
                 self.assertAlmostEqual(data["phiS"], exp_phis, 3, f"Expected {tic} phiS ~= {exp_phis}")
 
                 # Duration in TESS-ebs are in units of phase whereas these are in days
-                if exp_durp is None:
-                    self.assertIsNone(data["durP"], f"Expected {tic} durP is None")
+                if exp_widthp is None:
+                    self.assertIsNone(data["widthP"], f"Expected {tic} widthP is None")
                 else:
-                    self.assertAlmostEqual(data["durP"].n, exp_durp, 2, f"Expected {tic} durP ~= {exp_durp}")
-                if exp_durs is None:
-                    self.assertIsNone(data["durS"], f"Expected {tic} durS is None")
+                    self.assertAlmostEqual(data["widthP"], exp_widthp, 3, f"Expected {tic} widthP ~= {exp_widthp}")
+                if exp_widths is None:
+                    self.assertIsNone(data["widthS"], f"Expected {tic} widthS is None")
                 else:
-                    self.assertAlmostEqual(data["durS"].n, exp_durs, 2, f"Expected {tic} durS ~= {exp_durs}")
+                    self.assertAlmostEqual(data["widthS"], exp_widths, 3, f"Expected {tic} widthS ~= {exp_widths}")
 
     @unittest.skip
     def test_query_tess_ebs_ephemeris_known_orbital_params(self):
@@ -82,8 +82,8 @@ class Testcatalogues(unittest.TestCase):
                 # Calculate expected approx eclipse phase & duration values from known system params
                 e = (ecosw**2 + esinw**2)**0.5
                 exp_phiS = orbital.phase_of_secondary_eclipse(ecosw, e)
-                exp_durP = orbital.eclipse_duration(period, sum_r, inc, e, esinw, False)
-                exp_durS = orbital.eclipse_duration(period, sum_r, inc, e, esinw, True)
+                exp_widthP = orbital.eclipse_duration(period, sum_r, inc, e, esinw, False) / period
+                exp_widthS = orbital.eclipse_duration(period, sum_r, inc, e, esinw, True) / period
 
                 data = query_tess_ebs_ephemeris(tic)
                 self.assertIsNotNone(data, f"expected {target} data != None")
@@ -91,8 +91,8 @@ class Testcatalogues(unittest.TestCase):
                 print(f"{target}:", "{" , ", ".join(f"{k}: {v:.3f}" for k, v in data.items()), "}")
 
                 self.assertAlmostEqual(data["phiS"], exp_phiS, 2, f"Expected {target} phiS ~= {exp_phiS:.3f}")
-                self.assertAlmostEqual(data["durP"].n, exp_durP, 1, f"Expected {target} durP ~= {exp_durP:.3f}")
-                self.assertAlmostEqual(data["durS"].n, exp_durS, 1, f"Expected {target} durS ~= {exp_durS:.3f}")
+                self.assertAlmostEqual(data["widthP"], exp_widthP, 2, f"Expected {target} widthP ~= {exp_widthP:.3f}")
+                self.assertAlmostEqual(data["widthS"], exp_widthS, 2, f"Expected {target} widthS ~= {exp_widthS:.3f}")
 
 
     #
@@ -144,16 +144,18 @@ class Testcatalogues(unittest.TestCase):
                     period = period or config["period"]
                 else:
                     tess_ebs = query_tess_ebs_ephemeris(target)
-                    esinw = esinw or orbital.estimate_esinw(tess_ebs["durP"], tess_ebs["durS"])
+                    period = tess_ebs["period"]
+                    esinw = esinw or orbital.estimate_esinw(tess_ebs["widthP"] * period,
+                                                            tess_ebs["widthS"] * period)
                     period = period or tess_ebs["period"]
 
                 morph = tess_ebs["morph"]
-                print(f"TESS-ebs[{target}]: durP={tess_ebs['durP']:.3f},",
-                      f"durS={tess_ebs['durS']:.3f}, morph={morph:.3f}")
+                print(f"TESS-ebs[{target}]: widthP={tess_ebs['widthP']:.3f},",
+                      f"widthS={tess_ebs['widthS']:.3f}, morph={morph:.3f}")
 
-                durations = estimate_eclipse_durations_from_morphology(morph, period, esinw)
-                print(f"estimate[{target}]: durP={durations[0]:.3f},",
-                      f"durS={durations[1]:.3f} (where esinw={esinw:.6f})")
+                widths = estimate_eclipse_widths_from_morphology(morph, esinw)
+                print(f"estimate[{target}]: widthP={widths[0]:.3f},",
+                      f"widthS={widths[1]:.3f} (where esinw={esinw:.6f})")
 
     @unittest.skip
     def test_calc_morph_ecl_width_fit(self):

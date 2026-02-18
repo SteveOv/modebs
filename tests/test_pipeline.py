@@ -34,15 +34,15 @@ class Testpipeline(unittest.TestCase):
         eph = query_tess_ebs_ephemeris(config["tic"]) or {}
         t0 = eph.get("t0", config.get("t0", config.get("t0", None)))
         period = eph.get("period", config.get("period", None))
-        durp = eph.get("durP", config.get("durP", None))
-        durs = eph.get("durS", config.get("durS", None))
+        widthp = eph.get("widthP", config.get("widthP", None))
+        widths = eph.get("widthS", config.get("widthS", None))
         depthp = eph.get("depthP", config.get("depthP", None))
         depths = eph.get("depthS", config.get("depthS", None))
         phis = eph.get("phiS", config.get("phiS", None))
         lcs = load_lightcurves(target, sectors)
 
         # Test
-        add_eclipse_meta_to_lightcurves(lcs, t0, period, durp, durs, depthp, depths, phis)
+        add_eclipse_meta_to_lightcurves(lcs, t0, period, widthp, widths, depthp, depths, phis)
 
         for lc in lcs:
             # See test_lightcurves.test_find_eclipses_and_completeness_known_targets
@@ -73,8 +73,8 @@ class Testpipeline(unittest.TestCase):
                 eph = query_tess_ebs_ephemeris(config["tic"]) or {}
                 t0 = eph.get("t0", config.get("t0", config.get("t0", None)))
                 period = eph.get("period", config.get("period", None))
-                durp = eph.get("durP", config.get("durP", None))
-                durs = eph.get("durS", config.get("durS", None))
+                widthp = eph.get("widthP", config.get("widthP", None))
+                widths = eph.get("widthS", config.get("widthS", None))
                 depthp = eph.get("depthP", config.get("depthP", None))
                 depths = eph.get("depthS", config.get("depthS", None))
                 phis = eph.get("phiS", config.get("phiS", None))
@@ -82,7 +82,7 @@ class Testpipeline(unittest.TestCase):
 
                 # Prior steps in the pipeline where we have a dependency
                 # Sets primary|secondary _times & _completeness arrays and t0 ('best' primary) to lcs' meta
-                add_eclipse_meta_to_lightcurves(lcs, t0, period, durp, durs, depthp, depths, phis)
+                add_eclipse_meta_to_lightcurves(lcs, t0, period, widthp, widths, depthp, depths, phis)
 
                 # Test
                 sector_groups = choose_lightcurve_groups_for_fitting(lcs, completeness_th=0.8)
@@ -137,8 +137,8 @@ class Testpipeline(unittest.TestCase):
         eph = query_tess_ebs_ephemeris(config["tic"]) or {}
         t0 = eph.get("t0", config.get("t0", config.get("t0", None)))
         period = eph.get("period", config.get("period", None))
-        durp = eph.get("durP", config.get("durP", None))
-        durs = eph.get("durS", config.get("durS", None))
+        widthp = eph.get("widthP", config.get("widthP", None))
+        widths = eph.get("widthS", config.get("widthS", None))
         depthp = eph.get("depthP", config.get("depthP", None))
         depths = eph.get("depthS", config.get("depthS", None))
         phis = eph.get("phiS", config.get("phiS", None))
@@ -146,7 +146,7 @@ class Testpipeline(unittest.TestCase):
 
         # Prior step(s) in pipeline that test subject is dependent on.
         # The eclipse meta items will be used if flattening invoked
-        add_eclipse_meta_to_lightcurves(lcs, t0, period, durp, durs, depthp, depths, phis)
+        add_eclipse_meta_to_lightcurves(lcs, t0, period, widthp, widths, depthp, depths, phis)
 
         # Test
         append_mags_to_lightcurves_and_detrend(lcs,
@@ -154,8 +154,8 @@ class Testpipeline(unittest.TestCase):
                                                detrend_poly_degree=2,
                                                detrend_iterations=3,
                                                flatten=True,
-                                               durp=durp,
-                                               durs=durs,
+                                               durp=widthp * period,
+                                               durs=widths * period,
                                                verbose=True)
 
         for lc in lcs:

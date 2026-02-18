@@ -99,8 +99,8 @@
         "0160328766": {
             "details": "5 short cadence sectors (6, 32-33, 87 & 98); tess-ebs morph 0.199 & period ~10.318 d; Gaia DR3 ruwe 1.148; aka AW Col; SpT A3(m)A7-A7; eclipses of ~0.50 & ~0.15 mag; well detached and highly eccentric; some slow variability; all sectors have at least 1 of each eclipse type;",
             "notes": "TESS-ebs 2g eclipse widths appear switched so overriding here; in the 2021ApJ...912..123J catalogue;",
-            "durP": 0.44,
-            "durS": 0.25
+            "widthP": 0.043,
+            "widthS": 0.024
         },
         "0167756615": {
             "details": "3 short cadence sectors (5 @ 120s & 32-33 @ 600s); tess-ebs morph 0.159 & period ~19.430 d (incorrect); Gaia DR3 ruwe 2.227; eclipses of ~0.18 & ~0.13 mag; S5 has 1 of each sector; S32 has 2 secondaries & S33 has 3 primaries;",
@@ -120,8 +120,8 @@
         "0219362976": {
             "details": "5 short cadence sectors (4-6 & 31-32); tess-ebs morph 0.020 & period ~15.954 d; Gaia DR3 ruwe 1.221; high snr; eclipses of ~0.25 & ~0.07 mag; slow variability; highly eccentric with secondary at phase ~ 0.25;",
             "notes": "TESS-ebs 2g eclipse widths incorrect (has primary not the secondary wider); highly eccentric and gives nonsense fits without assistance (esinw);",
-            "durP": 0.10,
-            "durS": 0.15,
+            "widthP": 0.0063,
+            "widthS": 0.0094,
             "jktebop_overrides": { "esinw": 0.2 }
         },
         "0219421171": {
@@ -137,8 +137,8 @@
             "why_exclude": "cannot get a fit so will need investigation and probable intervention. Not even overriding ecosw & esinw with values calculated from the phase & duration of the eclipses works!",
             "details": "11 short cadence sectors (3-5, 30-32, 66, 90, 93 & 97-98); tess-ebs morph 0.010 & period ~40.304 d; Gaia DR3 ruwe 0.901; good snr; eclipses of ~0.24 & ~0.10 mag; highly eccentric;",
             "notes": "",
-            "durP": 0.198,
-            "durS": 0.215
+            "widthP": 0.0049,
+            "widthS": 0.0053
         },
         "0260269456": {
             "details": "26 short cadence sectors (27-29, 31-39, 61-62, 65-69, 87-89 & 93-96); tess-ebs morph 0.169 & period ~10.796 d; Gaia DR3 ruwe 0.893; good snr; eclipses of ~0.55 & ~0.40 mag; bright source of potential L3 just over 2 arcmin away;",
@@ -193,8 +193,8 @@
             "notes": "",
             "t0": 2206.68905,
             "period": 17.644114,
-            "durP": 0.52,
-            "durS": 0.52,
+            "widthP": 0.101,
+            "widthS": 0.101,
             "phiS": 0.29
         },
         "0350298314": {

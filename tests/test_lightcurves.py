@@ -165,7 +165,7 @@ class Testlightcurves(unittest.TestCase):
                 self.assertFalse(any(np.isnan(mags)))
 
     #
-    #   get_eclipse_times_and_masks(lc, ref_t0, period, durp, durs, phis, max_phase_shift)
+    #   find_eclipses_and_completeness(lc, ref_t0, period, widthP, widthS, depthP, depthS, phis, max_phase_shift)
     #
     def test_find_eclipses_and_completeness_known_targets(self):
         """ Tests find_eclipses_and_completeness(known target) correctly finds and identifies eclipses """
@@ -208,9 +208,9 @@ class Testlightcurves(unittest.TestCase):
             ret_vals = [lightcurves.find_eclipses_and_completeness(lc,
                                                                    target_cfg.get("t0", tess_ebs.get("t0", None)),
                                                                    target_cfg.get("period", tess_ebs.get("period", None)),
-                                                                   target_cfg.get("durP", tess_ebs.get("durP", None)),
-                                                                   target_cfg.get("durS", tess_ebs.get("durS",None)),
-                                                                   target_cfg.get("depthP", tess_ebs.get("deptP", None)),
+                                                                   target_cfg.get("widthP", tess_ebs.get("widthP", None)),
+                                                                   target_cfg.get("widthS", tess_ebs.get("widthS",None)),
+                                                                   target_cfg.get("depthP", tess_ebs.get("depthP", None)),
                                                                    target_cfg.get("depthS", tess_ebs.get("depthS", None)),
                                                                    target_cfg.get("phiS", tess_ebs.get("phiS", None)))
                         for lc in lcs]
