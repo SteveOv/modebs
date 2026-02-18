@@ -1,9 +1,10 @@
 """ Pipeline Stage 1 - ingesting targets """
 # pylint: disable=no-member
 from pathlib import Path
+import sys
 import re
-import warnings
 import argparse
+from datetime import datetime
 from contextlib import redirect_stdout
 
 import numpy as np
@@ -15,29 +16,35 @@ from astroquery.vizier import Vizier
 from astroquery.simbad import Simbad
 from astroquery.gaia import Gaia
 
-# pylint: disable=line-too-long, wrong-import-position
-warnings.filterwarnings("ignore", "Using UFloat objects with std_dev==0 may give unexpected results.", category=UserWarning)
-from uncertainties import ufloat
-
-from libs import pipeline, catalogues
+from libs import catalogues
 from libs.iohelpers import Tee
 from libs.targets import Targets
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Pipeline stage 1: ingest of targets.")
-    ap.add_argument("-i", "--input-file", dest="targets_file", type=Path, required=False,
+    ap.add_argument("-tf", "--targets-file", dest="targets_file", type=Path, required=False,
                     help="json file containing the details of the targets to ingest")
-    # We use a None in model_files as indication to pull in the default model under ebop_maven/data
-    ap.set_defaults(targets_file=Path("./config/formal-test-explicit-targets.json"))
+    ap.add_argument("-fo", "--force-overwrite", dest="force_overwrite", action="store_true",
+                    required=False, help="force the overwritting of any existing ingest found")
+    ap.set_defaults(targets_file=Path("./config/plato-lops2-tess-ebs-explicit-targets.json"),
+                    force_overwrite=False)
     args = ap.parse_args()
+    drop_dir = Path.cwd() / f"drop/{args.targets_file.stem}"
+    args.output_file = drop_dir / "targets.table"
 
-    drop_dir = Path.cwd() / "./drop"
-    log_file = drop_dir / f"{args.targets_file.stem}.ingest.log"
-    with redirect_stdout(Tee(open(log_file, "w", encoding="utf8"))):
+    if not args.force_overwrite and args.output_file.exists():
+        resp = input(f"** Warning: output data exists in '{drop_dir}'. Continue & overwrite y/N? ")
+        if resp.strip().lower() not in ["y", "yes"]:
+            sys.exit()
+    drop_dir.mkdir(parents=True, exist_ok=True)
 
-        targets_config = Targets("config/formal-test-explicit-targets.json")
-        print(f"Read in the configuration for {targets_config.count()} target(s).")
+    with redirect_stdout(Tee(open(drop_dir / "ingest.log", "w", encoding="utf8"))):
+        print(f"Started at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
+
+        targets_config = Targets(args.targets_file)
+        print(f"\nRead in the configuration from '{args.targets_file}'",
+              f"which contains {targets_config.count()} target(s) not excluded.")
 
         # Used to get the extended information published for each target
         simbad = Simbad()
@@ -130,6 +137,12 @@ if __name__ == "__main__":
             ("MB_err", float),
             ("log_age", float),
             ("log_age_err", float),
+            # Progress flags
+            ("fit_lcs", bool),
+            ("fit_radii", bool),
+            ("fit_masses", bool),
+            ("warnings", object),
+            ("errors", object),
         ]
 
         target_units = {
@@ -179,25 +192,31 @@ if __name__ == "__main__":
         # at this point and we can also use Data Wrangler on it for diagnostics.
         target_data = np.empty(shape=(targets_config.count(), ), dtype=target_dtype)
 
-        # Where possible, set the initial numerical values to nan to indicate missing data. Any
-        # int fields will be masked later, once we have a QTable, as we can only assign nan to floats.
+        # Where possible, set the initial numerical values to nan to indicate missing data. Any int
+        # fields will be masked later, once we have a QTable, as we can only assign nan to floats.
         for col_name in [n for n in target_data.dtype.names if target_data[n].dtype in [float]]:
             target_data[col_name] = np.nan
 
-        print("Getting basic information from config for these target(s).")
+        print("\nGetting basic information from config for these target(s).")
         for ix, target_config in enumerate(targets_config.iterate_known_targets()):
             target = target_config.target_id
             if target.isnumeric():
                 target = f"TIC {int(target):d}"
-            target_data[ix]["target"] = target
-            target_data[ix]["main_id"] = target_config.get("search_term", target)
+            row = target_data[ix]
+            row["target"] = target
+            row["main_id"] = target_config.get("search_term", target)
+            row["morph"] = 0.5
+            row["phiS"] = 0.5
+            row["fit_lcs"] = row["fit_radii"] = row["fit_masses"] = True
+            for k in ["Teff_sys", "logg_sys"]:
+                row[k] = target_config.get(k, None)
 
         # Get the basic published information from SIMBAD
-        print("Querying SIMBAD for id, SpT, mag & coordinate data.")
+        print("\nQuerying SIMBAD for id, SpT, mag & coordinate data.")
         if (tbl := simbad.query_objects(target_data["main_id"])) and len(tbl) == len(target_data):
-            id_pattern = re.compile(r"(Gaia DR3|V\*|TIC|HD|HIP|2MASS)\s+(.+?(?=\||$))", re.IGNORECASE)
+            id_patt = re.compile(r"(Gaia DR3|V\*|TIC|HD|HIP|2MASS)\s+(.+?(?=\||$))", re.IGNORECASE)
             for trow, srow in zip(target_data, tbl):
-                ids = np.array(id_pattern.findall(srow["ids"]), [("type", "O"), ("id", "O")])
+                ids = np.array(id_patt.findall(srow["ids"]), [("type", "O"), ("id", "O")])
                 trow["tics"] = "|".join(f"{i}" for i in ids[ids["type"]=="TIC"]["id"])
                 if "Gaia DR3" in ids["type"]:
                     trow["gaia_dr3_id"] = int(ids[ids["type"]=="Gaia DR3"][0]["id"])
@@ -211,7 +230,7 @@ if __name__ == "__main__":
                         trow[tfield] = _val
 
         # # Augment the basic information from Gaia DR3 (where target is in DR3)
-        print("Querying Gaia DR3 for coordinates, mags and ruwe data.")
+        print("\nQuerying Gaia DR3 for coordinates, mags and ruwe data.")
         AQL = "SELECT source_id, ra, dec, parallax, parallax_error, ruwe, " \
             + "phot_g_mean_mag, phot_bp_mean_mag, phot_rp_mean_mag, teff_gspphot, logg_gspphot " \
             + "FROM gaiadr3.gaia_source_lite " \
@@ -231,59 +250,63 @@ if __name__ == "__main__":
                             target_data[tfield][trow_ix] = _val
 
         # Lookup ephemeris information primarily from TESS-ebs
-        print("Querying TESS-ebs for ephemeris data.")
+        print("\nQuerying TESS-ebs for ephemeris data.")
+        nom_ephem_keys = ["morph", "widthP", "depthP", "widthS", "depthS", "phiS"]
         for trow in target_data:
-            period_factor = targets_config.get(trow["target"]).period_factor
-            tebs = catalogues.query_tess_ebs_ephemeris(trow["tics"].split("|"), period_factor)
+            target = trow["target"]
+            target_config = targets_config.get(target)
+            tebs = catalogues.query_tess_ebs_ephemeris(trow["tics"].split("|"),
+                                                       target_config.period_factor)
             if tebs is not None:
                 trow["t0"] = tebs["t0"].n
                 trow["t0_err"] = tebs["t0"].s
                 trow["period"] = tebs["period"].n
                 trow["period_err"] = tebs["period"].s
-                for k in ["morph", "widthP", "depthP", "widthS", "depthS", "phiS"]:
+                for k in nom_ephem_keys:
                     if tebs[k] is not None:
                         trow[k] = tebs[k]
-                if tebs["widthP"] is None or tebs["widthS"] is None:
-                    durP, _ = catalogues.estimate_eclipse_durations_from_morphology(trow["morph"],
-                                                                                    trow["period"])
-                    trow["widthP"] = trow["widthS"] = durP / trow["period"]
-                    print(f"No eclipse widths for {trow['target']} so estimated a value of",
-                        f"{trow['widthP']:.3f} for both, based on the morph metric.")
             else:
-                print(f"No TESS-ebs ephmeris for {trow['target']} so relying on config values.")
+                print(f"{target}: no TESS-ebs ephmeris so override values will be required.")
 
-        # Applying any target config overrides
-        print("Applying any target specific overrides from config.")
-        for ix, target_config in enumerate(targets_config.iterate_known_targets()):
-            for k in ["t0", "period", "morph", "Teff_sys", "logg_sys",
-                      "widthP", "widthS", "depthP",  "depthS", "phiP", "phiS"]:
-                if val := target_config.get(k, None) is not None:
-                    target_data[k] = val
+            config_keys = [k for k in ["t0","period"]+nom_ephem_keys if target_config.has_value(k)]
+            if len(config_keys) > 0:
+                print(f"{target}: copying ephemeris override(s) for {config_keys} from config.")
+                for k in config_keys:
+                    trow[k] = target_config.get(k)
+                    if k in ["t0", "period"]:
+                        trow[f"{k}_err"] = target_config.get(f"{k}_err", 0)
+
+            if np.isnan(trow["widthP"]) or np.isnan(trow["widthS"]):
+                widthP, _ = catalogues.estimate_eclipse_widths_from_morphology(trow["morph"])
+                trow["widthP"] = trow["widthS"] = widthP
+                print(f"{target}: no eclipse widths found, so an estimated a value of",
+                    f"{trow['widthP']:.3f} is being used for both (based on morph).")
 
         # Finally we convert to an astropy Masked QTable
-        print("Generating a QTable for the data.")
+        print("\nGenerating a QTable for the data.")
         targets = QTable(target_data, dtype=target_data.dtype, masked=True, units=target_units)
 
-        # Have to mask values <=0 for gaia_dr3_id as I cannot assign np.nan (for no data/null) to an int
+        # Have to mask for gaia_dr3_id <=0 as I cannot assign np.nan (for no data/null) to an int
         mask_int_mask = targets["gaia_dr3_id"] <= 0
-        print(f"Masking data for {sum(mask_int_mask)} rows where Gaia DR3 id is missing.")
+        print(f"\nMasking data for {sum(mask_int_mask)} rows where Gaia DR3 id is missing.")
         targets["gaia_dr3_id"] = np.ma.masked_where(mask_int_mask, targets["gaia_dr3_id"])
         for col_name in [n for n in targets.columns if targets[n].dtype in [int, float]]:
             targets[col_name] = np.ma.masked_invalid(targets[col_name])
 
-        save_file = drop_dir / f"{args.targets_file.stem}.table"
         SAVE_FORMAT = "votable" # Text based, so editable
-        print(f"Saving table to {save_file} in the '{SAVE_FORMAT}' format.")
-        save_file.parent.mkdir(parents=True, exist_ok=True)
-        targets.write(save_file, format=SAVE_FORMAT, overwrite=True)
+        print(f"\nSaving output to '{args.output_file}' in the '{SAVE_FORMAT}' format.")
+        targets.write(args.output_file, format=SAVE_FORMAT, overwrite=True)
 
         # Verify the save by reloading
-        print("Basic verification of newly created data file by re-opening without format prompt.")
-        targets2 = QTable.read(save_file)
+        print("\nBasic verification of new output file by re-opening without format prompt.")
+        targets2 = QTable.read(args.output_file)
         # print(targets2)
 
         # We should only see differences around empty/null/nan representation
-        print("Producing a difference report on the newly created data file")
-        with open(save_file.parent / f"{save_file.stem}.diff", mode="w", encoding="utf8") as df:
+        with open(args.output_file.parent / "ingest.diff", mode="w", encoding="utf8") as df:
+            print(f"\nProducing a difference report written to '{df.name}'. This also",
+                  "acts as a human readable copy of the contents of the output file.")
             if not report_diff_values(targets, targets2, df):
-                print(f"Save verfication indicated differences. Check the diff file: {df.name}")
+                print("Ingest verfication indicated differences. Check the diff file.")
+
+        print(f"\nCompleted at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
