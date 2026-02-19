@@ -33,10 +33,13 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Pipeline stage 2: fitting target lightcurves.")
     ap.add_argument("-tf", "--targets-file", dest="targets_file", type=Path, required=False,
                     help="json file containing the details of the targets to fit")
-    ap.set_defaults(targets_file=Path("./config/plato-lops2-tess-ebs-explicit-targets.json"))
+    ap.add_argument("-wd", "--write-diags", dest="write_diags", action="store_true", required=False,
+                    help="write a second, human readable output file for diagnostics")
+    ap.set_defaults(targets_file=Path("./config/plato-lops2-tess-ebs-explicit-targets.json"),
+                    write_diags=False)
     args = ap.parse_args()
     drop_dir = Path.cwd() / f"drop/{args.targets_file.stem}"
-    args.input_file = args.output_file = drop_dir / "targets.table"
+    args.input_file = args.output_file = drop_dir / "working-set.table"
 
     # EBOP MAVEN estimator for JKTEBOP input params; rA+rB, k, J, ecosw, esinw and bP/inc
     estimator = Estimator()
@@ -50,17 +53,16 @@ if __name__ == "__main__":
 
         # Open the targets table and the configs
         tdata = QTable.read(args.input_file)
-        to_fit_mask = tdata["fit_lcs"] == True # pylint: disable=singleton-comparison
+        to_fit_row_ixs = np.where(tdata["fitted_lcs"] == False)[0] # pylint: disable=singleton-comparison
 
-        to_fit_mask = tdata["target"] == "V539 Ara"
-
-        to_fit_count = sum(to_fit_mask)
+        to_fit_count = len(to_fit_row_ixs)
         print(f"Reading '{args.input_file}' which contains {to_fit_count} target(s) to be fitted."
               f"\nWill write updated data to '{args.output_file}'")
 
-        for row_ix, trow in enumerate(tdata[to_fit_mask], start=0):
+        for row_ix in to_fit_row_ixs:
+            trow = tdata[row_ix]
             target = trow["target"]
-            print("a\n\n============================================================")
+            print("\n\n============================================================")
             print(f"Processing target {row_ix+1} of {to_fit_count}: {target}")
             print("============================================================")
 
@@ -166,6 +168,7 @@ if __name__ == "__main__":
 
 
             # Estimating L3 by looking for nearby flux sources
+            l3 = 0
             print("Estimating fitting input value for L3 with Gaia DR3.")
             coords = SkyCoord(ra=trow["ra"], dec=trow["dec"],
                               distance=(1000 / trow["parallax"]).value * u.pc, frame="icrs")
@@ -233,7 +236,7 @@ if __name__ == "__main__":
 
             # Superset of all of the potentially fitted parameters to be read from fitting
             fitted_param_keys = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc", "L3",
-                                 "period", "ecc", "bP", "light_ratio", "reflA", "reflB"]
+                                 "period", "ecc", "bP", "LR", "reflA", "reflB"]
 
             # If max_workers >1 progress updates will occur after each attempt is complete, but overall elapsed
             # time is reduced. If set to 1, tasks are serialized but more frequent progress updates will occur.
@@ -241,12 +244,12 @@ if __name__ == "__main__":
             fitted_param_dicts = pipeline.fit_target_lightcurves(lcs,
                                                                  input_params=in_params,
                                                                  read_keys=fitted_param_keys,
-                                                                 primary_epoch=t0s,
+                                                                 t0=t0s,
                                                                  task=3,
                                                                  max_workers=8,
                                                                  max_attempts=3,
                                                                  timeout=900,
-                                                                 file_prefix="quick-fit")
+                                                                 file_prefix="fit-lrs")
 
             # Get the results into a structured array format
             fitted_params = np.empty(shape=(len(lcs), ),
@@ -268,18 +271,26 @@ if __name__ == "__main__":
             print("\n".join(f"{p:>14s}: {summary_params[p]:12.6f}"
                             for p in fitted_param_keys if summary_params[p] is not None))
 
-            # Finally, store the params
-            for k in ["rA_plus_rB", "k", "J", "ecosw", "esinw", "bP", "inc", "L3"]:
+            # Finally, store the params and the flag that indicates LC fitting has completed
+            for k in ["rA_plus_rB", "k", "J", "ecosw", "esinw", "bP", "inc", "L3", "LR"]:
                 unit = u.deg if k == "inc" else 1
-                tdata[to_fit_mask][row_ix][k] = summary_params[k].n * unit
-                tdata[to_fit_mask][row_ix][f"{k}_err"] = summary_params[k].s * unit
+                tdata[row_ix][k] = summary_params[k].n * unit
+                tdata[row_ix][f"{k}_err"] = summary_params[k].s * unit
 
-            teffR = (summary_params["light_ratio"] / summary_params["k"]**2)**0.25
-            tdata[to_fit_mask][row_ix]["TeffR"] = teffR.n
-            tdata[to_fit_mask][row_ix]["TeffR_err"] = teffR.s
-            print(f"    Teff_ratio: {teffR:12.6f} (calculated from light_ratio & k)")
+            teffR = (summary_params["LR"] / summary_params["k"]**2)**0.25
+            tdata[row_ix]["TeffR"] = teffR.n
+            tdata[row_ix]["TeffR_err"] = teffR.s
+            print(f"    Teff_ratio: {teffR:12.6f} (calculated from LR & k)")
+
+            tdata[row_ix]["fitted_lcs"] = True
 
         print(f"Writing updated data set to {args.output_file}")
         tdata.write(args.output_file, format="votable", overwrite=True)
+
+        if args.write_diags:
+            diag_file = drop_dir / "fit_lightcurves.diag"
+            print(f"Saving human readable copy of output to '{diag_file.name}' for diagnostics.")
+            tdata.write(diag_file, format="ascii.fixed_width_two_line",
+                        header_rows=["name", "dtype", "unit"], overwrite=True)
 
         print(f"\nCompleted at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")

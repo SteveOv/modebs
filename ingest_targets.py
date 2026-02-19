@@ -31,7 +31,7 @@ if __name__ == "__main__":
                     force_overwrite=False)
     args = ap.parse_args()
     drop_dir = Path.cwd() / f"drop/{args.targets_file.stem}"
-    args.output_file = drop_dir / "targets.table"
+    args.output_file = drop_dir / "working-set.table"
 
     if not args.force_overwrite and args.output_file.exists():
         resp = input(f"** Warning: output data exists in '{drop_dir}'. Continue & overwrite y/N? ")
@@ -138,9 +138,9 @@ if __name__ == "__main__":
             ("log_age", float),
             ("log_age_err", float),
             # Progress flags
-            ("fit_lcs", bool),
-            ("fit_radii", bool),
-            ("fit_masses", bool),
+            ("fitted_lcs", bool),
+            ("fitted_radii", bool),
+            ("fitted_masses", bool),
             ("warnings", object),
             ("errors", object),
         ]
@@ -207,7 +207,6 @@ if __name__ == "__main__":
             row["main_id"] = target_config.get("search_term", target)
             row["morph"] = 0.5
             row["phiS"] = 0.5
-            row["fit_lcs"] = row["fit_radii"] = row["fit_masses"] = True
             for k in ["Teff_sys", "logg_sys"]:
                 row[k] = target_config.get(k, None)
 
