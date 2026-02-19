@@ -45,6 +45,7 @@ all_param_captions = {
     "rA":           r"$r_{\rm A}$",
     "rB":           r"$r_{\rm B}$",
     "light_ratio":  r"$L_{\rm B}/L_{\rm A}$",
+    "LR":           r"$L_{\rm B}/L_{\rm A}$",
     "TeffA":        r"$T_{\rm eff,A}~[\text{K}]$",
     "TeffB":        r"$T_{\rm eff,B}~[\text{K}]$",
     "RA":           r"$R_{\rm A}~[\text{R}_{\odot}]$",

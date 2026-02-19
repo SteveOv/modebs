@@ -546,7 +546,7 @@ def median_params(input_params: ArrayLike,
 def fit_target_lightcurves(lcs: LightCurveCollection,
                            input_params: dict[str],
                            read_keys: List[str],
-                           primary_epoch: Union[float, UFloat, np.ndarray]=None,
+                           t0: Union[float, UFloat, np.ndarray]=None,
                            task: int=3,
                            iterations: int=10,
                            max_workers: int=1,
@@ -563,16 +563,11 @@ def fit_target_lightcurves(lcs: LightCurveCollection,
         - primary_epoch, which may be varied by lightcurve (see primary_epoch parameter)
         - poly fit instructions, which are calculated for the timings of each lightcurve
 
-    **Note:** Unlike the similar fit_target_lightcurve() func, this func does not accept a stdout_to
-    arg. This is because the act of running the fits in parallel make it difficult to capture and
-    coordinate the jktebop output. Instead JKTEBOP processing output will be written to sys.stdout
-    after each attempted fit.
-
     :lcs: the source lightcurves, which must have the time, delta_mag and delta_mag_err columns
     :input_params: the set initial input params to the fitting process shared by each lightcurve
     :read_keys: the set of fitted output params to read and return for each fit
-    :primary_epoch: either a single value for all lcs, individual values for each lc or None when
-    values will be taken from each lightcurve's meta dictionary under the t0 or primary_epoch keys
+    :t0: either a single value for all lcs, individual values for each lc or None when
+    values will be taken from each lightcurve's meta dictionary under the t0 key
     :task: the jktebop task to be executed
     :iterations: the number of iterations to run if task == 3, otherwise ignored
     :max_workers: the maximum number of concurrent fits to run
@@ -581,10 +576,10 @@ def fit_target_lightcurves(lcs: LightCurveCollection,
     :returns: a list of dictionaries containing the fitted parameters matching read_keys and the
     paths to the various jktebop files associated with the fitting
     """
-    if primary_epoch is None:
-        primary_epoch = [lc.meta.get("t0", lc.meta.get("primary_epoch", None)) for lc in lcs]
-    elif isinstance(primary_epoch, float|UFloat):
-        primary_epoch = [primary_epoch] * len(lcs)
+    if t0 is None:
+        t0 = [lc.meta.get("t0", lc.meta.get("primary_epoch", None)) for lc in lcs]
+    elif isinstance(t0, float|UFloat):
+        t0 = [t0] * len(lcs)
 
     task_params = { "task": task, "simulations": iterations if task == 8 else "" }
     if task != 3:
@@ -592,7 +587,7 @@ def fit_target_lightcurves(lcs: LightCurveCollection,
     max_workers = min(len(lcs), max_workers or 1)
 
     # Set up the sets of fit_target_lightcurve args may differ by lc/sector
-    all_in_params = [input_params.copy() | task_params | {"primary_epoch":p} for p in primary_epoch]
+    all_in_params = [input_params.copy() | task_params | { "t0": t } for t in t0]
     all_fit_stems = [file_prefix + "-" + lc.meta["LABEL"].replace(" ", "-").lower() for lc in lcs]
 
     # If we're to run in parallel this indicates to _fit_target to write JKTEBOP console output to

@@ -10,7 +10,7 @@
  ${reflA}       ${reflB}    Reflection effect star A   Reflection effect star B
  0.000          0.000       Phase of primary eclipse   Light scale factor (mag)
  ${period}                  Orbital period of eclipsing binary system (days)
- ${primary_epoch}           Reference time of primary minimum (JD)
+ ${t0}                      Reference time of primary minimum (JD)
  ${simulations}
  1 1  Adjust RADII SUM    or  RADII RATIO    (0, 1, 2, 3)
  1 ${qphot_fit}  Adjust INCLINATION  or  MASSRATIO      (0, 1, 2, 3)
