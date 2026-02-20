@@ -1,5 +1,6 @@
 """ Pipeline Stage 2 - fitting target lightcurves """
 # pylint: disable=no-member, invalid-name
+from inspect import getsourcefile
 from pathlib import Path
 import warnings
 import argparse
@@ -23,6 +24,9 @@ from libs import pipeline, lightcurves
 from libs.iohelpers import Tee
 from libs.targets import Targets
 
+
+THIS_STEM = Path(getsourcefile(lambda: 0)).stem
+
 # The eclipse completeness ratio above which eclipses are considered complete
 ECLIPSE_COMPLETE_TH = 0.9
 
@@ -44,7 +48,7 @@ if __name__ == "__main__":
     # EBOP MAVEN estimator for JKTEBOP input params; rA+rB, k, J, ecosw, esinw and bP/inc
     estimator = Estimator()
 
-    with redirect_stdout(Tee(open(drop_dir / "fit_lightcurves.log", "w", encoding="utf8"))):
+    with redirect_stdout(Tee(open(drop_dir / f"{THIS_STEM}.log", "w", encoding="utf8"))):
         print(f"Started at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
 
         targets_config = Targets(args.targets_file)
@@ -133,7 +137,7 @@ if __name__ == "__main__":
 
 
             # Flatten (optional depending on morph), append delta_mag & delta_mag_err columns
-            # and then detrend & rectify the mags to zero by subtracting a low order polynomial 
+            # and then detrend & rectify the mags to zero by subtracting a low order polynomial
             do_flatten = target_config.flatten \
                         or (target_config.flatten is None and trow["morph"] <= FLATTEN_TH)
             print("Appending delta_mags/delta_mags_err colums and detrending.",
@@ -288,7 +292,7 @@ if __name__ == "__main__":
         tdata.write(args.output_file, format="votable", overwrite=True)
 
         if args.write_diags:
-            diag_file = drop_dir / "fit_lightcurves.diag"
+            diag_file = drop_dir / f"{THIS_STEM}.diag"
             print(f"Saving human readable copy of output to '{diag_file.name}' for diagnostics.")
             tdata.write(diag_file, format="ascii.fixed_width_two_line",
                         header_rows=["name", "dtype", "unit"], overwrite=True)

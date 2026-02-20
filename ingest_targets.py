@@ -1,5 +1,6 @@
 """ Pipeline Stage 1 - ingesting targets """
 # pylint: disable=no-member
+from inspect import getsourcefile
 from pathlib import Path
 import sys
 import re
@@ -20,6 +21,7 @@ from libs import catalogues
 from libs.iohelpers import Tee
 from libs.targets import Targets
 
+THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Pipeline stage 1: ingest of targets.")
@@ -39,7 +41,7 @@ if __name__ == "__main__":
             sys.exit()
     drop_dir.mkdir(parents=True, exist_ok=True)
 
-    with redirect_stdout(Tee(open(drop_dir / "ingest.log", "w", encoding="utf8"))):
+    with redirect_stdout(Tee(open(drop_dir / f"{THIS_STEM}.log", "w", encoding="utf8"))):
         print(f"Started at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
 
         targets_config = Targets(args.targets_file)
@@ -302,7 +304,7 @@ if __name__ == "__main__":
         # print(targets2)
 
         # We should only see differences around empty/null/nan representation
-        with open(args.output_file.parent / "ingest.diff", mode="w", encoding="utf8") as df:
+        with open(args.output_file.parent / f"{THIS_STEM}.diff", mode="w", encoding="utf8") as df:
             print(f"\nProducing a difference report written to '{df.name}'. This also",
                   "acts as a human readable copy of the contents of the output file.")
             if not report_diff_values(targets, targets2, df):

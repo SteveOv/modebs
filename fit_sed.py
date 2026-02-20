@@ -1,5 +1,6 @@
 """ Pipeline Stage 3 - MCMC fitting of target SEDs """
 # pylint: disable=no-member, invalid-name
+from inspect import getsourcefile
 from pathlib import Path
 import warnings
 import argparse
@@ -25,6 +26,8 @@ from libs import extinction
 from libs.sed import get_sed_for_target, group_and_average_fluxes, create_outliers_mask
 from libs.iohelpers import Tee
 from libs.targets import Targets
+
+THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 
 NUM_STARS = 2
 
@@ -54,7 +57,7 @@ if __name__ == "__main__":
     args.input_file = args.output_file = drop_dir / "working-set.table"
 
 
-    with redirect_stdout(Tee(open(drop_dir / "fit_sed.log", "w", encoding="utf8"))):
+    with redirect_stdout(Tee(open(drop_dir / f"{THIS_STEM}.log", "w", encoding="utf8"))):
         print(f"Started at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
 
         targets_config = Targets(args.targets_file)
@@ -235,7 +238,7 @@ if __name__ == "__main__":
             tdata.write(args.output_file, format="votable", overwrite=True)
 
             if args.write_diags:
-                diag_file = drop_dir / "fit_sed.diag"
+                diag_file = drop_dir / f"{THIS_STEM}.diag"
                 tdata.write(diag_file, format="ascii.fixed_width_two_line",
                             header_rows=["name", "dtype", "unit"], overwrite=True)
 
