@@ -19,7 +19,7 @@ from deblib.constants import G, R_sun, M_sun
 
 from libs.iohelpers import Tee
 from libs.targets import Targets
-from libs.pipeline_dal import QTableDal
+from libs.pipeline_dal import QTableFileDal
 from libs.fit_masses import minimize_fit, mcmc_fit
 
 
@@ -55,7 +55,7 @@ if __name__ == "__main__":
         print(f"Read in the configuration from '{args.targets_file}'",
               f"which contains {targets_config.count()} target(s).")
 
-        dal = QTableDal(args.working_set_file, file_format="votable")
+        dal = QTableFileDal(args.working_set_file)
         to_fit_targets = list(dal.keys_where("fitted_masses", lambda val: val == False)) # pylint: disable=singleton-comparison
         to_fit_count = len(to_fit_targets)
         print(f"The data indicates there are {to_fit_count} target(s) to be fitted.")
