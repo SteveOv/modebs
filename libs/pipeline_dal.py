@@ -282,7 +282,11 @@ class QTableDal(Dal):
         """
         has_unit = row.columns[param].unit is not None
         value = row[param].value if has_unit else row[param]
-        if hasattr(value, "unmasked"): # Bit of a hack but np.ma.is_masked doesn't work here
+        if _np.ma.is_masked(value):
+            # Value is explicitly masked which is expected when no value has been set
+            value = None
+        elif _np.ma.isMaskedArray(value) or hasattr(value, "unmasked"):
+            # We also seem to get masked value types, even when we have values
             value = value.unmasked
         return value
 
