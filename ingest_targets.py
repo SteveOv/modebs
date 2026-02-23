@@ -126,9 +126,19 @@ if __name__ == "__main__":
                 print(f"{target_id}: no TESS-ebs ephmeris so override values will be required.")
                 params = { }
 
+            # Special case: if no secondary data and we know period is doubled. This is likely to
+            # be a system with very similar primary and secondary eclipses, so copy values over.
+            if config.period_factor == 2 \
+                    and all(params[v] is None for v in ["widthS", "depthS", "phiS"]):
+                print(f"{target_id}: No secondary data in TESS-ebs & the period is to be doubled.",
+                      "Copying primary data to the secondary (assume similar eclipses & phiS=0.5).")
+                params["widthS"] = params["widthP"]
+                params["depthS"] = params["depthP"]
+                params["phiS"] = 0.5
+
             ephem_keys_overs = [k for k in ephem_keys if config.has_value(k)]
             if len(ephem_keys_overs) > 0:
-                print(f"{target_id}: copying ephemeris overrides for {ephem_keys_overs} from config.")
+                print(f"{target_id}: copying ephemeris overrides of {ephem_keys_overs} from config")
                 for k in ephem_keys_overs:
                     if k in ["t0", "period"]:
                         params[k] = ufloat(config.get(k), config.get(f"{k}_err", 0))
