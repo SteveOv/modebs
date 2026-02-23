@@ -38,8 +38,6 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Pipeline stage 2: fitting target lightcurves.")
     ap.add_argument("-tf", "--targets-file", dest="targets_file", type=Path, required=False,
                     help="json file containing the details of the targets to fit")
-    ap.add_argument("-wd", "--write-diags", dest="write_diags", action="store_true", required=False,
-                    help="write a second, human readable output file for diagnostics")
     ap.set_defaults(targets_file=Path("./config/plato-lops2-tess-ebs-explicit-targets.json"),
                     write_diags=False)
     args = ap.parse_args()
