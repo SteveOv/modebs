@@ -77,7 +77,6 @@ class Dal(_ABC):
         ("TeffR", float),
         ("TeffR_err", float),
         # SED fitting i/o params
-        ("Av", float),
         ("TeffA", float),
         ("TeffA_err", float),
         ("TeffB", float),
