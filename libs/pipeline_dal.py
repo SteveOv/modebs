@@ -105,7 +105,7 @@ class Dal(_ABC):
         ("log_age_err", float),
         # Progress flags
         ("fitted_lcs", bool),
-        ("fitted_seds", bool),
+        ("fitted_sed", bool),
         ("fitted_masses", bool),
         ("warnings", object),
         ("errors", object)
