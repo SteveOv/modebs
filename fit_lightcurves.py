@@ -56,7 +56,7 @@ if __name__ == "__main__":
 
         # Open the targets table and the configs
         wset = QTableFileDal(args.working_set_file)
-        to_fit_target_ids = list(wset.keys_where("fitted_lcs", lambda v: v == False)) # pylint: disable=singleton-comparison
+        to_fit_target_ids = list(wset.yield_keys("fitted_lcs", where=lambda fl: fl == False)) # pylint: disable=singleton-comparison
         to_fit_count = len(to_fit_target_ids)
         print(f"The working-set indicates there are {to_fit_count} target(s) to be fitted.")
 

@@ -148,6 +148,32 @@ class Dal(_ABC):
     }
 
     @_abstractmethod
+    def yield_keys(self,
+                   *params: str,
+                   where: _Callable[[any], bool]=lambda *vals: True) -> _Generator:
+        """
+        Yields key values where the where() func evaluates to True when passed the requested values.
+
+        To yield all keys
+        ```python
+        key_gen = dal.yield_keys()
+        ```
+        
+        To yield only keys where fitted_lcs and fitted_sed flags are True
+        ```python
+        key_gen = dal.yield_keys("fitted_lcs", "fitted_sed", where=lambda v1, v2: v1 == v2 == True)
+        ```
+        or, alternatively
+        ```python
+        key_gen = dal.yield_keys("fitted_lcs", "fitted_sed", where=lambda *vals: np.all(vals))
+        ```
+
+        :params: the parameters whose values are to be evaluated for each row
+        :where: the bool function to evaluate the parameter values
+        :return: yields key values for the rows where the where func evaluates to True
+        """
+
+    @_abstractmethod
     def read_values(self, key: any, *params: str) -> _ArrayLike:
         """
         Read the requested param values, for the required key, from the data source.
@@ -166,17 +192,6 @@ class Dal(_ABC):
         :params: the name/value pairs of the params to write
         """
 
-    @_abstractmethod
-    def keys_where(self,
-                   param: str,
-                   where: _Callable[[any], bool]=lambda val: val is True) -> _Generator:
-        """
-        Yields key values where the where() func evaluate to True
-
-        :param: the parameter to evaluate
-        :where: the function to evaluate the parameter
-        :return: yields key values for the rows where the where func evaluates to True
-        """
 
 class QTableDal(Dal):
     """
@@ -204,22 +219,18 @@ class QTableDal(Dal):
         """ Return the name of the primary key column """
         return self._key_name
 
-    def keys_where(self,
-                   param: str,
-                   where: _Callable[[any], bool]=lambda val: val is True) -> _Generator:
-        for row in self._table:
-            value = self._read_param_value(row, param)
-            if where(value):
-                yield self._read_param_value(row, self._key_name)
 
-    def yield_values(self, *params: str):
-        """
-        Yields the requested values from each row in turn
-
-        :params: the names of the params to read values for
-        """
-        for key in self._table[self._key_name]:
-            yield self.read_values(key, *params)
+    def yield_keys(self,
+                   *params: str,
+                   where: _Callable[[any], bool]=lambda *vals: True) -> _Generator:
+        if params is not None and len(params) > 0:
+            for row in self._table:
+                key = self._read_param_value(row, self._key_name)
+                if where(*self.read_values(key, *params)):
+                    yield key
+        else:
+            for row in self._table:
+                yield self._read_param_value(row, self.key_name)
 
     def read_values(self, key: any, *params: str):
         if isinstance(params, str):

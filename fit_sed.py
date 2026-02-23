@@ -64,7 +64,8 @@ if __name__ == "__main__":
               f"which contains {targets_config.count()} target(s) that have not been excluded.")
 
         wset = QTableFileDal(args.working_set_file)
-        to_fit_target_ids = list(wset.keys_where("fitted_sed", lambda v: v == False)) # pylint: disable=singleton-comparison
+        to_fit_target_ids = list(wset.yield_keys("fitted_lcs", "fitted_sed",
+                                                 where=lambda fl, fs: fl == True and fs == False)) # pylint: disable=singleton-comparison
         to_fit_count = len(to_fit_target_ids)
         print(f"The working-set indicates there are {to_fit_count} targets to be fitted.")
 
