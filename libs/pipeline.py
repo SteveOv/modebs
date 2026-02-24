@@ -13,7 +13,7 @@ from itertools import groupby
 
 import numpy as np
 from numpy.typing import ArrayLike
-from uncertainties import UFloat, ufloat
+from uncertainties import UFloat, ufloat, nominal_value
 from uncertainties.unumpy import nominal_values
 import astropy.units as u
 from astropy.time import Time
@@ -58,16 +58,6 @@ def get_teff_from_spt(target_spt):
                 and _spt_to_teff_map[tp].n > (teff.n if teff is not None else 0):
                 teff = _spt_to_teff_map[tp]
     return teff
-
-
-def nominal_value(value: Union[UFloat, Number]) -> Number:
-    """
-    Simple helper function to get the nominal value of a number
-    whether or not it's a UFloat
-    """
-    if isinstance(value, UFloat):
-        return value.nominal_value
-    return value
 
 
 def mask_lightcurves_unusable_fluxes(lcs: LightCurveCollection,

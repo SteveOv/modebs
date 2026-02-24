@@ -10,7 +10,7 @@ from sys import stdout
 import numpy as np
 from scipy.signal import find_peaks
 
-from uncertainties import unumpy, UFloat
+from uncertainties import unumpy, UFloat, nominal_value
 import astropy.units as u
 from astropy.time import Time, TimeDelta
 from astropy.table import Table
@@ -276,9 +276,6 @@ def find_eclipses_and_completeness(lc: LightCurve,
     :verbose: whether or not to send messages to stdout with details the search
     :returns: a tuple of (t0, prim_times, prim_completeness, sec_times, sec_completeness)
     """
-    def nominal_value(value):
-        return value.nominal_value if isinstance(value, UFloat) else value
-
     ref_t0 = to_lc_time(ref_t0, lc).value if isinstance(ref_t0, Time) else nominal_value(ref_t0)
     period = period.to(u.d).value if isinstance(period, u.Quantity) else nominal_value(period)
     widthp = nominal_value(widthp)
