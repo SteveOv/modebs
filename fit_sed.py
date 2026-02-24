@@ -101,9 +101,6 @@ if __name__ == "__main__":
 
                 main_id, k, TeffR, Teff_sys, logg_sys, st = wset.read_values(target_id,
                                         "main_id", "k", "TeffR", "Teff_sys", "logg_sys", "spt")
-                Teff_sys = Teff_sys or pipeline.get_teff_from_spt(st) or 5650
-                logg_sys = logg_sys or 4.0
-
                 ra, dec, parallax = wset.read_values(target_id, "ra", "dec", "parallax")
                 coords = SkyCoord(ra=nominal_value(ra) * u.deg, dec=nominal_value(dec) * u.deg,
                                   distance=(1000 / nominal_value(parallax)) * u.pc, frame="icrs")

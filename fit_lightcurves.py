@@ -280,6 +280,8 @@ if __name__ == "__main__":
                 print(f"\nWriting fitted params for {write_params} and TeffR to working-set.")
                 params = { k: summary_params[k] for k in write_params }
                 params["TeffR"] = TeffR
+                params["Teff_sys"] = Teff_sys   # These have come from TIC
+                params["logg_sys"] = logg_sys   # and will be used later in SED fitting
                 params["fitted_lcs"] = True
                 wset.write_values(target_id, errors="", **params)
 
