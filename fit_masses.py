@@ -147,7 +147,7 @@ if __name__ == "__main__":
 
                 # Finally, store the params and the flag that indicates fitting has completed
                 print(f"\nWriting fitted params for {list(write_params.keys())} to working-set.")
-                wset.write_values(target_id, fitted_masses=True, errors=None, **write_params)
+                wset.write_values(target_id, fitted_masses=True, errors="", **write_params)
 
             except Exception as exc: # pylint: disable=broad-exception-caught
                 print(f"{target_id}: Failed with the following exception. Depending on the nature",
