@@ -233,8 +233,9 @@ class QTableDal(Dal):
 
         :masked: whether or not the table is masked
         """
-        self._table = _QTable(masked=masked, dtype=self._col_dtype, units=self._col_units, rows=[])
         super().__init__(key_name="target_id")
+        self._table = _QTable(masked=masked, dtype=self._col_dtype, units=self._col_units, rows=[])
+        self._table.add_index(self.key_name, unique=True)
 
     def yield_keys(self,
                    *params: str,
@@ -252,12 +253,8 @@ class QTableDal(Dal):
         if isinstance(params, str):
             params = [params]
 
-        # No lock on a read
-        row_mask = self._table[self._key_name] == key
-        if not _np.any(row_mask):
-            raise ValueError(f"No data row found for key {key}")
-
-        row = self._table[row_mask][0]
+        # No lock on a read. Raises an KeyError if the key value is unknown
+        row = self._table.loc[key]
         values = _np.empty_like(params, dtype=object)
         for ix, col in enumerate(params):
             if col in row.colnames:
@@ -271,12 +268,11 @@ class QTableDal(Dal):
     def write_values(self, key: any, **params: dict[str, any]):
         with self._WRITE_LOCK:
             # Unlike reading, writes need to be direct to the table (row/col indices) to persist
-            row_mask = self._table[self._key_name] == key
-            if not _np.any(row_mask):
+            try:
+                row_ix = self._table.loc_indices[key]
+            except KeyError:
                 self._table.add_row(vals={ self._key_name: key })
-                row_ix = -1 #len(self._table) - 1
-            else:
-                row_ix = _np.where(row_mask)[0][0]
+                row_ix = self._table.loc_indices[key]
 
             for col, value in params.items():
                 if col in self._table.colnames:
@@ -356,6 +352,7 @@ class QTableFileDal(QTableDal):
             if file.exists():
                 print(f"Loading data file '{file.name}' as {file_format}/{file_format_kwargs}")
                 self._table = _QTable.read(self._file, format=self._format, **self._format_kwargs)
+                self._table.add_index(self.key_name, unique=True)
             else:
                 # Cannot save the file immediately as we get a ValueError thrown with the message
                 # "max() arg is an empty sequence" from within astropy. Probably because there
