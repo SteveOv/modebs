@@ -18,6 +18,80 @@ from uncertainties import nominal_value as _nom_val, std_dev as _std_dev
 class Dal(_ABC):
     """ Base data access layer (Dal) for reading/writing simple table data """
 
+    def __init__(self, key_name: str):
+        """
+        Initializes a Dal class which provides a consistent interface to underlying storage.
+
+        :key_name: the name of the col/param which acts as each row's unique key/index value
+        """
+        self._key_name = key_name
+        super().__init__()
+
+    @property
+    def key_name(self) -> str:
+        """ Return the name of the primary key column """
+        return self._key_name
+
+    def yield_values(self, *params):
+        """
+        Yields the requested param values for each row in turn.
+
+        :params: the names of the params to read values for
+        :returns: a Generator of an array of the requested values for each row
+        """
+        for key in self.yield_keys():
+            yield self.read_values(key, *params)
+
+    @_abstractmethod
+    def yield_keys(self,
+                   *params: str,
+                   where: _Callable[[any], bool]=lambda *vals: True) -> _Generator:
+        """
+        Yields key values where the where() func evaluates to True when passed the requested values.
+
+        To yield all keys
+        ```python
+        key_gen = dal.yield_keys()
+        ```
+        
+        To yield only keys where fitted_lcs and fitted_sed flags are True
+        ```python
+        key_gen = dal.yield_keys("fitted_lcs", "fitted_sed", where=lambda v1, v2: v1 == v2 == True)
+        ```
+        or, alternatively
+        ```python
+        key_gen = dal.yield_keys("fitted_lcs", "fitted_sed", where=lambda *vals: np.all(vals))
+        ```
+
+        :params: the parameters whose values are to be evaluated for each row
+        :where: the bool function to evaluate the parameter values
+        :return: yields key values for the rows where the where func evaluates to True
+        """
+
+    @_abstractmethod
+    def read_values(self, key: any, *params: str) -> _ArrayLike:
+        """
+        Read the requested param values, for the required key, from the data source.
+
+        :key: the unique key to the item to read params from
+        :params: the names of the params to read values for
+        :returns: an array of the requested values
+        """
+
+    @_abstractmethod
+    def write_values(self, key: any, **params: dict[str, any]):
+        """
+        Writes the requested param values, for the required key, to the data source.
+
+        :key: the unique key to the item to read params from
+        :params: the name/value pairs of the params to write
+        """
+
+
+class QTableDal(Dal):
+    """
+    Pipeline Dal for reading/writing of an in memory astropy QTable
+    """
     _col_dtype = [
         # SIMBAD and IDs
         ("target_id", "<U14"),
@@ -147,59 +221,9 @@ class Dal(_ABC):
         "MB_err": _u.solMass,
     }
 
-    @_abstractmethod
-    def yield_keys(self,
-                   *params: str,
-                   where: _Callable[[any], bool]=lambda *vals: True) -> _Generator:
-        """
-        Yields key values where the where() func evaluates to True when passed the requested values.
-
-        To yield all keys
-        ```python
-        key_gen = dal.yield_keys()
-        ```
-        
-        To yield only keys where fitted_lcs and fitted_sed flags are True
-        ```python
-        key_gen = dal.yield_keys("fitted_lcs", "fitted_sed", where=lambda v1, v2: v1 == v2 == True)
-        ```
-        or, alternatively
-        ```python
-        key_gen = dal.yield_keys("fitted_lcs", "fitted_sed", where=lambda *vals: np.all(vals))
-        ```
-
-        :params: the parameters whose values are to be evaluated for each row
-        :where: the bool function to evaluate the parameter values
-        :return: yields key values for the rows where the where func evaluates to True
-        """
-
-    @_abstractmethod
-    def read_values(self, key: any, *params: str) -> _ArrayLike:
-        """
-        Read the requested param values, for the required key, from the data source.
-
-        :key: the unique key to the item to read params from
-        :params: the names of the params to read values for
-        :returns: an array of the requested values
-        """
-
-    @_abstractmethod
-    def write_values(self, key: any, **params: dict[str, any]):
-        """
-        Writes the requested param values, for the required key, to the data source.
-
-        :key: the unique key to the item to read params from
-        :params: the name/value pairs of the params to write
-        """
-
-
-class QTableDal(Dal):
-    """
-    Pipeline data access for reading/writing of an in memory astropy QTable
-    """
     _WRITE_LOCK = threading.RLock()
 
-    def __init__(self, key_name: str="target_id", masked: bool=True):
+    def __init__(self, masked: bool=True):
         """
         Initializes the QTableDal Dal class which uses an atropy QTable for storing the data.
 
@@ -207,18 +231,10 @@ class QTableDal(Dal):
         This Dal also supports reading/writing UFloats and expects the nominal and std_dev
         components to be split across pairs of columns named as [param] and [param]_err.
 
-        :key_name: the name of the col/param which acts as each row's unique key/index value
         :masked: whether or not the table is masked
         """
-        self._key_name = key_name
         self._table = _QTable(masked=masked, dtype=self._col_dtype, units=self._col_units, rows=[])
-        super().__init__()
-
-    @property
-    def key_name(self) -> str:
-        """ Return the name of the primary key column """
-        return self._key_name
-
+        super().__init__(key_name="target_id")
 
     def yield_keys(self,
                    *params: str,
@@ -241,7 +257,7 @@ class QTableDal(Dal):
         if not _np.any(row_mask):
             raise ValueError(f"No data row found for key {key}")
 
-        row = self._table[_np.where(row_mask)[0]][0]
+        row = self._table[row_mask][0]
         values = _np.empty_like(params, dtype=object)
         for ix, col in enumerate(params):
             if col in row.colnames:
@@ -254,10 +270,11 @@ class QTableDal(Dal):
 
     def write_values(self, key: any, **params: dict[str, any]):
         with self._WRITE_LOCK:
+            # Unlike reading, writes need to be direct to the table (row/col indices) to persist
             row_mask = self._table[self._key_name] == key
             if not _np.any(row_mask):
                 self._table.add_row(vals={ self._key_name: key })
-                row_ix = len(self._table) - 1
+                row_ix = -1 #len(self._table) - 1
             else:
                 row_ix = _np.where(row_mask)[0][0]
 
@@ -290,14 +307,13 @@ class QTableDal(Dal):
         """
         Read a param value from the row and handle all of the issues around units and masked values
         """
-        has_unit = row.columns[param].unit is not None
-        value = row[param].value if has_unit else row[param]
+        value = row[param] if (row.columns[param].unit is None) else row[param].value
         if _np.ma.is_masked(value):
-            # Value is explicitly masked which is expected when no value has been set
-            value = None
-        elif _np.ma.isMaskedArray(value) or hasattr(value, "unmasked"):
+            # Value is explicitly masked which is expected when no value has been stored
+            return None
+        if _np.ma.isMaskedArray(value) or hasattr(value, "unmasked"):
             # We also seem to get masked value types, even when we have values
-            value = value.unmasked
+            return value.unmasked
         return value
 
 
@@ -305,7 +321,6 @@ class QTableFileDal(QTableDal):
     """ Pipeline data access for reading/writing a file based on an astropy QTable """
     def __init__(self,
                  file: _Union[str, _Path],
-                 key_name: str="target_id",
                  file_format: str="ascii.fixed_width_two_line",
                  **file_format_kwargs):
         """
@@ -322,10 +337,9 @@ class QTableFileDal(QTableDal):
 
         This is not thread safe nor is it robust enough to be used where multiple clients expected.
         There is no locking mechanism so it will happily overwrite updates from elsewhere. If you
-        need multiple clients, large datasets or more durable storage, use a real database.
+        need multiple clients, large datasets or more durable storage, use a "real" database Dal.
 
         :file: the file name of the storage file
-        :key_name: the name of the col/param which acts as each row's unique key/index value
         :file_format: the format of the file
         :file_format_kwargs: optional kwargs specific to each file_format
         """
@@ -338,7 +352,7 @@ class QTableFileDal(QTableDal):
 
         with self._WRITE_LOCK:
             # Inits a new in-memory table which we can save (no file yet) or overwrite (file exists)
-            super().__init__(key_name=key_name)
+            super().__init__()
             if file.exists():
                 print(f"Loading data file '{file.name}' as {file_format}/{file_format_kwargs}")
                 self._table = _QTable.read(self._file, format=self._format, **self._format_kwargs)
