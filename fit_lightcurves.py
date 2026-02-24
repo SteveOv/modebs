@@ -8,6 +8,7 @@ from datetime import datetime
 from contextlib import redirect_stdout
 import copy
 import traceback
+import re
 
 import numpy as np
 import astropy.units as u
@@ -17,10 +18,11 @@ from astropy.coordinates import SkyCoord
 warnings.filterwarnings("ignore", "Using UFloat objects with std_dev==0 may give unexpected results.", category=UserWarning)
 from uncertainties import UFloat, nominal_value
 from uncertainties.unumpy import nominal_values
+import matplotlib.pyplot as plt
 
 from ebop_maven.estimator import Estimator
 
-from libs import pipeline, lightcurves
+from libs import pipeline, lightcurves, plots
 from libs.iohelpers import Tee
 from libs.targets import Targets
 from libs.pipeline_dal import QTableFileDal
@@ -34,12 +36,32 @@ ECLIPSE_COMPLETE_TH = 0.9
 # The morph value for systems considered very well detached & from which we invoke flattening & clip
 FLATTEN_TH = 0.2
 
+
+# Plotting ax_func callback functions
+def indicate_eclipses(_, ax, lc): # pylint: disable=redefined-outer-name
+    """ Vertical line for each pri/sec eclipse times with extra + marker for t0 eclipse """
+    for ecl_type, ls, c in [("secondary", "--", "g"), ("primary", "-.", "r")]:
+        alphas = [0.33 if cf else 0.1 for cf in lc.meta[f"{ecl_type}_completeness"] >= ECLIPSE_COMPLETE_TH]
+        if len(lc.meta[f"{ecl_type}_times"]) > 0:
+            ax.vlines(lc.meta[f"{ecl_type}_times"], 0.5, 1.05, c, ls, label=ecl_type, alpha=alphas, zorder=-20)
+        ax.plot(lc.meta["t0"], 1.03, marker="+", markersize=10, color="r", zorder=-10, alpha=0.33)
+
+def highlight_mask(_, ax, lc): # pylint: disable=redefined-outer-name
+    """ Grey background for timespans in the lcs' meta[flat_mask] """
+    if (_mask := lc.meta.get("flat_mask", None)) is not None:
+        for sl in np.ma.clump_masked(np.ma.masked_where(_mask, lc.time.value)):
+            ax.axvspan(lc.time[sl.start].value, lc.time[sl.stop-1].value,
+                       color="lightgray", zorder=-50, transform=ax.get_xaxis_transform())
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Pipeline stage 2: fitting target lightcurves.")
     ap.add_argument("-tf", "--targets-file", dest="targets_file", type=Path, required=False,
                     help="json file containing the details of the targets to fit")
+    ap.add_argument("-pf", "--plot-figs", dest="plot_figs", action="store_true", required=False,
+                    help="plot figs for each target as the process progresses")
     ap.set_defaults(targets_file=Path("./config/plato-lops2-tess-ebs-explicit-targets.json"),
-                    write_diags=False)
+                    plot_figs=False, figs_type="png", figs_dpi=100)
     args = ap.parse_args()
     drop_dir = Path.cwd() / f"drop/{args.targets_file.stem}"
     args.working_set_file = drop_dir / "working-set.table"
@@ -67,19 +89,22 @@ if __name__ == "__main__":
                 print("\n\n============================================================")
                 print(f"Processing target {fit_counter} of {to_fit_count}: {target_id}")
                 print("============================================================")
+                if args.plot_figs:
+                    figs_dir = drop_dir / "figs" / re.sub(r"[^\w\d]", "-", f"{target_id}".lower())
+                    figs_dir.mkdir(parents=True, exist_ok=True)
 
                 # It's quicker to get LCs once and cache the results than to continue to bother MAST
                 search_term, tics = wset.read_values(target_id, "main_id", "tics")
                 lcs = lightcurves.load_lightcurves(target_id,
-                                                search_term,
-                                                sectors=None,
-                                                mission=config.mission,
-                                                author=config.author,
-                                                exptime=config.exptime,
-                                                quality_bitmask=config.quality_bitmask,
-                                                flux_column=config.flux_column,
-                                                force_mast=False, cache_dir=Path() / ".cache/",
-                                                verbose=True)
+                                                   search_term,
+                                                   sectors=None,
+                                                   mission=config.mission,
+                                                   author=config.author,
+                                                   exptime=config.exptime,
+                                                   quality_bitmask=config.quality_bitmask,
+                                                   flux_column=config.flux_column,
+                                                   force_mast=False, cache_dir=Path() / ".cache/",
+                                                   verbose=True)
 
                 # Then filter out any results that are for a different TIC (unlikely but possible).
                 select_mask = np.in1d([l.meta['TARGETID'] for l in lcs],
@@ -98,16 +123,24 @@ if __name__ == "__main__":
 
                 print("\nClipping the lightcurves' invalid fluxes, known distorted sections",
                     "& any isolated sections < 2 d in length.")
-                pipeline.mask_lightcurves_unusable_fluxes(lcs,
-                                                        config.quality_masks or [],
-                                                        min_section_dur=2 * u.d)
+                pipeline.mask_lightcurves_unusable_fluxes(lcs, config.quality_masks or [],
+                                                          min_section_dur=2 * u.d)
 
 
                 print("\nInspecting the lightcurves to find and characterise their eclipses")
                 t0, period, widthP, widthS, depthP, depthS, phiS, morph = wset.read_values(
                     target_id, "t0","period","widthP","widthS","depthP","depthS","phiS","morph")
                 pipeline.add_eclipse_meta_to_lightcurves(lcs, t0, period, widthP, widthS,
-                                                        depthP, depthS, phiS, verbose=True)
+                                                         depthP, depthS, phiS, verbose=True)
+
+
+                if args.plot_figs:
+                    lc_plot_cols = min(len(lcs), 3) if len(lcs) < 12 else 4
+                    ax_titles=[f"S{l.sector:02d} ({l.meta['FLUX_ORIGIN']} @ {l.meta['FRAMETIM']*l.meta['NUM_FRM']} s)" for l in lcs] # pylint: disable=line-too-long
+                    fig = plots.plot_lightcurves(lcs, "flux", normalize_lcs=True, cols=lc_plot_cols,
+                                                 ax_func=indicate_eclipses, ax_titles=ax_titles)
+                    fig.savefig(figs_dir / f"lcs-parsed.{args.figs_type}", dpi=args.figs_dpi)
+                    plt.close(fig)
 
 
                 # Group lightcurves to ensure sufficient coverage for fitting. This will also
@@ -141,6 +174,13 @@ if __name__ == "__main__":
                                                                 verbose=True)
 
 
+                if args.plot_figs:
+                    fig = plots.plot_lightcurves(lcs, "delta_mag", cols=lc_plot_cols,
+                                                 ax_func=highlight_mask)
+                    fig.savefig(figs_dir / f"lcs-grouped.{args.figs_type}", dpi=args.figs_dpi)
+                    plt.close(fig)
+
+
                 # EBOP MAVEN estimates of fitting input params. Requires phase folded & binned mags
                 print("\nPreparing phase-folded & binned copies of the lightcurves for EBOP MAVEN.")
                 bins = estimator.mags_feature_bins
@@ -153,12 +193,11 @@ if __name__ == "__main__":
                     binned_fold[ix] = lightcurves.get_binned_phase_mags_data(flc, bins, wrap_phase)
 
                 print("\nEstimating fitting input parameters with EBOP MAVEN.")
-                predictions = estimator.predict(binned_fold[:, 1], iterations=1000)
-                predictions_dict = pipeline.predictions_to_mean_dict(predictions, True, "inc")
-                print(("Mean predicted" if predictions.size > 1 else "Predicted"), "parameters",
+                preds = estimator.predict(binned_fold[:, 1], iterations=1000)
+                preds_dict = pipeline.predictions_to_mean_dict(preds, True, "inc")
+                print(("Mean predicted" if preds.size > 1 else "Predicted"), "parameters",
                       f"from {len(lcs)} LC group(s), including the value calculated for inc.")
-                print("\n".join(f"{p:>14s}: {predictions_dict[p]:12.6f}" for p in predictions_dict))
-
+                print("\n".join(f"{p:>14s}: {preds_dict[p]:12.6f}" for p in preds_dict))
 
                 # Estimating L3 by looking for nearby flux sources. Unfortunately this can be
                 # unreliable with queries intermittently failing. A re-run is generally sufficient.
@@ -198,7 +237,7 @@ if __name__ == "__main__":
                 # Substiturte LR ~= J*k^2 giving TeffR ~= ((J*k^2)/k^2)^1/4 ~= J^1/4
                 print(f"\nSetting up LD params based on Teff_sys={Teff_sys:.0f} K &",
                       f"logg_sys={logg_sys:.3f}, subject to overrides from config.")
-                TeffR = nominal_value(predictions_dict["J"]**0.25)
+                TeffR = nominal_value(preds_dict["J"]**0.25)
                 ld_Teffs = (Teff_sys, Teff_sys*TeffR) if TeffR < 1 else (Teff_sys/TeffR, Teff_sys)
                 ld_params = pipeline.pop_and_complete_ld_config(fit_overrides,
                                                             *nominal_values(ld_Teffs),
@@ -210,7 +249,7 @@ if __name__ == "__main__":
                 refl_fit = -1 if (morph <= FLATTEN_TH) else 1
                 in_params = {
                     # Mass ratio (qphot), can be -1 (force spherical) or a specified ratio value
-                    "qphot": -1 if (morph <= FLATTEN_TH) else predictions_dict["k"]**1.4,
+                    "qphot": -1 if (morph <= FLATTEN_TH) else preds_dict["k"]**1.4,
                     "gravA": 0.,                "gravB": 0.,
                     "L3": l3,
                     "reflA": 0.,                "reflB": 0.,
@@ -227,7 +266,7 @@ if __name__ == "__main__":
                     "sf_fit": 1,
                     "period_fit": 1,            "primary_epoch_fit": 1,
 
-                    **predictions_dict,
+                    **preds_dict,
                     **ld_params,
                     **fit_overrides,
                 }
@@ -250,6 +289,12 @@ if __name__ == "__main__":
                                                                      max_attempts=3,
                                                                      timeout=900,
                                                                      file_prefix="fit-lrs")
+
+
+                if args.plot_figs:
+                    # TODO: fit & residuals plot
+                    pass
+
 
                 # Get the results into a structured array format
                 fitted_params = np.empty(shape=(len(lcs), ),
@@ -284,6 +329,21 @@ if __name__ == "__main__":
                 params["logg_sys"] = logg_sys   # and will be used later in SED fitting
                 params["fitted_lcs"] = True
                 wset.write_values(target_id, errors="", **params)
+
+
+                if args.plot_figs and fitted_params.size > 1:
+                    xlim = (lcs.sector.min() - 2, lcs.sector.max() + 2)
+                    def median_and_uncertainty(key, ax):
+                        # pylint: disable=cell-var-from-loop, missing-function-docstring
+                        v = summary_params[key]
+                        ax.hlines([v.n], *xlim, "k", "-", lw=1.0, label="median")
+                        ax.axhspan(v.n-v.s, v.n+v.s, color="silver", zorder=-50,label="uncertainty")
+
+                    fig = plots.plot_parameter_scatter(fitted_params, lcs.sector, write_params,
+                                                       ax_func=median_and_uncertainty, xlim=xlim)
+                    fig.savefig(figs_dir / f"lcs-fitted-params.{args.figs_type}", dpi=args.figs_dpi)
+                    plt.close(fig)
+
 
             except Exception as exc: # pylint: disable=broad-exception-caught
                 print(f"{target_id}: Failed with the following exception. Depending on the nature",
