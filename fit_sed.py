@@ -49,8 +49,10 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Pipeline stage 3: fitting target SED.")
     ap.add_argument("-tf", "--targets-file", dest="targets_file", type=Path, required=False,
                     help="json file containing the details of the targets to fit")
+    ap.add_argument("-ms", "--max-steps", dest="max_mcmc_steps", type=int, required=False,
+                    help="the maximum number of MCMC steps to run for [100 000]")
     ap.set_defaults(targets_file=Path("./config/plato-lops2-tess-ebs-explicit-targets.json"),
-                    write_diags=False)
+                    max_mcmc_steps=100000, mcmc_walkers=100, mcmc_thin_by=10)
     args = ap.parse_args()
     drop_dir = Path.cwd() / f"drop/{args.targets_file.stem}"
     args.working_set_file = drop_dir / "working-set.table"
@@ -211,11 +213,18 @@ if __name__ == "__main__":
 
                 print("\nPerforming a full MCMC fit from the output from the 'quick' fit.",
                       "Values marked * are fitted.")
-                thin_by = 10 # sample every nth step from the chain
-                theta_mcmc_fit, _ = mcmc_fit(x, y, y_err, theta0=theta_min_fit, fit_mask=fit_mask,
-                                             ln_prior_func=ln_prior_func, stellar_grid=model_grid,
-                                             nwalkers=100, nsteps=100000, thin_by=thin_by, seed=42,
-                                             early_stopping=True, processes=8, progress=True,
+                theta_mcmc_fit, _ = mcmc_fit(x, y, y_err,
+                                             theta0=theta_min_fit,
+                                             fit_mask=fit_mask,
+                                             ln_prior_func=ln_prior_func,
+                                             stellar_grid=model_grid,
+                                             nwalkers=args.mcmc_walkers,
+                                             nsteps=args.max_mcmc_steps,
+                                             thin_by=args.mcmc_thin_by,
+                                             seed=42,
+                                             early_stopping=True,
+                                             processes=8,
+                                             progress=True,
                                              verbose=True)
 
 
