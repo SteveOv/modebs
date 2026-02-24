@@ -133,7 +133,7 @@ if __name__ == "__main__":
 
                 print(f"Parameters for {target_id} with nominals & 1-sigma uncertainties",
                       "from MCMC fit ([known value])")
-                write_params = { }
+                write_params = { "M_sys": M_sys, "a": a }
                 for (k, unit), val in zip(fit_labels_and_units.items(), theta_fit):
                     label = ""
                     if config.get("labels", {}).get(k, None) is not None:
