@@ -70,7 +70,7 @@ if __name__ == "__main__":
             else:
                 search_term = config.get("search_term", target_id)
             dal.write_values(target_id, main_id=search_term, morph=0.5, phiS=0.5,
-                             fitted_lcs=False, fitted_seds=False, fitted_masses=False)
+                             fitted_lcs=False, fitted_sed=False, fitted_masses=False)
 
 
         # Get the basic published information from SIMBAD. We do a mass query
