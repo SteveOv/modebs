@@ -29,6 +29,7 @@ iso = ISO(f"{ISO_FILE}", verbose=True)
 # Build up the known datapoints and corresponding radius & teff values.
 # Get the linear values for these so that we can perform interpolation in linear space.
 ages_list = []
+eep_list = []
 masses_list = []
 radii_list = []
 teffs_list = []
@@ -40,6 +41,7 @@ for log_age in sorted(iso.ages):
 
         # Points/axes
         ages_list += [10**log_age] * new_rows
+        eep_list += list(iso_block[mass_sort]["EEP"])
         masses_list += list(iso_block[mass_sort]["star_mass"])
 
         # corresponding values
@@ -51,11 +53,14 @@ x = np.array(list(zip(ages_list, masses_list)), dtype=float)
 radius_interp = RBFInterpolator(x, radii_list, neighbors=2**x.ndim, smoothing=5, kernel="linear")
 teff_interp = RBFInterpolator(x, teffs_list, neighbors=2**x.ndim, smoothing=5, kernel="linear")
 
+x = np.array(list(zip(eep_list, masses_list)), dtype=float)
+age_interp = RBFInterpolator(x, ages_list, neighbors=2**x.ndim, smoothing=5, kernel="linear")
+
 # Priors based on the data
 age_limits = (min(ages_list), max(ages_list))
 mass_limits = (min(masses_list), max(masses_list))
 
-del x, ages_list, masses_list, radii_list, teffs_list, iso
+del x, ages_list, masses_list, radii_list, teffs_list, eep_list, iso
 
 def _objective_func(theta: np.ndarray[float],
                     sys_mass: UFloat,
@@ -234,3 +239,15 @@ def mcmc_fit(theta0: np.ndarray[float],
     fit_err_high = np.quantile(samples, 0.84, axis=0) - fit_nom
     fit_err_low = fit_nom - np.quantile(samples, 0.16, axis=0)
     return uarray(fit_nom, np.mean([fit_err_high, fit_err_low], axis=0)), sampler
+
+
+def log_age_for_mass_and_eep(mass: float, eep: int=300) -> float:
+    """
+    An approximate log10(age) for the requested mass and equivalent evolutionary point (EEP).
+    Within the same phases range as the interpolators used for radii & masses for the model func.
+
+    :mass: the requested mass (solMass)
+    :eep: the equivalent evolutionay point (EEP)
+    :returns: the log(age) of the nearest mass
+    """
+    return np.log10(age_interp([(eep, mass)])[0])

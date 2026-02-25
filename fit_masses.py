@@ -22,7 +22,7 @@ from deblib.constants import G, R_sun, M_sun
 import corner
 from sed_fit.fitter import samples_from_sampler
 
-from libs.fit_masses import minimize_fit, mcmc_fit
+from libs.fit_masses import minimize_fit, mcmc_fit, log_age_for_mass_and_eep
 from libs import pipeline
 from libs.iohelpers import Tee
 from libs.targets import Targets
@@ -90,7 +90,8 @@ if __name__ == "__main__":
 
                 print("Getting known values from previous steps to set up fitting priors")
                 TeffA, TeffB, RA, RB = wset.read_values(target_id, "TeffA", "TeffB", "RA", "RB")
-                rA_plus_rB, k, period = wset.read_values(target_id, "rA_plus_rB", "k", "period")
+                rA_plus_rB, k, period, qphot = wset.read_values(target_id, "rA_plus_rB", "k",
+                                                                "period", "qphot")
                 rA = rA_plus_rB / (k + 1)
                 rB = rA_plus_rB / ((1/k) + 1)
                 print("\n".join(f"{p:>20s}: {v:12.3f}" for p, v in [("TeffA", TeffA),
@@ -114,13 +115,14 @@ if __name__ == "__main__":
                 prior_Teffs = np.array([TeffA, TeffB])
 
 
-                # Estimate fit starting position with masses based on the observed radii
-                # and a reasonable M-S age given the likely mass regime
-                theta_masses = np.array([M_sys * r for r in prior_radii])
-                theta_masses *= (M_sys / np.sum(theta_masses))
-                theta_age = 9.0 if max(nominal_values(theta_masses)) <= 2.0 else \
-                            8.0 if max(nominal_values(theta_masses)) <= 5.0 else 7.0
-                theta0 = np.concatenate([nominal_values(theta_masses), [theta_age]])
+                # Estimate fit starting position with masses derived from M_sys & the expected mass
+                # ratio and an approximate age for the more massive star within the main-sequence.
+                if qphot is None or qphot <= 0:
+                    # The approx single k-q (k=q^0.715) relations of Demircan & Kahraman (1991).
+                    qphot = k**1.4
+                theta_masses = nominal_values([_MA := M_sys / (qphot + 1), M_sys - _MA])
+                theta_age = log_age_for_mass_and_eep(np.max(theta_masses))
+                theta0 = np.concatenate([theta_masses, [theta_age]])
 
 
                 print()

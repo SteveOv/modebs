@@ -276,7 +276,7 @@ if __name__ == "__main__":
                 }
 
                 # Set of the potentially fitted parameters to be read from par file after fitting
-                read_keys = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc", "L3",
+                read_keys = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc", "qphot", "L3",
                                     "period", "ecc", "bP", "LR", "reflA", "reflB"]
 
                 # Now we fit the lightcurves with JKTEBOP. If max_workers >1 progress updates
@@ -325,7 +325,8 @@ if __name__ == "__main__":
 
 
                 # Finally, store the params and the flag that indicates LC fitting has completed
-                write_params = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "bP", "inc", "L3", "LR"]
+                write_params = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "bP",
+                                "inc", "qphot", "L3", "LR"]
                 print(f"\nWriting fitted params for {write_params} and TeffR to working-set.")
                 params = { k: summary_params[k] for k in write_params }
                 params["TeffR"] = TeffR

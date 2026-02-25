@@ -143,6 +143,8 @@ class QTableDal(Dal):
         ("inc", float),
         ("inc_err", float),
         # JKTEBOP lightcurve fitting i/o params (from other sources)
+        ("qphot", float),
+        ("qphot_err", float),
         ("L3", float),
         ("L3_err", float),
         # JKTEBOP lightcurve fitting output params
