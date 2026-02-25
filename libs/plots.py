@@ -21,6 +21,8 @@ from uncertainties.unumpy import nominal_values, std_devs
 
 from lightkurve import LightCurve as _LC, FoldedLightCurve as _FLC, LightCurveCollection as _LCC
 
+from deblib import vmath
+
 from sed_fit.stellar_grids import StellarGrid
 from sed_fit.fitter import model_func, iterate_theta
 
@@ -302,10 +304,10 @@ def plot_fitted_model_sed(sed: Table,
     return fig
 
 
-def plot_mass_radius_hr_diagram(masses: ArrayLike,
-                                radii: ArrayLike,
-                                labels: ArrayLike=None,
-                                plot_zams: bool=False,
+def plot_mass_radius_diagram(masses: ArrayLike,
+                             radii: ArrayLike,
+                             labels: ArrayLike=None,
+                             plot_zams: bool=False,
                                 **format_kwargs) -> _Figure:
     """
     Plots a log(R) vs log(M) diagram with an optional ZAMS line.
@@ -325,11 +327,13 @@ def plot_mass_radius_hr_diagram(masses: ArrayLike,
         raise ValueError("labels do not match the masses or radii")
 
     fig, ax = plt.subplots(1, 1, figsize=(6, 4), constrained_layout=True)
-    ax.set(xlabel= r"$\log{(M\,/\,{\rm M_{\odot}})}$", xscale="log", xlim=(0.1, 30),
-           ylabel=r"$\log{(R\,/\,{\rm R_{\odot}})}$", yscale="log", ylim=(0.05, 100))
+    ax.set(xlabel= r"$\log{(M\,/\,{\rm M_{\odot}})}$", xscale="linear", xlim=(-1, 1.5),
+           ylabel=r"$\log{(R\,/\,{\rm R_{\odot}})}$", yscale="linear", ylim=(-1, 1.5))
 
+    log_masses = vmath.log10(masses)
+    log_radii = vmath.log10(radii)
     labels = labels or [None] * masses.shape[0]
-    for ix, (mass_vals, rad_vals, label) in enumerate(zip(masses, radii, labels)):
+    for ix, (mass_vals, rad_vals, label) in enumerate(zip(log_masses, log_radii, labels)):
         ax.errorbar(x=nominal_values(mass_vals), xerr=std_devs(mass_vals),
                     y=nominal_values(rad_vals), yerr=std_devs(rad_vals),
                     fmt="o", ms=5, markeredgewidth=1.5, fillstyle="full", zorder=-ix, label=label)
@@ -339,7 +343,53 @@ def plot_mass_radius_hr_diagram(masses: ArrayLike,
         zmass = np.linspace(zams[0].min(), zams[0].max(), 250)
         zsort = np.argsort(zams[0])
         zrad = make_interp_spline(zams[0, zsort], zams[1, zsort], k=1)(zmass) # smoothing
-        ax.plot(zmass, 10**zrad, ls="--", lw=1, c="k", zorder=-100, alpha=0.5, label="ZAMS")
+        ax.plot(vmath.log10(zmass), zrad, ls="--", lw=1, c="k", zorder=-100, alpha=.5, label="ZAMS")
+
+    format_axes(ax, **format_kwargs)
+    return fig
+
+
+def plot_hr_diagram(teffs: ArrayLike,
+                    luminosities: ArrayLike,
+                    labels: ArrayLike=None,
+                    plot_zams: bool=False,
+                    **format_kwargs) -> _Figure:
+    """
+    Plots a log(L) vs log(T_eff) Hertzsprung-Russell diagram with an optional ZAMS line.
+    Returns the figure of the plot for the calling code to show or save.
+
+    :teffs: the mass values to plot on the x-axis in shape (#sets, #teffs) or (#teffs) for 1 set
+    :luminosities: the radius values to plot on the y-axis in shape (#sets, #lums) or (#lums) for 1 set
+    :labels: optional labels text for each set (if multiple sets) or item (if a single set)
+    :plot_zams: whether or not to include a zero age main-sequence line on the figure
+    :format_kwargs: kwargs to be passed on to format_axes()
+    :returns: the Figure
+    """
+    # Masses & radii both support multiple sets, but they must be the same shape
+    if teffs.shape != luminosities.shape:
+        raise ValueError("teffs and luminosities are not of the same shape")
+    if labels is not None and len(labels) != teffs.shape[0]:
+        raise ValueError("labels do not match the teffs or luminosities")
+
+    fig, ax = plt.subplots(1, 1, figsize=(6, 4), constrained_layout=True)
+    ax.set(xlabel=r"$\log{(T_{\rm eff}\,/\,{\rm K})}$", xscale="linear", xlim=(3.35, 4.45),
+           ylabel=r"$\log{(L\,/\,{\rm L_{\odot}})}$", yscale="linear", ylim=(-2.6, 4.5))
+
+    log_teffs = vmath.log10(teffs)
+    log_lums = vmath.log10(luminosities)
+
+    labels = labels or [None] * teffs.shape[0]
+    for ix, (teff_vals, lum_vals, label) in enumerate(zip(log_teffs, log_lums, labels)):
+        ax.errorbar(x=nominal_values(teff_vals), xerr=std_devs(teff_vals),
+                    y=nominal_values(lum_vals), yerr=std_devs(lum_vals),
+                    fmt="o", ms=5, markeredgewidth=1.5, fillstyle="full", zorder=-ix, label=label)
+
+    if plot_zams:
+        zams = _get_solar_isochrone_eep_values(eep=202, phase=0.0, cols=["log_Teff", "log_L"])
+        zteff = np.linspace(zams[0].min(), zams[0].max(), 250)
+        zsort = np.argsort(zams[0])
+        zlum = make_interp_spline(zams[0, zsort], zams[1, zsort], k=1)(zteff) # smoothing
+        ax.plot(zteff, zlum, ls="--", lw=1, c="k", zorder=-100, alpha=0.5, label="ZAMS")
 
     format_axes(ax, **format_kwargs)
     return fig
