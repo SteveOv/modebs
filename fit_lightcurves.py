@@ -69,7 +69,9 @@ if __name__ == "__main__":
     estimator = Estimator()
 
     with redirect_stdout(Tee(open(drop_dir / f"{THIS_STEM}.log", "a", encoding="utf8"))) as log:
-        print(f"Started at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
+        print("\n\n============================================================")
+        print(f"Started {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
+        print("============================================================")
 
         targets_config = Targets(args.targets_file)
         print(f"Read in the configuration from '{args.targets_file}'",
@@ -85,9 +87,9 @@ if __name__ == "__main__":
         for fit_counter, target_id in enumerate(to_fit_target_ids, start=1):
             try:
                 config = targets_config.get(target_id)
-                print("\n\n============================================================")
+                print("\n\n------------------------------------------------------------")
                 print(f"Processing target {fit_counter} of {to_fit_count}: {target_id}")
-                print("============================================================")
+                print("------------------------------------------------------------")
                 if args.plot_figs:
                     figs_dir = drop_dir / "figs" / pipeline.to_file_safe_str(target_id)
                     figs_dir.mkdir(parents=True, exist_ok=True)
@@ -134,6 +136,7 @@ if __name__ == "__main__":
 
 
                 if args.plot_figs:
+                    print("\nCreating plot of the lightcurves with the eclipses marked.")
                     lc_plot_cols = min(len(lcs), 3) if len(lcs) < 12 else 4
                     ax_titles=[f"S{l.sector:02d} ({l.meta['FLUX_ORIGIN']} @ {l.meta['FRAMETIM']*l.meta['NUM_FRM']} s)" for l in lcs] # pylint: disable=line-too-long
                     fig = plots.plot_lightcurves(lcs, "flux", normalize_lcs=True, cols=lc_plot_cols,
@@ -174,6 +177,8 @@ if __name__ == "__main__":
 
 
                 if args.plot_figs:
+                    print("\nCreating plot of the grouped lightcurves"
+                          " showing the eclipse masks used in flattening." if do_flatten else ".")
                     fig = plots.plot_lightcurves(lcs, "delta_mag", cols=lc_plot_cols,
                                                  ax_func=highlight_mask)
                     fig.savefig(figs_dir / f"lcs-grouped.{args.figs_type}", dpi=args.figs_dpi)
@@ -331,6 +336,7 @@ if __name__ == "__main__":
 
 
                 if args.plot_figs and fitted_params.size > 1:
+                    print("\nCreating plot of the scatter, by group, in the fitted params.")
                     xlim = (lcs.sector.min() - 2, lcs.sector.max() + 2)
                     def median_and_uncertainty(key, ax):
                         # pylint: disable=cell-var-from-loop, missing-function-docstring
@@ -350,4 +356,6 @@ if __name__ == "__main__":
                 traceback.print_exception(exc, file=log)
                 wset.write_values(target_id, errors=type(exc).__name__)
 
-        print(f"\nCompleted at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
+        print("\n\n============================================================")
+        print(f"\nCompleted {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
+        print("============================================================")
