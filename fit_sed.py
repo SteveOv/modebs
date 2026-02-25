@@ -70,7 +70,9 @@ if __name__ == "__main__":
 
 
     with redirect_stdout(Tee(open(drop_dir / f"{THIS_STEM}.log", "a", encoding="utf8"))) as log:
-        print(f"Started at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
+        print("\n\n============================================================")
+        print(f"Started {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
+        print("============================================================")
 
         targets_config = Targets(args.targets_file)
         print(f"Read in the configuration from '{args.targets_file}'",
@@ -105,9 +107,9 @@ if __name__ == "__main__":
         for fit_counter, target_id in enumerate(to_fit_target_ids, start=1):
             try:
                 config = targets_config.get(target_id)
-                print("\n\n============================================================")
+                print("\n\n------------------------------------------------------------")
                 print(f"Processing target {fit_counter} of {to_fit_count}: {target_id}")
-                print("============================================================")
+                print("------------------------------------------------------------")
                 if args.plot_figs:
                     figs_dir = drop_dir / "figs" / pipeline.to_file_safe_str(target_id)
                     figs_dir.mkdir(parents=True, exist_ok=True)
@@ -165,11 +167,12 @@ if __name__ == "__main__":
 
 
                 if args.plot_figs:
+                    print("\nCreating SED observations plot")
                     _fluxes = [sed["sed_flux"], sed["sed_der_flux"]] if Av else [sed["sed_flux"]]
                     fig = plots.plot_sed(sed["sed_wl"].quantity, _fluxes, [sed["sed_eflux"]]*2,
                                          fmts=["or", ".b"], labels=["observed", "dereddened"],
                                          title=f"{target_id} SED")
-                    fig.savefig(figs_dir / f"sed-dereddened.{args.figs_type}", dpi=args.figs_dpi)
+                    fig.savefig(figs_dir / f"sed-observations.{args.figs_type}", dpi=args.figs_dpi)
                     plt.close(fig)
 
 
@@ -270,6 +273,7 @@ if __name__ == "__main__":
 
 
                 if args.plot_figs:
+                    print("\nCreating MCMC corner and fitted model vs SED observations plots")
                     _data = samples_from_sampler(sampler, thin_by=args.mcmc_thin_by, flat=True)
                     fig = corner.corner(data=_data, show_titles=True, plot_datapoints=True,
                                         quantiles=[0.16, 0.5, 0.84], labels=theta_labels[fit_mask],
@@ -289,4 +293,6 @@ if __name__ == "__main__":
                 traceback.print_exception(exc, file=log)
                 wset.write_values(target_id, fitted_sed=False, errors=type(exc).__name__)
 
-        print(f"\nCompleted at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
+        print("\n\n============================================================")
+        print(f"\nCompleted {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
+        print("============================================================")
