@@ -9,6 +9,7 @@ from contextlib import redirect_stdout
 import traceback
 
 import numpy as np
+import matplotlib.pyplot as plt
 import astropy.units as u
 
 # pylint: disable=line-too-long, wrong-import-position
@@ -18,15 +19,25 @@ from uncertainties.unumpy import nominal_values
 
 from deblib.constants import G, R_sun, M_sun
 
+import corner
+from sed_fit.fitter import samples_from_sampler
+
+from libs.fit_masses import minimize_fit, mcmc_fit
+from libs import pipeline
 from libs.iohelpers import Tee
 from libs.targets import Targets
 from libs.pipeline_dal import QTableFileDal
-from libs.fit_masses import minimize_fit, mcmc_fit
 
 
 THIS_STEM = Path(getsourcefile(lambda: 0)).stem
+
 NUM_STARS = 2
-fit_labels_and_units = { "MA": u.Msun, "MB": u.Msun, "log(age)": u.dex(u.yr) }
+subs = ["ABCDEFGHIJKLM"[n] for n in range(NUM_STARS)]
+theta_labels = np.array([f"$M_{{\\rm {sub}}} / {{\\rm R_{{\\odot}}}}$" for sub in subs]
+                      + ["$\\log{{({{\\rm age}})}} / {{\\rm yr}}$"])
+
+theta_params_and_units = np.array([(f"M{sub}", u.Msun) for sub in subs] \
+                                + [("log(age)", u.dex(u.yr))])
 
 
 def print_mass_theta(theta, name: str="theta"):
@@ -38,17 +49,22 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Pipeline stage 4: fitting target masses.")
     ap.add_argument("-tf", "--targets-file", dest="targets_file", type=Path, required=False,
                     help="json file containing the details of the targets to fit")
+    ap.add_argument("-pf", "--plot-figs", dest="plot_figs", action="store_true", required=False,
+                    help="plot figs for each target as the process progresses")
     ap.add_argument("-ms", "--max-steps", dest="max_mcmc_steps", type=int, required=False,
                     help="the maximum number of MCMC steps to run for [100 000]")
     ap.set_defaults(targets_file=Path("./config/plato-lops2-tess-ebs-explicit-targets.json"),
-                    max_mcmc_steps=100000, mcmc_walkers=100, mcmc_thin_by=10)
+                    plot_figs=False, figs_type="png", figs_dpi=100,
+                    max_mcmc_steps=100000, mcmc_walkers=100, mcmc_thin_by=10, mcmc_processes=8)
     args = ap.parse_args()
     drop_dir = Path.cwd() / f"drop/{args.targets_file.stem}"
     args.working_set_file = drop_dir / "working-set.table"
 
 
     with redirect_stdout(Tee(open(drop_dir / f"{THIS_STEM}.log", "a", encoding="utf8"))) as log:
-        print(f"\n\nStarted {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
+        print("\n\n============================================================")
+        print(f"Started {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
+        print("============================================================")
 
         targets_config = Targets(args.targets_file)
         print(f"Read in the configuration from '{args.targets_file}'",
@@ -64,9 +80,12 @@ if __name__ == "__main__":
         for fit_counter, target_id in enumerate(to_fit_targets, start=1):
             try:
                 config = targets_config.get(target_id)
-                print("\n\n============================================================")
+                print("\n\n------------------------------------------------------------")
                 print(f"Processing target {fit_counter} of {to_fit_count}: {target_id}")
-                print("============================================================")
+                print("------------------------------------------------------------")
+                if args.plot_figs:
+                    figs_dir = drop_dir / "figs" / pipeline.to_file_safe_str(target_id)
+                    figs_dir.mkdir(parents=True, exist_ok=True)
 
 
                 print("Getting known values from previous steps to set up fitting priors")
@@ -117,25 +136,25 @@ if __name__ == "__main__":
 
                 print()
                 print("Performing a full MCMC fit for masses and log(age) with uncertainties.")
-                theta_fit, _ = mcmc_fit(theta0=theta_fit,
-                                        sys_mass=M_sys,
-                                        radii=prior_radii,
-                                        teffs=prior_Teffs,
-                                        nwalkers=args.mcmc_walkers,
-                                        nsteps=args.max_mcmc_steps,
-                                        thin_by=args.mcmc_thin_by,
-                                        seed=42,
-                                        early_stopping=True,
-                                        processes=8,
-                                        progress=True,
-                                        verbose=True)
-                print_mass_theta(theta_fit, "theta_mcmc")
+                theta_mcmc_fit, sampler = mcmc_fit(theta0=theta_fit,
+                                                   sys_mass=M_sys,
+                                                   radii=prior_radii,
+                                                   teffs=prior_Teffs,
+                                                   nwalkers=args.mcmc_walkers,
+                                                   nsteps=args.max_mcmc_steps,
+                                                   thin_by=args.mcmc_thin_by,
+                                                   seed=42,
+                                                   early_stopping=True,
+                                                   processes=args.mcmc_processes,
+                                                   progress=True,
+                                                   verbose=True)
+                print_mass_theta(theta_mcmc_fit, "theta_mcmc")
 
 
                 print(f"Parameters for {target_id} with nominals & 1-sigma uncertainties",
                       "from MCMC fit ([known value])")
                 write_params = { "M_sys": M_sys, "a": a }
-                for (k, unit), val in zip(fit_labels_and_units.items(), theta_fit):
+                for (k, unit), val in zip(theta_params_and_units, theta_mcmc_fit):
                     label = ""
                     if config.get("labels", {}).get(k, None) is not None:
                         lval = ufloat(config.labels.get(k, np.NaN), config.labels.get(k+"_err", 0))
@@ -150,10 +169,24 @@ if __name__ == "__main__":
                 print(f"\nWriting fitted params for {list(write_params.keys())} to working-set.")
                 wset.write_values(target_id, fitted_masses=True, errors="", **write_params)
 
+
+                if args.plot_figs:
+                    print("\nCreating MCMC corner plot")
+                    _data = samples_from_sampler(sampler, thin_by=args.mcmc_thin_by, flat=True)
+                    fig = corner.corner(data=_data, show_titles=True, plot_datapoints=True,
+                                        quantiles=[0.16, 0.5, 0.84], labels=theta_labels,
+                                        truths=nominal_values(theta_mcmc_fit))
+                    fig.savefig(figs_dir/f"masses-mcmc-corner.{args.figs_type}", dpi=args.figs_dpi)
+                    plt.close(fig)
+
+
             except Exception as exc: # pylint: disable=broad-exception-caught
                 print(f"{target_id}: Failed with the following exception. Depending on the nature",
                     "of the failure it may be possible to rerun this module to fit failed targets.")
                 traceback.print_exception(exc, file=log)
                 wset.write_values(target_id, fitted_masses=False, errors=type(exc).__name__)
 
+
+        print("\n\n============================================================")
         print(f"\nCompleted {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
+        print("============================================================")
