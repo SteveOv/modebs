@@ -9,20 +9,23 @@ from contextlib import redirect_stdout
 import traceback
 
 import numpy as np
+import matplotlib.pyplot as plt
 import astropy.units as u
 from astropy.coordinates import SkyCoord
 
 # pylint: disable=line-too-long, wrong-import-position
 warnings.filterwarnings("ignore", "Using UFloat objects with std_dev==0 may give unexpected results.", category=UserWarning)
 from uncertainties import ufloat, nominal_value
+from uncertainties.unumpy import nominal_values
 
 # Dereddening of SEDS
 from dust_extinction.parameter_averages import G23
 
+import corner
 from sed_fit.stellar_grids import get_stellar_grid
-from sed_fit.fitter import create_theta, minimize_fit, mcmc_fit
+from sed_fit.fitter import create_theta, minimize_fit, mcmc_fit, samples_from_sampler
 
-from libs import pipeline, extinction
+from libs import pipeline, extinction, plots
 from libs.sed import get_sed_for_target, group_and_average_fluxes, create_outliers_mask
 from libs.iohelpers import Tee
 from libs.targets import Targets
@@ -31,27 +34,35 @@ from libs.pipeline_dal import QTableFileDal
 THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 
 NUM_STARS = 2
+subs = ["ABCDEFGHIJKLM"[n] for n in range(NUM_STARS)]
+theta_labels = np.array([f"$T_{{\\rm eff,{sub}}} / {{\\rm K}}$" for sub in subs]
+                      + [f"$\\log{{g}}_{{\\rm {sub}}}$" for sub in subs]
+                      + [f"$R_{{\\rm {sub}}} / {{\\rm R_{{\\odot}}}}$" for sub in subs]
+                      + ["${\\rm D} / {\\rm pc}$", "${\\rm A_{V}}$"])
 
-subs = "ABCDEFGHIJKLM"
-theta_labels = np.array([(f"Teff{subs[st]}", u.K) for st in range(NUM_STARS)] \
-                    +[(f"logg{subs[st]}", u.dimensionless_unscaled) for st in range(NUM_STARS)] \
-                    +[(f"R{subs[st]}", u.Rsun) for st in range(NUM_STARS)] \
-                    +[("dist", u.pc), ("Av", u.dimensionless_unscaled)])
+theta_params_and_units = np.array([(f"Teff{sub}", u.K) for sub in subs]
+                                + [(f"logg{sub}", u.dimensionless_unscaled) for sub in subs]
+                                + [(f"R{sub}", u.Rsun) for sub in subs]
+                                + [("dist", u.pc), ("Av", u.dimensionless_unscaled)])
 
+# Dictates which params in theta are fitted (True) and which are held fixed (False)
+fit_mask = np.array([True] * NUM_STARS      # Teff
+                  + [False] * NUM_STARS     # logg
+                  + [True] * NUM_STARS      # radius
+                  + [True]                  # dist
+                  + [False])                # Av (we handle av by derredening the SED)
 
-fit_mask = np.array([True] * NUM_STARS      # teff
-                    + [False] * NUM_STARS   # logg
-                    + [True] * NUM_STARS    # radius
-                    + [True]                # dist
-                    + [False])              # av (we've handled av by derredening the SED)
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Pipeline stage 3: fitting target SED.")
     ap.add_argument("-tf", "--targets-file", dest="targets_file", type=Path, required=False,
                     help="json file containing the details of the targets to fit")
+    ap.add_argument("-pf", "--plot-figs", dest="plot_figs", action="store_true", required=False,
+                    help="plot figs for each target as the process progresses")
     ap.add_argument("-ms", "--max-steps", dest="max_mcmc_steps", type=int, required=False,
                     help="the maximum number of MCMC steps to run for [100 000]")
     ap.set_defaults(targets_file=Path("./config/plato-lops2-tess-ebs-explicit-targets.json"),
+                    plot_figs=False, figs_type="png", figs_dpi=100,
                     max_mcmc_steps=100000, mcmc_walkers=100, mcmc_thin_by=10)
     args = ap.parse_args()
     drop_dir = Path.cwd() / f"drop/{args.targets_file.stem}"
@@ -97,7 +108,9 @@ if __name__ == "__main__":
                 print("\n\n============================================================")
                 print(f"Processing target {fit_counter} of {to_fit_count}: {target_id}")
                 print("============================================================")
-
+                if args.plot_figs:
+                    figs_dir = drop_dir / "figs" / pipeline.to_file_safe_str(target_id)
+                    figs_dir.mkdir(parents=True, exist_ok=True)
 
                 main_id, k, TeffR, Teff_sys, logg_sys, st = wset.read_values(target_id,
                                         "main_id", "k", "TeffR", "Teff_sys", "logg_sys", "spt")
@@ -149,6 +162,15 @@ if __name__ == "__main__":
                             sed["sed_flux"] / ext_model.extinguish(sed["sed_wl"].to(u.um), Av=Av)
                 else:
                     sed["sed_der_flux"] = sed["sed_flux"]
+
+
+                if args.plot_figs:
+                    _fluxes = [sed["sed_flux"], sed["sed_der_flux"]] if Av else [sed["sed_flux"]]
+                    fig = plots.plot_sed(sed["sed_wl"].quantity, _fluxes, [sed["sed_eflux"]]*2,
+                                         fmts=["or", ".b"], labels=["observed", "dereddened"],
+                                         title=f"{target_id} SED")
+                    fig.savefig(figs_dir / f"sed-dereddened.{args.figs_type}", dpi=args.figs_dpi)
+                    plt.close(fig)
 
 
                 # Set up the MCMC fitting theta and priors. For now, hard coded to 2 stars.
@@ -203,32 +225,32 @@ if __name__ == "__main__":
 
 
                 print("\nPerforming an initial 'quick' minimize fit. Values marked * are fitted.")
-                theta_min_fit, _ = minimize_fit(x, y, y_err=y_err, theta0=theta0, fit_mask=fit_mask,
+                theta_min_fit, _ = minimize_fit(x, y, y_err, theta0=theta0, fit_mask=fit_mask,
                                                 ln_prior_func=ln_prior_func,
                                                 stellar_grid=model_grid, verbose=True)
 
 
                 print("\nPerforming a full MCMC fit from the output from the 'quick' fit.",
                       "Values marked * are fitted.")
-                theta_mcmc_fit, _ = mcmc_fit(x, y, y_err,
-                                             theta0=theta_min_fit,
-                                             fit_mask=fit_mask,
-                                             ln_prior_func=ln_prior_func,
-                                             stellar_grid=model_grid,
-                                             nwalkers=args.mcmc_walkers,
-                                             nsteps=args.max_mcmc_steps,
-                                             thin_by=args.mcmc_thin_by,
-                                             seed=42,
-                                             early_stopping=True,
-                                             processes=8,
-                                             progress=True,
-                                             verbose=True)
+                theta_mcmc_fit, sampler = mcmc_fit(x, y, y_err,
+                                                   theta0=theta_min_fit,
+                                                   fit_mask=fit_mask,
+                                                   ln_prior_func=ln_prior_func,
+                                                   stellar_grid=model_grid,
+                                                   nwalkers=args.mcmc_walkers,
+                                                   nsteps=args.max_mcmc_steps,
+                                                   thin_by=args.mcmc_thin_by,
+                                                   seed=42,
+                                                   early_stopping=True,
+                                                   processes=8,
+                                                   progress=True,
+                                                   verbose=True)
 
 
                 print(f"\nFinal parameters for {target_id} with nominals & 1-sigma uncertainties",
                         "from MCMC fit ([known value])")
                 write_params = {}
-                for (k, unit), val, mask in zip(theta_labels, theta_mcmc_fit, fit_mask):
+                for (k, unit), val, mask in zip(theta_params_and_units, theta_mcmc_fit, fit_mask):
                     label = ""
                     if k == "dist":
                         label = f"({coords.distance.to(u.pc).value:.3f} pc)"
@@ -245,6 +267,21 @@ if __name__ == "__main__":
                 # Finally, store the params and the flag that indicates SED fitting has completed
                 print(f"\nWriting fitted params for {list(write_params.keys())} to working-set.")
                 wset.write_values(target_id, fitted_sed=True, errors="", **write_params)
+
+
+                if args.plot_figs:
+                    _data = samples_from_sampler(sampler, thin_by=args.mcmc_thin_by, flat=True)
+                    fig = corner.corner(data=_data, show_titles=True, plot_datapoints=True,
+                                        quantiles=[0.16, 0.5, 0.84], labels=theta_labels[fit_mask],
+                                        truths=nominal_values(theta_mcmc_fit[fit_mask]))
+                    fig.savefig(figs_dir / f"sed-mcmc-corner.{args.figs_type}", dpi=args.figs_dpi)
+                    plt.close(fig)
+
+                    fig = plots.plot_fitted_model_sed(sed, theta_mcmc_fit, model_grid,
+                                                      title=f"{target_id} SED & MCMC model fit")
+                    fig.savefig(figs_dir / f"sed-mcmc-fit.{args.figs_type}", dpi=args.figs_dpi)
+                    plt.close(fig)
+
 
             except Exception as exc: # pylint: disable=broad-exception-caught
                 print(f"{target_id}: Failed with the following exception. Depending on the nature",
