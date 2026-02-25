@@ -190,5 +190,5 @@ if __name__ == "__main__":
 
 
         print("\n\n============================================================")
-        print(f"\nCompleted {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
+        print(f"Completed {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
         print("============================================================")

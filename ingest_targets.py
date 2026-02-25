@@ -49,7 +49,9 @@ if __name__ == "__main__":
 
 
     with redirect_stdout(Tee(open(drop_dir / f"{THIS_STEM}.log", "w", encoding="utf8"))):
-        print(f"Started at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
+        print("\n\n============================================================")
+        print(f"Started {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
+        print("============================================================")
 
         dal = QTableFileDal(args.working_set_file)
         targets_config = Targets(args.targets_file)
@@ -63,7 +65,7 @@ if __name__ == "__main__":
         gaia_tbosb_catalog = Vizier(catalog="I/357/tbosb2", row_limit=1)
 
 
-        print("\nSetting up storage row for these target(s).")
+        print("\nSetting up storage a row for each target.")
         for ix, config in enumerate(targets_config.iterate_known_targets()):
             if (target_id := config.target_id).isnumeric():
                 search_term = config.get("search_term", f"TIC {int(target_id):d}")
@@ -169,4 +171,6 @@ if __name__ == "__main__":
                 dal.write_values(target_id, **params)
 
 
-        print(f"\nCompleted at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
+        print("\n\n============================================================")
+        print(f"Completed {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
+        print("============================================================")

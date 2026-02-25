@@ -177,8 +177,8 @@ if __name__ == "__main__":
 
 
                 if args.plot_figs:
-                    print("\nCreating plot of the grouped lightcurves"
-                          " showing the eclipse masks used in flattening." if do_flatten else ".")
+                    print("\nCreating plot of the grouped lightcurves" +
+                          (" showing the eclipse masks used in flattening." if do_flatten else "."))
                     fig = plots.plot_lightcurves(lcs, "delta_mag", cols=lc_plot_cols,
                                                  ax_func=highlight_mask)
                     fig.savefig(figs_dir / f"lcs-grouped.{args.figs_type}", dpi=args.figs_dpi)
@@ -337,7 +337,7 @@ if __name__ == "__main__":
 
 
                 if args.plot_figs and fitted_params.size > 1:
-                    print("\nCreating plot of the scatter, by group, in the fitted params.")
+                    print("\nCreating plot of the scatter in the fitted params, by group.")
                     xlim = (lcs.sector.min() - 2, lcs.sector.max() + 2)
                     def median_and_uncertainty(key, ax):
                         # pylint: disable=cell-var-from-loop, missing-function-docstring
@@ -358,5 +358,5 @@ if __name__ == "__main__":
                 wset.write_values(target_id, errors=type(exc).__name__)
 
         print("\n\n============================================================")
-        print(f"\nCompleted {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
+        print(f"Completed {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
         print("============================================================")
