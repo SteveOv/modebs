@@ -41,6 +41,22 @@ _spt_to_teff_map = {
     "O": ufloat(35000, 10000)
 }
 
+_to_file_safe_sub_pattern = re.compile(r"[^\w\d._-]", re.IGNORECASE)
+
+def to_file_safe_str(text: str, replacement: str="-", lower: bool=True) -> str:
+    """
+    Parse the text and replace any potentially troublesome characters when used as a file name.
+    Do no pass in a full path as / and \\ are among the characters which will be replaced.
+
+    :text: the original text
+    :replacement: the character to substitute for any troublesome characters
+    :lower: whether or not to force the revised text to lower case [True]
+    :returns: the revised text
+    """
+    retval = _to_file_safe_sub_pattern.sub(replacement, text)
+    return retval.lower() if lower else retval
+
+
 def get_teff_from_spt(target_spt):
     """
     Estimates a stellar T_eff [K] from the passed spectral type.

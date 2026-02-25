@@ -8,7 +8,6 @@ from datetime import datetime
 from contextlib import redirect_stdout
 import copy
 import traceback
-import re
 
 import numpy as np
 import astropy.units as u
@@ -90,7 +89,7 @@ if __name__ == "__main__":
                 print(f"Processing target {fit_counter} of {to_fit_count}: {target_id}")
                 print("============================================================")
                 if args.plot_figs:
-                    figs_dir = drop_dir / "figs" / re.sub(r"[^\w\d]", "-", f"{target_id}".lower())
+                    figs_dir = drop_dir / "figs" / pipeline.to_file_safe_str(target_id)
                     figs_dir.mkdir(parents=True, exist_ok=True)
 
                 # It's quicker to get LCs once and cache the results than to continue to bother MAST
