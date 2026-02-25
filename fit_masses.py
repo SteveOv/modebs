@@ -99,8 +99,9 @@ if __name__ == "__main__":
                 # and a reasonable M-S age given the likely mass regime
                 theta_masses = np.array([M_sys * r for r in prior_radii])
                 theta_masses *= (M_sys / np.sum(theta_masses))
-                theta_age = [9.0 if max(nominal_values(theta_masses)) <= 2.0 else 8.0]
-                theta0 = np.concatenate([nominal_values(theta_masses), theta_age])
+                theta_age = 9.0 if max(nominal_values(theta_masses)) <= 2.0 else \
+                            8.0 if max(nominal_values(theta_masses)) <= 5.0 else 7.0
+                theta0 = np.concatenate([nominal_values(theta_masses), [theta_age]])
 
 
                 print()
