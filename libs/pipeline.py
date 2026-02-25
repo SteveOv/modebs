@@ -42,6 +42,7 @@ _spt_to_teff_map = {
 }
 
 _to_file_safe_sub_pattern = re.compile(r"[^\w\d._-]", re.IGNORECASE)
+_spt_find_pattern = re.compile(r"([A-Z]{1}[0-9]*)")
 
 def to_file_safe_str(text: str, replacement: str="-", lower: bool=True) -> str:
     """
@@ -65,13 +66,11 @@ def get_teff_from_spt(target_spt):
     :returns: the estimated teff in K
     """
     teff = None
-
-    # Also add the whole spt in case it's just a single char (i.e.: V889 Aql is set to "A")
-    if target_spt is not None \
-            and (spts := re.findall(r"([A-Z][0-9])", target_spt) + [target_spt.upper()]):
-        for spt in spts:
-            if spt and len(spt) and (tp := spt.strip()[0]) in _spt_to_teff_map \
-                and _spt_to_teff_map[tp].n > (teff.n if teff is not None else 0):
+    if target_spt is not None:
+        spts = _spt_find_pattern.findall(target_spt.strip().upper())
+        for spt in (s for s in spts if len(s) > 0):
+            tp = spt.strip()[0]
+            if (tp in _spt_to_teff_map) and (teff is None or _spt_to_teff_map[tp].n > teff.n):
                 teff = _spt_to_teff_map[tp]
     return teff
 

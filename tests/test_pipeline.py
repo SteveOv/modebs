@@ -5,11 +5,13 @@ import unittest
 import numpy as np
 import astropy.units as u
 from astropy.coordinates import SkyCoord
+from uncertainties import nominal_value, std_dev
 
 from tests.helpers.lightcurve_helpers import load_lightcurves, KNOWN_TARGETS
 from libs.catalogues import query_tess_ebs_ephemeris
 from libs.lightcurves import find_lightcurve_segments, fit_polynomial
 
+from libs.pipeline import get_teff_from_spt, _spt_to_teff_map # pylint: disable=protected-access
 from libs.pipeline import add_eclipse_meta_to_lightcurves
 from libs.pipeline import choose_lightcurve_groups_for_fitting
 from libs.pipeline import stitch_lightcurve_groups
@@ -20,6 +22,37 @@ from libs.pipeline import fit_target_lightcurves
 
 class Testpipeline(unittest.TestCase):
     """ Unit tests for the pipeline module. """
+
+    def test_get_teff_from_spt_happy_path(self):
+        """ Test get_teff_from_spt(str) asserting expected responses """
+
+        for (spt,                       exp_teff) in [
+            (None,                      None),
+            ("",                        None),
+            (" ",                       None),
+            ("V",                       None),
+
+            ("M4.5",                    _spt_to_teff_map["M"]),
+            ("K4 + M3",                 _spt_to_teff_map["K"]),
+            ("G",                       _spt_to_teff_map["G"]),
+            ("G1 V + M1 V",             _spt_to_teff_map["G"]),
+            ("F5 IV-V + F5 IV-V",       _spt_to_teff_map["F"]),
+            ("A2mA5-F2",                _spt_to_teff_map["A"]),
+            ("A0 Vp(Si) + Am",          _spt_to_teff_map["A"]),
+            ("B1.5 V",                  _spt_to_teff_map["B"]),
+            ("O My",                    _spt_to_teff_map["O"]),
+
+            ("M1 V + G1 V",             _spt_to_teff_map["G"]),
+            ("g1 V + m1 V",             _spt_to_teff_map["G"]),
+        ]:
+            with self.subTest("SpT == " + ("None" if spt is None else f"'{spt}'")):
+                teff = get_teff_from_spt(spt)
+                if exp_teff is None:
+                    self.assertIsNone(teff)
+                else:
+                    self.assertEqual(nominal_value(exp_teff), nominal_value(teff))
+                    self.assertEqual(std_dev(exp_teff), std_dev(teff))
+
 
     #
     # add_eclipse_meta_to_lightcurves(lcs: LightCurveCollection)
