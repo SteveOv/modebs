@@ -681,7 +681,9 @@ def _fit_target(time: ArrayLike,
     to the jktebop files used as inputs or the output of the fit (keys having the form ext_fname)
     """
     best_out_params = { }
+    best_file_params = { }
     best_attempt = 1
+    msgs = []
     all_keys = list(jktebop._param_file_line_beginswith.keys()) # pylint: disable=protected-access
 
     # JKTEBOP will fail if it finds files from a previous fitting
@@ -704,14 +706,10 @@ def _fit_target(time: ArrayLike,
                    comment="#",
                    delimiter=" ")
 
-    def write_out(msg):
-        if stdout_to:
-            stdout_to.write(msg)
-
     # Preserve the initial inputs as we'll progressively update the attempt intputs if retries occur
     next_att_in_params = input_params.copy()
+    converged = False
     for attempt in range(1, 1 + max(1, int(max_attempts))):
-
         att_fname_stem = file_stem + f".a{attempt:d}"
         att_file_params = {
             "dat_fname": dat_fname,
@@ -724,7 +722,7 @@ def _fit_target(time: ArrayLike,
         next_att_in_params["data_file_name"] = dat_fname.name
         next_att_in_params["file_name_stem"] = att_fname_stem
 
-        failed_to_converge = False
+        msg = None
         with PassthroughTextWriter(stdout_to, hold_output=hold_stdout,
                                 inspect_func=lambda ln: "Warning: a good fit was not found" in ln) \
                             as stdout_cap:
@@ -734,8 +732,7 @@ def _fit_target(time: ArrayLike,
             # to read out the revised values for the superset of potentially fitted parameters.
             plines = jktebop.run_jktebop_task(in_fname, par_fname, None, stdout_cap, timeout)
             att_out_params = jktebop.read_fitted_params_from_par_lines(plines, all_keys, True)
-
-            failed_to_converge = stdout_cap.inspect_flag
+            converged = not stdout_cap.inspect_flag
 
         if attempt == 1:
             # The fallback position, being the outputs from the first attempt regardless of success
@@ -743,23 +740,31 @@ def _fit_target(time: ArrayLike,
             best_out_params = att_out_params.copy()
             best_file_params = att_file_params.copy()
 
-        if failed_to_converge:
-            write_out(f"** Attempt {attempt} of {max_attempts} to fit {file_stem} didn't complete.")
-
+        if not converged:
+            msg = f"Attempt {attempt} of {max_attempts} of {file_stem} didn't fully converge."
             if max_attempts > 1:
                 if attempt < max_attempts:
                     next_att_in_params |= att_out_params
-                    write_out(" Will retry from the final position of this attempt.\n")
+                    msg += " Will retry from the final position of this attempt."
                 else:
-                    write_out(f" Will revert to the results from attempt {best_attempt}.\n")
+                    msg += f" Will revert to the results from attempt {best_attempt}."
             else:
-                write_out(" Only 1 attempt allowed so will return these results.\n")
+                msg += " Only 1 attempt allowed so will return these results."
         else:
-            write_out(f"** Attempt {attempt} of {max_attempts} to fit {file_stem} completed.\n")
-
+            msg = f"Attempt {attempt} of {max_attempts} to fit {file_stem} completed successfully."
             if attempt > 1: # A retry fit worked, these become the best params
                 best_out_params = att_out_params
                 best_file_params = att_file_params
+
+        if msg is not None:
+            if stdout_to:
+                stdout_to.write("** " + msg + "\n")
+            msgs += [msg]
+
+        if converged:
             break
 
+    # Include any progress messages we've generated across all attempts
+    best_file_params["msgs"] = msgs
+    best_file_params["converged"] = converged
     return { k: best_out_params.get(k, None) for k in read_keys } | best_file_params

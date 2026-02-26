@@ -284,6 +284,15 @@ if __name__ == "__main__":
                                                                      file_prefix="fit-lrs")
 
 
+                # Review fitting metadata to check whether any of the fits are suspect.
+                warn_msg = ""
+                warn_ixs = [i for i, fd in enumerate(fitted_param_dicts) if not fd.get("converged")]
+                if len(warn_ixs) > 0:
+                    warn_msg = f"{len(warn_ixs)} LC fit(s) incomplete"
+                    print("\n** The fit of the following lightcurve(s) did not converge:",
+                          ", ".join(lcs[ix].meta["LABEL"] for ix in warn_ixs))
+
+
                 if args.plot_figs:
                     # TODO: fit & residuals plot
                     pass
@@ -322,7 +331,7 @@ if __name__ == "__main__":
                 params["Teff_sys"] = Teff_sys   # These have come from TIC
                 params["logg_sys"] = logg_sys   # and will be used later in SED fitting
                 params["fitted_lcs"] = True
-                wset.write_values(target_id, errors="", **params)
+                wset.write_values(target_id, errors="", warnings=warn_msg, **params)
 
 
                 if args.plot_figs and fitted_params.size > 1:
