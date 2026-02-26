@@ -86,13 +86,15 @@ if __name__ == "__main__":
                 params = {
                     "main_id": srow["main_id"],
                     "tics": "|".join(f"{i}" for i in ids[ids["type"]=="TIC"]["id"]),
-                    "gaia_dr3_id": int(ids[ids["type"]=="Gaia DR3"][0]["id"]),
                     ** { col: srow[scol] for col, scol in [("ra", "ra"), ("dec", "dec"),
                                                            ("parallax", "plx_value"),
                                                            ("spt", "sp_type"),
                                                            ("G_mag", "G"), ("V_mag", "V")]
                                                         if scol in srow.colnames }
                 }
+
+                if any(dr3_mask := ids["type"]=="Gaia DR3"):
+                    params["gaia_dr3_id"] = int(ids[dr3_mask][0]["id"])
                 dal.write_values(target_id, **params)
 
 
