@@ -282,7 +282,10 @@ def stitch_lightcurve_groups(lcs: LightCurveCollection,
 
                 for k in ["LIVETIME", "TELAPSE"]:
                     if all(k in lc.meta for lc in lcs[mask]):
-                        grp_lcs[-1].meta[k] = sum(lc.meta[k] for lc in lcs[mask])
+                        grp_lcs[-1].meta[k] = np.sum([lc.meta[k] for lc in lcs[mask]])
+
+                for (k, d) in [("CROWDSAP", 1)]:
+                    grp_lcs[-1].meta[k] = np.mean([lc.meta.get(k, d) for lc in lcs[mask]])
 
     return LightCurveCollection(grp_lcs)
 
@@ -592,7 +595,8 @@ def fit_target_lightcurves(lcs: LightCurveCollection,
     max_workers = min(len(lcs), max_workers or 1)
 
     # Set up the sets of fit_target_lightcurve args may differ by lc/sector
-    all_in_params = [input_params.copy() | task_params | { "t0": t } for t in t0]
+    all_in_params = [input_params.copy() | task_params \
+                     | { "t0": t, "L3": 1-lc.meta.get("CROWDSAP", 1) } for t, lc in zip(t0, lcs)]
     all_fit_stems = [file_prefix + "-" + lc.meta["LABEL"].replace(" ", "-").lower() for lc in lcs]
 
     # If we're to run in parallel this indicates to _fit_target to write JKTEBOP console output to

@@ -11,7 +11,6 @@ import traceback
 
 import numpy as np
 import astropy.units as u
-from astropy.coordinates import SkyCoord
 
 # pylint: disable=line-too-long, wrong-import-position
 warnings.filterwarnings("ignore", "Using UFloat objects with std_dev==0 may give unexpected results.", category=UserWarning)
@@ -203,16 +202,6 @@ if __name__ == "__main__":
                       f"from {len(lcs)} LC group(s), including the value calculated for inc.")
                 print("\n".join(f"{p:>14s}: {preds_dict[p]:12.6f}" for p in preds_dict))
 
-                # Estimating L3 by looking for nearby flux sources. Unfortunately this can be
-                # unreliable with queries intermittently failing. A re-run is generally sufficient.
-                dr3_id, ra, dec, parallax, G_mag = wset.read_values(
-                                        target_id, "gaia_dr3_id", "ra", "dec", "parallax", "G_mag")
-                print("\nEstimating fitting input value for L3 with Gaia DR3.")
-                coords = SkyCoord(ra=nominal_value(ra) * u.deg, dec=nominal_value(dec) * u.deg,
-                                distance=(1000 / nominal_value(parallax)) * u.pc, frame="icrs")
-                G_mag = G_mag or lcs[0].meta["TESSMAG"]
-                l3 = pipeline.estimate_l3_with_gaia(coords, 120, dr3_id, G_mag, 0.1, True)
-
 
                 # Clip masks retain only obs within 2.5 d of an eclipse for fitting. Can optimise
                 # fitting & is especially useful where we have previously flattened the lightcurves
@@ -255,7 +244,7 @@ if __name__ == "__main__":
                     # Mass ratio (qphot), can be -1 (force spherical) or a specified ratio value
                     "qphot": -1 if (morph <= FLATTEN_TH) else preds_dict["k"]**1.4,
                     "gravA": 0.,                "gravB": 0.,
-                    "L3": l3,
+                    # The pipeline code sets initial L3 from each LC's CROWDSAP (or in overrides)
                     "reflA": 0.,                "reflB": 0.,
 
                     "period": nominal_value(period),
