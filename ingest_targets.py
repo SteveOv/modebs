@@ -155,7 +155,7 @@ if __name__ == "__main__":
 
 
         print("\nApplying any non-ephemeris overrides from config.")
-        over_keys = ["Teff_sys", "logg_sys"]
+        over_keys = ["parallax", "ra", "dec", "Teff_sys", "logg_sys"]
         for config in targets_config.iterate_known_targets():
             with_overs_keys = list(c for c in over_keys if config.has_value(c))
             if len(with_overs_keys) > 0:
@@ -164,8 +164,8 @@ if __name__ == "__main__":
                 params = { }
                 for k in with_overs_keys:
                     params[k] = config.get(k)
-                    if k in ["t0", "period"]:
-                        params[f"{k}_err"] = config.get(f"{k}_err", 0)
+                    if config.has_value(k_err := f"{k}_err"):
+                        params[k_err] = config.get(k_err, 0)
                 dal.write_values(target_id, **params)
 
 

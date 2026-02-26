@@ -50,8 +50,9 @@
             }
         },
         "0055659311": {
-            "details": "26 short cadence sectors (1-2, 4-12, 61-65, 67-69, 87-90, 94-96); tess-ebs morph 0.049 & period ~31.113 d; Gaia DR3 ruwe -- with no parallax; dist from Gaia DR2 ~500 pc; eclipses of ~0.25 & ~0.24 mag;",
-            "notes": ""
+            "details": "26 short cadence sectors (1-2, 4-12, 61-65, 67-69, 87-90, 94-96); tess-ebs morph 0.049 & period ~31.113 d; eclipses of ~0.25 & ~0.24 mag;",
+            "notes": "Gaia DR3 ruwe -- with no parallax; dist from Gaia DR2 ~500 pc so set parallax to 2.0;",
+            "parallax": 2.0
         },
         "0063192395": {
             "details": "3 short cadence sectors (6, 7 & 87); tess-ebs morph 0.528 & period ~3.065 d; Gaia DR3 ruwe 1.259; eclipses of ~0.33 & ~0.30 mag; some ellipsoidal effect; eclipses have shifted by +0.05 by sector 87; some crowding in FoV so expect L3>0;",
