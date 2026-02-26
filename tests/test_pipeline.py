@@ -201,6 +201,7 @@ class Testpipeline(unittest.TestCase):
     # estimate_l3_with_gaia(centre: SkyCoord, radius_as: float, target_source_id: int,
     #                       target_g_mag: float, max_l3: float, verbose: bool) -> float:
     #
+    @unittest.skip("Deprecated - we now use TESS' CROWDSAP as the source of L3 estimates")
     def test_estimate_l3_with_gaia_happy_path(self):
         """ Happy path tests of estimate_l3_with_gaia() """
 

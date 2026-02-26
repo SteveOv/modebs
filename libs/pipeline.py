@@ -595,8 +595,8 @@ def fit_target_lightcurves(lcs: LightCurveCollection,
     max_workers = min(len(lcs), max_workers or 1)
 
     # Set up the sets of fit_target_lightcurve args may differ by lc/sector
-    all_in_params = [input_params.copy() | task_params \
-                     | { "t0": t, "L3": 1-lc.meta.get("CROWDSAP", 1) } for t, lc in zip(t0, lcs)]
+    all_in_params = [input_params.copy() | task_params | \
+                { "t0": t, "L3": max(0, 1-lc.meta.get("CROWDSAP", 1)) } for t, lc in zip(t0, lcs)]
     all_fit_stems = [file_prefix + "-" + lc.meta["LABEL"].replace(" ", "-").lower() for lc in lcs]
 
     # If we're to run in parallel this indicates to _fit_target to write JKTEBOP console output to
