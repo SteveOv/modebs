@@ -121,6 +121,9 @@ if __name__ == "__main__":
                 lcs = lcs[select_mask]
                 print(f"Retained {len(lcs)} lightcurves after applying any configured selections.")
 
+                for lc in lcs: # Used downstream in naming LC groups and jktebop fitting files
+                    lc.meta["target"] = target_id
+
                 print("\nClipping the lightcurves' invalid fluxes, known distorted sections",
                     "& any isolated sections < 2 d in length.")
                 pipeline.mask_lightcurves_unusable_fluxes(lcs, config.quality_masks or [],
@@ -281,7 +284,7 @@ if __name__ == "__main__":
                                                                      max_workers=8,
                                                                      max_attempts=3,
                                                                      timeout=900,
-                                                                     file_prefix="fit-lrs")
+                                                                     file_prefix="fit-lcs")
 
 
                 # Review fitting metadata to check whether any of the fits are suspect.
