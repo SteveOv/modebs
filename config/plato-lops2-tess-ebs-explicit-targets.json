@@ -191,11 +191,13 @@
         },
         "0319863494": {
             "details": "6 short cadence sectors (7, 33-34, 61 & 87-88); tess-ebs morph 0.124 & period ~5.135 d; Gaia DR3 ruwe 1.153; SpT A1V; good SNR; eclipses of ~0.25 & ~0.15 mag although they differ across sectors and the secondary appears more clearly total on later sectors (change in inc?); crowded field so L3 likely significant; significant eccentricity;",
-            "notes": "",
+            "notes": "TESS-ebs ephemeris values not usable for this target;",
             "t0": 2206.68905,
             "period": 17.644114,
             "widthP": 0.101,
             "widthS": 0.101,
+            "depthP": 0.20,
+            "depthS": 0.15,
             "phiS": 0.29
         },
         "0350298314": {
