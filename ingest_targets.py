@@ -65,7 +65,7 @@ if __name__ == "__main__":
         gaia_tbosb_catalog = Vizier(catalog="I/357/tbosb2", row_limit=1)
 
 
-        print("\nSetting up storage a row for each target.")
+        print("\nSetting up a storage row for each target.")
         for ix, config in enumerate(targets_config.iterate_known_targets()):
             if (target_id := config.target_id).isnumeric():
                 search_term = config.get("search_term", f"TIC {int(target_id):d}")
@@ -136,12 +136,12 @@ if __name__ == "__main__":
                 params["depthS"] = params["depthP"]
                 params["phiS"] = 0.5
 
-            ephem_keys_overs = [k for k in ephem_keys if config.has_value(k)]
-            if len(ephem_keys_overs) > 0:
-                print(f"{target_id}: copying ephemeris overrides of {ephem_keys_overs} from config")
-                for k in ephem_keys_overs:
-                    if k in ["t0", "period"]:
-                        params[k] = ufloat(config.get(k), config.get(f"{k}_err", 0))
+            ephem_overs_keys = [k for k in ephem_keys if config.has_value(k)]
+            if len(ephem_overs_keys) > 0:
+                print(f"{target_id}: copying ephemeris overrides of {ephem_overs_keys} from config")
+                for k in ephem_overs_keys:
+                    if config.has_value(k_err := f"{k}_err"):
+                        params[k] = ufloat(config.get(k), config.get(k_err, 0))
                     else:
                         params[k] = config.get(k)
 
@@ -163,9 +163,10 @@ if __name__ == "__main__":
                 print(f"{target_id}: copying override(s) for {with_overs_keys} from config.")
                 params = { }
                 for k in with_overs_keys:
-                    params[k] = config.get(k)
                     if config.has_value(k_err := f"{k}_err"):
-                        params[k_err] = config.get(k_err, 0)
+                        params[k] = ufloat(config.get(k), config.get(k_err, 0))
+                    else:
+                        params[k] = config.get(k)
                 dal.write_values(target_id, **params)
 
 
