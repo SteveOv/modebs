@@ -14,7 +14,7 @@ import astropy.units as u
 
 # pylint: disable=line-too-long, wrong-import-position
 warnings.filterwarnings("ignore", "Using UFloat objects with std_dev==0 may give unexpected results.", category=UserWarning)
-from uncertainties import ufloat
+from uncertainties import ufloat, nominal_value
 from uncertainties.unumpy import nominal_values
 
 from deblib.constants import G, R_sun, M_sun
@@ -117,7 +117,7 @@ if __name__ == "__main__":
 
                 # Estimate fit starting position with masses derived from M_sys & the expected mass
                 # ratio and an approximate age for the more massive star within the main-sequence.
-                if qphot is None or qphot <= 0:
+                if qphot is None or nominal_value(qphot) <= 0:
                     # The approx single k-q (k=q^0.715) relations of Demircan & Kahraman (1991).
                     qphot = k**1.4
                 theta_masses = nominal_values([_MA := M_sys / (qphot + 1), M_sys - _MA])
