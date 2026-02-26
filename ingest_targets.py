@@ -60,7 +60,7 @@ if __name__ == "__main__":
 
         # Used to get the extended information published for each target
         simbad = Simbad()
-        simbad.add_votable_fields("parallax", "allfluxes", "sp", "ids")
+        simbad.add_votable_fields("parallax", "sp", "ids")
         tic_catalog = Vizier(catalog="IV/39/tic82", row_limit=10)
         gaia_tbosb_catalog = Vizier(catalog="I/357/tbosb2", row_limit=1)
 
@@ -77,7 +77,7 @@ if __name__ == "__main__":
 
         # Get the basic published information from SIMBAD. We do a mass query
         # and code is dependent on SIMBAD returning the rows in the requested order.
-        print("\nQuerying SIMBAD for id, SpT, mag & coordinate data.")
+        print("\nQuerying SIMBAD for id, SpT & coordinate data.")
         id_patt = re.compile(r"(Gaia DR3|V\*|TIC|HD|HIP|2MASS)\s+(.+?(?=\||$))", re.IGNORECASE)
         target_sterms = np.array(list(dal.yield_values(dal.key_name, "main_id"))).T
         if (tbl := simbad.query_objects(target_sterms[1])) and len(tbl) == target_sterms.shape[1]:
@@ -86,10 +86,10 @@ if __name__ == "__main__":
                 params = {
                     "main_id": srow["main_id"],
                     "tics": "|".join(f"{i}" for i in ids[ids["type"]=="TIC"]["id"]),
-                    ** { col: srow[scol] for col, scol in [("ra", "ra"), ("dec", "dec"),
-                                                           ("parallax", "plx_value"),
-                                                           ("spt", "sp_type"),
-                                                           ("G_mag", "G"), ("V_mag", "V")]
+                    ** { col: srow[scol] for (col, scol) in [("ra", "ra"),
+                                                             ("dec", "dec"),
+                                                             ("parallax", "plx_value"),
+                                                             ("spt", "sp_type")]
                                                         if scol in srow.colnames }
                 }
 
@@ -99,23 +99,19 @@ if __name__ == "__main__":
 
 
         # Augment the basic information from Gaia DR3 (where target is in DR3)
-        print("\nQuerying Gaia DR3 for coordinates, mags and ruwe data.")
+        print("\nQuerying Gaia DR3 for coordinates and ruwe data.")
         target_sterms = np.array(list(dal.yield_values(dal.key_name, "gaia_dr3_id"))).T
         AQL = "SELECT source_id, ra, dec, parallax, parallax_error, ruwe, " \
-            + "phot_g_mean_mag, phot_bp_mean_mag, phot_rp_mean_mag, teff_gspphot, logg_gspphot " \
-            + "FROM gaiadr3.gaia_source_lite " \
+            + "teff_gspphot, logg_gspphot FROM gaiadr3.gaia_source_lite " \
             + f"WHERE source_id in ({','.join(f'{i:d}' for i in target_sterms[1] if i)})"
         if job := Gaia.launch_job(AQL):
             for srow in job.get_results():
                 target_id = target_sterms[0][target_sterms[1] == srow["source_id"]][0]
                 params = { col: srow[scol] for (col, scol) in [("ra", "ra"),
-                                                                ("dec", "dec"),
-                                                                ("parallax", "parallax"),
-                                                                ("parallax_err", "parallax_error"),
-                                                                ("G_mag", "phot_g_mean_mag"),
-                                                                ("BP_mag", "phot_bp_mean_mag"),
-                                                                ("RP_mag", "phot_rp_mean_mag"),
-                                                                ("ruwe", "ruwe")]}
+                                                               ("dec", "dec"),
+                                                               ("parallax", "parallax"),
+                                                               ("parallax_err", "parallax_error"),
+                                                               ("ruwe", "ruwe")]}
                 dal.write_values(target_id, **params)
 
 
