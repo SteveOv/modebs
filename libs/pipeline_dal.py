@@ -1,6 +1,6 @@
 """ Data access components for reading/writing pipeline progress """
 # pylint: disable=no-member
-from typing import Union as _Union, Callable as _Callable, Generator as _Generator
+from typing import Union as _Union, Tuple as _Tuple, Callable as _Callable, Generator as _Generator
 from pathlib import Path as _Path
 from numbers import Number as _Number
 from abc import ABC as _ABC, abstractmethod as _abstractmethod
@@ -8,7 +8,6 @@ from warnings import warn as _warn
 import threading
 
 import numpy as _np
-from numpy.typing import ArrayLike as _ArrayLike
 import astropy.units as _u
 from astropy.table import QTable as _QTable
 from uncertainties import ufloat as _ufloat, UFloat as _UFloat
@@ -32,7 +31,7 @@ class Dal(_ABC):
         """ Return the name of the primary key column """
         return self._key_name
 
-    def yield_values(self, *params):
+    def yield_values(self, *params) -> _Generator[_Union[_Tuple, any], None, None]:
         """
         Yields the requested param values for each row in turn.
 
@@ -43,9 +42,8 @@ class Dal(_ABC):
             yield self.read_values(key, *params)
 
     @_abstractmethod
-    def yield_keys(self,
-                   *params: str,
-                   where: _Callable[[any], bool]=lambda *vals: True) -> _Generator:
+    def yield_keys(self, *params: str,
+                   where: _Callable[[any], bool]=lambda *vals: True) -> _Generator[str, None, None]:
         """
         Yields key values where the where() func evaluates to True when passed the requested values.
 
@@ -69,13 +67,13 @@ class Dal(_ABC):
         """
 
     @_abstractmethod
-    def read_values(self, key: any, *params: str) -> _ArrayLike:
+    def read_values(self, key: any, *params: str) -> _Union[_Tuple, any]:
         """
         Read the requested param values, for the required key, from the data source.
 
         :key: the unique key to the item to read params from
         :params: the names of the params to read values for
-        :returns: an array of the requested values
+        :returns: an tuple of the requested values or a single value if only one requested
         """
 
     @_abstractmethod
@@ -239,17 +237,21 @@ class QTableDal(Dal):
         self._table = _QTable(masked=masked, dtype=self._col_dtype, units=self._col_units, rows=[])
         self._table.add_index(self.key_name, unique=True)
 
-    def yield_keys(self,
-                   *params: str,
+    def yield_keys(self, *params: str,
                    where: _Callable[[any], bool]=lambda *vals: True) -> _Generator:
-        if params is not None and len(params) > 0:
+        if params is None or len(params) == 0:
+            for row in self._table:
+                yield self._read_param_value(row, self.key_name)
+        elif len(params) == 1:
+            for row in self._table:
+                key = self._read_param_value(row, self._key_name)
+                if where(self.read_values(key, *params)):
+                    yield key
+        else:
             for row in self._table:
                 key = self._read_param_value(row, self._key_name)
                 if where(*self.read_values(key, *params)):
                     yield key
-        else:
-            for row in self._table:
-                yield self._read_param_value(row, self.key_name)
 
     def read_values(self, key: any, *params: str):
         if isinstance(params, str):
@@ -257,15 +259,17 @@ class QTableDal(Dal):
 
         # No lock on a read. Raises an KeyError if the key value is unknown
         row = self._table.loc[key]
-        values = _np.empty_like(params, dtype=object)
-        for ix, col in enumerate(params):
+        values = []
+        for col in params:
             if col in row.colnames:
                 value = self._read_param_value(row, col)
                 if value is not None and (err_col := col + "_err") in row.colnames:
-                    values[ix] = _ufloat(value, self._read_param_value(row, err_col))
+                    values.append(_ufloat(value, self._read_param_value(row, err_col)))
                 else:
-                    values[ix] = value
-        return values
+                    values.append(value)
+            else:
+                values.append(None)
+        return values[0] if len(params) == 1 else tuple(values)
 
     def write_values(self, key: any, **params: dict[str, any]):
         with self._WRITE_LOCK:

@@ -90,7 +90,7 @@ if __name__ == "__main__":
                 print(f"Processing target {fit_counter} of {to_fit_count}: {target_id}")
                 print("------------------------------------------------------------")
                 config = targets_config.get(target_id)
-                warn_msg = wset.read_values(target_id, "warnings")[0] or ""
+                warn_msg = wset.read_values(target_id, "warnings") or ""
                 if args.plot_figs:
                     figs_dir = drop_dir / "figs" / pipeline.to_file_safe_str(target_id)
                     figs_dir.mkdir(parents=True, exist_ok=True)
