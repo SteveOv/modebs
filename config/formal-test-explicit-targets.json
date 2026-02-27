@@ -32,6 +32,8 @@
             "notes": "distorted sections of S18 & 78 - both have low(est) pdc_tot (<0.5) so may be easily omitted; S77 has highest pdc_tot = 0.891; override teff_sys to more appropriate value for SpT; needs both stars' LD fixed at pow2/0.519/0.3811 to match the published light-curve fits; Southworth25obsR22 uses E(B-V)=0.44+/-0.05 mag and gives dist=1814+/-37 pc;",
             "exclude_sectors": [18, 78],
             "Teff_sys": 12000,
+            "Av": 1.364,
+            "jktebop_overrides": { "LDA1_fit": 0, "LDB1_fit": 0 },
             "labels": {
                 "MA": 4.674,            "MA_err": 0.091,
                 "MB": 4.586,            "MB_err": 0.084,
