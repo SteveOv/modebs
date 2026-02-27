@@ -38,7 +38,7 @@ theta_labels = np.array([f"$M_{{\\rm {sub}}} / {{\\rm R_{{\\odot}}}}$" for sub i
                       + ["$\\log{{({{\\rm age}})}} / {{\\rm yr}}$"])
 
 theta_params_and_units = np.array([(f"M{sub}", u.Msun) for sub in subs] \
-                                + [("log(age)", u.dex(u.yr))])
+                                + [("log_age", u.dex(u.yr))])
 
 
 def print_mass_theta(theta, name: str="theta"):
@@ -119,17 +119,17 @@ if __name__ == "__main__":
 
                 # Estimate fit starting position with masses derived from M_sys & the expected mass
                 # ratio and an approximate age for the more massive star within the main-sequence.
+                print("\nSetting up the starting position (theta0) for fitting.")
                 if qphot is None or nominal_value(qphot) <= 0:
                     # The approx single k-q (k=q^0.715) relations of Demircan & Kahraman (1991).
                     qphot = k**1.4
                 theta_masses = nominal_values([_MA := M_sys / (qphot + 1), M_sys - _MA])
                 theta_age = log_age_for_mass_and_eep(np.max(theta_masses))
                 theta0 = np.concatenate([theta_masses, [theta_age]])
-
-
-                print()
-                print("Performing an initial 'quick' minimize fit for approximate values.")
                 print_mass_theta(theta0, "theta0")
+
+
+                print("\nPerforming an initial 'quick' minimize fit for approximate values.")
                 theta_fit, _ = minimize_fit(theta0=theta0,
                                             sys_mass=M_sys,
                                             radii=prior_radii,
@@ -138,8 +138,7 @@ if __name__ == "__main__":
                 print_mass_theta(theta_fit, "theta_min")
 
 
-                print()
-                print("Performing a full MCMC fit for masses and log(age) with uncertainties.")
+                print("\nPerforming a full MCMC fit for masses and log(age) with uncertainties.")
                 theta_mcmc_fit, sampler = mcmc_fit(theta0=theta_fit,
                                                    sys_mass=M_sys,
                                                    radii=prior_radii,
@@ -165,8 +164,8 @@ if __name__ == "__main__":
                         label = f"({lval:.3f} {unit:unicode})"
                     print(f"{k:>12s} = {val:.3f} {unit:unicode} \t", label)
 
-                    if k not in ["log(age)"]:
-                        write_params[k] = val
+                    # *** also updates the target data ***
+                    write_params[k] = val
 
 
                 # Finally, store the params and the flag that indicates fitting has completed
