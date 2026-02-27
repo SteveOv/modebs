@@ -22,14 +22,13 @@ THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Pipeline stage 1: ingest of targets.")
-    ap.add_argument("-tf", "--targets-file", dest="targets_file", type=Path, required=False,
-                    help="json file containing the details of the targets to ingest")
+    ap.add_argument(dest="targets_file", type=Path, metavar="TARGETS_FILE",
+                    help="json file containing the details of the targets to fit")
     ap.add_argument("-ft", "--figs-type", dest="figs_type", type=str, required=False,
                     help="the type of fig, as indicated by its file extension [png]")
     ap.add_argument("-fd", "--figs-dpi", dest="figs_dpi", type=int, required=False,
                     help="the dpi of any figs, if they are a raster type [100]")
-    ap.set_defaults(targets_file=Path("./config/plato-lops2-tess-ebs-explicit-targets.json"),
-                    figs_type="png", figs_dpi=100)
+    ap.set_defaults(figs_type="png", figs_dpi=100)
     args = ap.parse_args()
     drop_dir = Path.cwd() / f"drop/{args.targets_file.stem}"
     args.working_set_file = drop_dir / "working-set.table"
@@ -38,6 +37,8 @@ if __name__ == "__main__":
         print("\n\n============================================================")
         print(f"Started {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
         print("============================================================")
+        print(f"\nThe targets configuration file:   {args.targets_file}")
+        print(f"Directory for data, logs & plots: {drop_dir}")
 
         figs_dir = drop_dir / "figs"
         figs_dir.mkdir(parents=True, exist_ok=True)

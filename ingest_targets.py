@@ -26,16 +26,14 @@ THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Pipeline stage 1: ingest of targets.")
-    ap.add_argument("-tf", "--targets-file", dest="targets_file", type=Path, required=False,
+    ap.add_argument(dest="targets_file", type=Path, metavar="TARGETS_FILE",
                     help="json file containing the details of the targets to ingest")
     ap.add_argument("-fo", "--force-overwrite", dest="force_overwrite", action="store_true",
                     required=False, help="force the overwritting of any existing ingest found")
-    ap.set_defaults(targets_file=Path("./config/plato-lops2-tess-ebs-explicit-targets.json"),
-                    force_overwrite=False, batch_size=20)
+    ap.set_defaults(force_overwrite=False, batch_size=20)
     args = ap.parse_args()
     drop_dir = Path.cwd() / f"drop/{args.targets_file.stem}"
     args.working_set_file = drop_dir / "working-set.table"
-
 
     if not args.force_overwrite and args.working_set_file.exists():
         resp = input(f"** Warning: output data exists in '{drop_dir}'. Continue & overwrite y/N? ")
@@ -51,10 +49,12 @@ if __name__ == "__main__":
         print("\n\n============================================================")
         print(f"Started {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
         print("============================================================")
+        print(f"\nThe targets configuration file:   {args.targets_file}")
+        print(f"Directory for data, logs & plots: {drop_dir}")
 
         dal = QTableFileDal(args.working_set_file)
         targets_config = Targets(args.targets_file)
-        print(f"\nRead in the configuration from '{args.targets_file}'",
+        print(f"Read in the configuration from '{args.targets_file.name}'",
               f"which contains {targets_config.count()} target(s) not excluded.")
 
 

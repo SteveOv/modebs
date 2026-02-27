@@ -48,34 +48,34 @@ def print_mass_theta(theta, name: str="theta"):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Pipeline stage 4: fitting target masses.")
-    ap.add_argument("-tf", "--targets-file", dest="targets_file", type=Path, required=False,
+    ap.add_argument(dest="targets_file", type=Path, metavar="TARGETS_FILE",
                     help="json file containing the details of the targets to fit")
     ap.add_argument("-pf", "--plot-figs", dest="plot_figs", action="store_true", required=False,
                     help="plot figs for each target as the process progresses")
     ap.add_argument("-ms", "--max-steps", dest="max_mcmc_steps", type=int, required=False,
                     help="the maximum number of MCMC steps to run for [100 000]")
-    ap.set_defaults(targets_file=Path("./config/plato-lops2-tess-ebs-explicit-targets.json"),
-                    plot_figs=False, figs_type="png", figs_dpi=100,
+    ap.set_defaults(plot_figs=False, figs_type="png", figs_dpi=100,
                     max_mcmc_steps=100000, mcmc_walkers=100, mcmc_thin_by=10, mcmc_processes=8)
     args = ap.parse_args()
     drop_dir = Path.cwd() / f"drop/{args.targets_file.stem}"
     args.working_set_file = drop_dir / "working-set.table"
 
-
     with redirect_stdout(Tee(open(drop_dir / f"{THIS_STEM}.log", "a", encoding="utf8"))) as log:
         print("\n\n============================================================")
         print(f"Started {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
         print("============================================================")
+        print(f"\nThe targets configuration file:   {args.targets_file}")
+        print(f"Directory for data, logs & plots: {drop_dir}")
 
         targets_config = Targets(args.targets_file)
-        print(f"Read in the configuration from '{args.targets_file}'",
+        print(f"Read in the configuration from '{args.targets_file.name}'",
               f"which contains {targets_config.count()} target(s) that have not been excluded.")
 
         wset = QTableFileDal(args.working_set_file)
         to_fit_targets = list(wset.yield_keys("fitted_lcs", "fitted_sed", "fitted_masses",
                                               where=lambda fl, fs, fm: fl and fs and not fm))
         to_fit_count = len(to_fit_targets)
-        print(f"The data indicates there are {to_fit_count} target(s) to be fitted.")
+        print(f"The working-set indicates there are {to_fit_count} target(s) to be fitted.")
 
 
         for fit_counter, target_id in enumerate(to_fit_targets, start=1):

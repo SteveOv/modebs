@@ -55,12 +55,11 @@ def highlight_mask(_, ax, lc): # pylint: disable=redefined-outer-name
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Pipeline stage 2: fitting target lightcurves.")
-    ap.add_argument("-tf", "--targets-file", dest="targets_file", type=Path, required=False,
+    ap.add_argument(dest="targets_file", type=Path, metavar="TARGETS_FILE",
                     help="json file containing the details of the targets to fit")
     ap.add_argument("-pf", "--plot-figs", dest="plot_figs", action="store_true", required=False,
                     help="plot figs for each target as the process progresses")
-    ap.set_defaults(targets_file=Path("./config/plato-lops2-tess-ebs-explicit-targets.json"),
-                    plot_figs=False, figs_type="png", figs_dpi=100)
+    ap.set_defaults(plot_figs=False, figs_type="png", figs_dpi=100)
     args = ap.parse_args()
     drop_dir = Path.cwd() / f"drop/{args.targets_file.stem}"
     args.working_set_file = drop_dir / "working-set.table"
@@ -72,9 +71,11 @@ if __name__ == "__main__":
         print("\n\n============================================================")
         print(f"Started {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
         print("============================================================")
+        print(f"\nThe targets configuration file:   {args.targets_file}")
+        print(f"Directory for data, logs & plots: {drop_dir}")
 
         targets_config = Targets(args.targets_file)
-        print(f"Read in the configuration from '{args.targets_file}'",
+        print(f"Read in the configuration from '{args.targets_file.name}'",
               f"which contains {targets_config.count()} target(s) that have not been exluded.")
 
         # Open the targets table and the configs
