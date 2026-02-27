@@ -12,7 +12,6 @@ from contextlib import redirect_stdout
 # pylint: disable=line-too-long, wrong-import-position
 warnings.filterwarnings("ignore", "Using UFloat objects with std_dev==0 may give unexpected results.", category=UserWarning)
 from uncertainties import ufloat
-from astroquery.vizier import Vizier
 from astroquery.simbad import Simbad
 from astroquery.gaia import Gaia
 import numpy as np
@@ -32,7 +31,7 @@ if __name__ == "__main__":
     ap.add_argument("-fo", "--force-overwrite", dest="force_overwrite", action="store_true",
                     required=False, help="force the overwritting of any existing ingest found")
     ap.set_defaults(targets_file=Path("./config/plato-lops2-tess-ebs-explicit-targets.json"),
-                    force_overwrite=False)
+                    force_overwrite=False, batch_size=20)
     args = ap.parse_args()
     drop_dir = Path.cwd() / f"drop/{args.targets_file.stem}"
     args.working_set_file = drop_dir / "working-set.table"
@@ -78,7 +77,7 @@ if __name__ == "__main__":
         simbad.add_votable_fields("parallax", "sp", "ids")
         id_patt = re.compile(r"(Gaia DR3|V\*|TIC|HD|HIP|2MASS)\s+(.+?(?=\||$))", re.IGNORECASE)
         st_index = {m: t for m, t in dal.yield_values("search_term", dal.key_name) if m is not None}
-        for sterms in pipeline.grouper(st_index.keys(), size=20, fillvalue=None):
+        for sterms in pipeline.grouper(st_index.keys(), size=args.batch_size, fillvalue=None):
             # zip strict so we get ValueError if not same len as the sterms
             sterms = [m for m in sterms if m is not None]
             for sterm, srow in zip(sterms, simbad.query_objects(sterms), strict=True):
@@ -102,9 +101,9 @@ if __name__ == "__main__":
         # Gaia DR3 queries are keyed on the gaia_dr3_id from above against the source_id field.
         print("\nQuerying Gaia DR3 in batches for coordinates and ruwe data.")
         gt_index = {g: t for g, t in dal.yield_values("gaia_dr3_id", dal.key_name) if g is not None}
-        for gids in pipeline.grouper(gt_index.keys(), size=20, fillvalue=None):
-            AQL = "SELECT source_id, ra, dec, parallax, parallax_error, ruwe, " \
-                + "teff_gspphot, logg_gspphot FROM gaiadr3.gaia_source_lite " \
+        for gids in pipeline.grouper(gt_index.keys(), size=args.batch_size, fillvalue=None):
+            AQL = f"SELECT TOP {args.batch_size*2} source_id, ra, dec, parallax, parallax_error, " \
+                + "ruwe, teff_gspphot, logg_gspphot FROM gaiadr3.gaia_source_lite " \
                 + f"WHERE source_id in ({','.join(f'{i:d}' for i in gids if i is not None)})"
             for srow in Gaia.launch_job(AQL).get_results():
                 if (target_id := gt_index.get(srow["source_id"], None)) is not None:
