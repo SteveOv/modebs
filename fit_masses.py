@@ -148,6 +148,7 @@ if __name__ == "__main__":
                                                    thin_by=args.mcmc_thin_by,
                                                    seed=42,
                                                    early_stopping=True,
+                                                   early_stopping_from=25000,
                                                    processes=args.mcmc_processes,
                                                    progress=True,
                                                    verbose=True)

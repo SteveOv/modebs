@@ -168,6 +168,7 @@ def mcmc_fit(theta0: np.ndarray[float],
              processes: int=1,
              autocor_tol: int=50,
              early_stopping: bool=True,
+             early_stopping_from: int=None,
              early_stopping_threshold: float=0.01,
              progress: Union[bool, str]=False,
              verbose: bool=False) -> Tuple[np.ndarray[UFloat], EnsembleSampler]:
@@ -186,6 +187,7 @@ def mcmc_fit(theta0: np.ndarray[float],
     :processes: optional number of parallel processes to use, or None to let code choose
     :autocor_tol: the autocorrelation tolerance
     :early_stopping: stop fitting if solution has converged & further improvements are negligible
+    :early_stopping_from: override of the number of steps before early stopping is considered
     :early_stopping_threshold: the delta(tau) threshold below which to consider early stopping
     :progress: whether to show a progress bar (see emcee documentation for other values)
     :returns: the fitted set of mass and log(age) values as UFloats with 1-sigma uncertainties
@@ -200,7 +202,8 @@ def mcmc_fit(theta0: np.ndarray[float],
     tau = [np.inf] * ndim
 
     # Min steps before the Autocorr algo becomes useful & unlikely to give a chain too short error
-    min_steps_before_es = int(50 * ndim * autocor_tol)
+    if early_stopping_from is None or early_stopping_from <= 0:
+        early_stopping_from = int(50 * ndim * autocor_tol)
 
     # Starting positions for the walkers clustered around theta0
     p0 = [theta0 + (theta0 * rng.normal(0, 0.05, ndim)) for _ in np.arange(int(nwalkers))]
@@ -208,6 +211,12 @@ def mcmc_fit(theta0: np.ndarray[float],
     with Pool(processes=processes) as pool, catch_warnings(category=[RuntimeWarning, UserWarning]):
         filterwarnings("ignore", message="invalid value encountered in ")
         filterwarnings("ignore", message="Using UFloat objects with std_dev==0")
+
+        if verbose:
+            print(f"A MCMC fit on {processes} process(es) with {nwalkers:d} walkers for {nsteps:d}",
+                  (f"steps, sampling every {thin_by:d} steps." if thin_by > 1 else "steps."))
+            if early_stopping:
+                print(f"Early stopping will be considered after {early_stopping_from:d} steps.")
 
         sampler = EnsembleSampler(int(nwalkers), ndim,
                                   _objective_func, args=(sys_mass, radii, teffs), pool=pool)
@@ -220,7 +229,7 @@ def mcmc_fit(theta0: np.ndarray[float],
                     # The autocor time (tau) is the #steps to effectively forget start position.
                     # As the fit converges the change in tau will tend towards zero.
                     prev_tau, tau = tau, sampler.get_autocorr_time(c=5, tol=autocor_tol) * thin_by
-                    if step >= min_steps_before_es \
+                    if step >= early_stopping_from \
                             and not any(np.isnan(tau)) \
                             and all(tau < step / 100) \
                             and all(abs(prev_tau - tau) / prev_tau < early_stopping_threshold):
