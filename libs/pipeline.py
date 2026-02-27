@@ -2,14 +2,14 @@
 Low level utility functions for light curve ingest, pre-processing, estimation and fitting.
 """
 # pylint: disable=no-member, too-many-arguments, too-many-positional-arguments
-from typing import Union, Tuple, Dict, List
+from typing import Union, Tuple, Dict, List, Iterable
 from io import TextIOBase
 from sys import stdout
 import warnings
 import re
 from numbers import Number
 from multiprocessing import Pool
-from itertools import groupby
+from itertools import groupby, zip_longest
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -73,6 +73,21 @@ def to_file_safe_str(text: str, replacement: str="-", lower: bool=True) -> str:
     """
     retval = _to_file_safe_sub_pattern.sub(replacement, text)
     return retval.lower() if lower else retval
+
+
+def grouper(iterable: Iterable, size: int, fillvalue=None):
+    """
+    Iterates over iterable, yielding the contents in groups (tuples) of the requested size.
+
+    From https://docs.python.org/3/library/itertools.html#itertools-recipes
+
+    :iterable: the iterable to iterate in groups
+    :size: the size of each group
+    :fillvalue: used to fill out the final group when there are insufficient items in the iterable
+    :returns: tuples, of the requested size, of values from iterator 
+    """
+    batchable = [iter(iterable)] * size
+    return zip_longest(*batchable, fillvalue=fillvalue)
 
 
 def get_teff_from_spt(target_spt):

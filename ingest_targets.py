@@ -17,7 +17,7 @@ from astroquery.simbad import Simbad
 from astroquery.gaia import Gaia
 import numpy as np
 
-from libs import catalogues
+from libs import pipeline, catalogues
 from libs.iohelpers import Tee
 from libs.targets import Targets
 from libs.pipeline_dal import QTableFileDal
@@ -58,12 +58,6 @@ if __name__ == "__main__":
         print(f"\nRead in the configuration from '{args.targets_file}'",
               f"which contains {targets_config.count()} target(s) not excluded.")
 
-        # Used to get the extended information published for each target
-        simbad = Simbad()
-        simbad.add_votable_fields("parallax", "sp", "ids")
-        tic_catalog = Vizier(catalog="IV/39/tic82", row_limit=10)
-        gaia_tbosb_catalog = Vizier(catalog="I/357/tbosb2", row_limit=1)
-
 
         print("\nSetting up a storage row for each target.")
         for ix, config in enumerate(targets_config.iterate_known_targets()):
@@ -75,21 +69,26 @@ if __name__ == "__main__":
                              fitted_lcs=False, fitted_sed=False, fitted_masses=False)
 
 
-        # Get the basic published information from SIMBAD. We do a mass query
+        # Get the basic published information from SIMBAD. We do batched queries
         # and code is dependent on SIMBAD returning the rows in the requested order.
-        print("\nQuerying SIMBAD for id, SpT & coordinate data.")
+        print("\nQuerying SIMBAD in batches for id, SpT & coordinate data.")
+        simbad = Simbad()
+        simbad.add_votable_fields("parallax", "sp", "ids")
         id_patt = re.compile(r"(Gaia DR3|V\*|TIC|HD|HIP|2MASS)\s+(.+?(?=\||$))", re.IGNORECASE)
-        target_sterms = np.array(list(dal.yield_values(dal.key_name, "main_id"))).T
-        if (tbl := simbad.query_objects(target_sterms[1])) and len(tbl) == target_sterms.shape[1]:
-            for target_id, srow in zip(target_sterms[0], tbl):
+        st_index = {m: t for m, t in dal.yield_values("main_id", dal.key_name) if m is not None}
+        for sterms in pipeline.grouper(st_index.keys(), size=20, fillvalue=None):
+            # zip strict so we get ValueError if not same len as the sterms
+            sterms = [m for m in sterms if m is not None]
+            for sterm, srow in zip(sterms, simbad.query_objects(sterms), strict=True):
+                target_id = st_index[sterm]
                 ids = np.array(id_patt.findall(srow["ids"]), [("type", "O"), ("id", "O")])
                 params = {
                     "main_id": srow["main_id"],
                     "tics": "|".join(f"{i}" for i in ids[ids["type"]=="TIC"]["id"]),
                     ** { col: srow[scol] for (col, scol) in [("ra", "ra"),
-                                                             ("dec", "dec"),
-                                                             ("parallax", "plx_value"),
-                                                             ("spt", "sp_type")]
+                                                            ("dec", "dec"),
+                                                            ("parallax", "plx_value"),
+                                                            ("spt", "sp_type")]
                                                         if scol in srow.colnames }
                 }
 
@@ -99,20 +98,20 @@ if __name__ == "__main__":
 
 
         # Augment the basic information from Gaia DR3 (where target is in DR3)
-        print("\nQuerying Gaia DR3 for coordinates and ruwe data.")
-        target_sterms = np.array(list(dal.yield_values(dal.key_name, "gaia_dr3_id"))).T
-        AQL = "SELECT source_id, ra, dec, parallax, parallax_error, ruwe, " \
-            + "teff_gspphot, logg_gspphot FROM gaiadr3.gaia_source_lite " \
-            + f"WHERE source_id in ({','.join(f'{i:d}' for i in target_sterms[1] if i)})"
-        if job := Gaia.launch_job(AQL):
-            for srow in job.get_results():
-                target_id = target_sterms[0][target_sterms[1] == srow["source_id"]][0]
-                params = { col: srow[scol] for (col, scol) in [("ra", "ra"),
-                                                               ("dec", "dec"),
-                                                               ("parallax", "parallax"),
-                                                               ("parallax_err", "parallax_error"),
-                                                               ("ruwe", "ruwe")]}
-                dal.write_values(target_id, **params)
+        print("\nQuerying Gaia DR3 in batches for coordinates and ruwe data.")
+        gt_index = {g: t for g, t in dal.yield_values("gaia_dr3_id", dal.key_name) if g is not None}
+        for gids in pipeline.grouper(gt_index.keys(), size=20, fillvalue=None):
+            AQL = "SELECT source_id, ra, dec, parallax, parallax_error, ruwe, " \
+                + "teff_gspphot, logg_gspphot FROM gaiadr3.gaia_source_lite " \
+                + f"WHERE source_id in ({','.join(f'{i:d}' for i in gids if i is not None)})"
+            for srow in Gaia.launch_job(AQL).get_results():
+                if (target_id := gt_index.get(srow["source_id"], None)) is not None:
+                    params = { col: srow[scol] for (col, scol) in [("ra", "ra"),
+                                                                ("dec", "dec"),
+                                                                ("parallax", "parallax"),
+                                                                ("parallax_err", "parallax_error"),
+                                                                ("ruwe", "ruwe")]}
+                    dal.write_values(target_id, **params)
 
 
         # Lookup ephemeris information primarily from TESS-ebs
