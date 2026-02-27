@@ -26,6 +26,7 @@ from sed_fit.stellar_grids import get_stellar_grid
 from sed_fit.fitter import create_theta, minimize_fit, mcmc_fit, samples_from_sampler
 
 from libs import pipeline, extinction, plots
+from libs.pipeline import PipelineError
 from libs.sed import get_sed_for_target, group_and_average_fluxes, create_outliers_mask
 from libs.iohelpers import Tee
 from libs.targets import Targets
@@ -106,10 +107,11 @@ if __name__ == "__main__":
 
         for fit_counter, target_id in enumerate(to_fit_target_ids, start=1):
             try:
-                config = targets_config.get(target_id)
                 print("\n\n------------------------------------------------------------")
                 print(f"Processing target {fit_counter} of {to_fit_count}: {target_id}")
                 print("------------------------------------------------------------")
+                config = targets_config.get(target_id)
+                warn_msg = wset.read_values(target_id, "warnings")[0] or ""
                 if args.plot_figs:
                     figs_dir = drop_dir / "figs" / pipeline.to_file_safe_str(target_id)
                     figs_dir.mkdir(parents=True, exist_ok=True)
@@ -125,6 +127,9 @@ if __name__ == "__main__":
                 print()
                 sed = get_sed_for_target(target_id, main_id,
                                          radius=0.1, remove_duplicates=True, verbose=True)
+                if sed is None or len(sed) == 0:
+                    raise PipelineError(target_id, f"No SED observations found for {main_id}")
+
                 sed = group_and_average_fluxes(sed, verbose=True)
 
                 # Filter SED to those covered by our models and also remove any outliers
@@ -158,11 +163,12 @@ if __name__ == "__main__":
                             print(f"Found mean extinction of {len(avs)} catalogue(s): A_V={Av:.6f}")
                             break
 
-                if Av:
+                if Av is not None:
                     print(f"Dereddening observations with A_V={Av:.3f}")
                     sed["sed_der_flux"] = \
                             sed["sed_flux"] / ext_model.extinguish(sed["sed_wl"].to(u.um), Av=Av)
                 else:
+                    warn_msg += "No Av found;"
                     sed["sed_der_flux"] = sed["sed_flux"]
 
 
@@ -269,7 +275,8 @@ if __name__ == "__main__":
 
                 # Finally, store the params and the flag that indicates SED fitting has completed
                 print(f"\nWriting fitted params for {list(write_params.keys())} to working-set.")
-                wset.write_values(target_id, fitted_sed=True, errors="", **write_params)
+                wset.write_values(target_id, fitted_sed=True,
+                                  errors="", warnings=warn_msg, **write_params)
 
 
                 if args.plot_figs:
@@ -288,10 +295,12 @@ if __name__ == "__main__":
 
 
             except Exception as exc: # pylint: disable=broad-exception-caught
-                print(f"{target_id}: Failed with the following exception. Depending on the nature",
-                    "of the failure it may be possible to rerun this module to fit failed targets.")
+                print("\n*** Failed with the following error. Depending on the nature of the",
+                      "error, it may be possible to rerun this module to fit failed targets. ***")
                 traceback.print_exception(exc, file=log)
-                wset.write_values(target_id, fitted_sed=False, errors=type(exc).__name__)
+                wset.write_values(target_id, fitted_sed=False,
+                                  errors=type(exc).__name__, warnings=warn_msg)
+
 
         print("\n\n============================================================")
         print(f"Completed {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")

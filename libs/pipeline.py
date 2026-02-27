@@ -44,6 +44,23 @@ _spt_to_teff_map = {
 _to_file_safe_sub_pattern = re.compile(r"[^\w\d._-]", re.IGNORECASE)
 _spt_find_pattern = re.compile(r"([A-Z]{1}[0-9]*)")
 
+
+class PipelineError(Exception):
+    """ Base class for all custom pipeline runtime exceptions """
+    def __init__(self, target_id: str, *args):
+        """ Initializes a new PipelineError Exception """
+        super().__init__(*args)
+        self._target_id = target_id
+
+    @property
+    def target_id(self) -> str:
+        """ Gets the id of the target """
+        return self._target_id
+
+    def __str__(self):
+        return f"[{self._target_id}] " + super().__str__()
+
+
 def to_file_safe_str(text: str, replacement: str="-", lower: bool=True) -> str:
     """
     Parse the text and replace any potentially troublesome characters when used as a file name.

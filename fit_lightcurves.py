@@ -21,6 +21,7 @@ import matplotlib.pyplot as plt
 from ebop_maven.estimator import Estimator
 
 from libs import pipeline, lightcurves, plots
+from libs.pipeline import PipelineError
 from libs.iohelpers import Tee
 from libs.targets import Targets
 from libs.pipeline_dal import QTableFileDal
@@ -85,10 +86,11 @@ if __name__ == "__main__":
 
         for fit_counter, target_id in enumerate(to_fit_target_ids, start=1):
             try:
-                config = targets_config.get(target_id)
                 print("\n\n------------------------------------------------------------")
                 print(f"Processing target {fit_counter} of {to_fit_count}: {target_id}")
                 print("------------------------------------------------------------")
+                config = targets_config.get(target_id)
+                warn_msg = wset.read_values(target_id, "warnings")[0] or ""
                 if args.plot_figs:
                     figs_dir = drop_dir / "figs" / pipeline.to_file_safe_str(target_id)
                     figs_dir.mkdir(parents=True, exist_ok=True)
@@ -109,6 +111,8 @@ if __name__ == "__main__":
                                                    flux_column=config.flux_column,
                                                    force_mast=False, cache_dir=Path() / ".cache/",
                                                    verbose=True)
+                if lcs is None or len(lcs) == 0:
+                    raise PipelineError(target_id, f"No lightcurves found for {search_term}.")
 
                 # Then filter out any results that are for a different TIC (unlikely but possible).
                 select_mask = np.in1d([l.meta['TARGETID'] for l in lcs],
@@ -123,10 +127,13 @@ if __name__ == "__main__":
                 if len((sectors_flat := config.sectors_flat) or []) > 0:
                     select_mask = np.in1d(lcs.sector, sectors_flat)
                 lcs = lcs[select_mask]
-                print(f"Retained {len(lcs)} lightcurves after applying any configured selections.")
+                if len(lcs) == 0:
+                    raise PipelineError(target_id, "No lightcurves retained after config selection")
 
+                print(f"Retained {len(lcs)} lightcurves after applying any configured selections.")
                 for lc in lcs: # Used downstream in naming LC groups and jktebop fitting files
                     lc.meta["target"] = target_id
+
 
                 print("\nClipping the lightcurves' invalid fluxes, known distorted sections",
                     "& any isolated sections < 2 d in length.")
@@ -165,6 +172,8 @@ if __name__ == "__main__":
                                                                                 ECLIPSE_COMPLETE_TH,
                                                                                 verbose=True)
                 lcs = pipeline.stitch_lightcurve_groups(lcs, sector_groups, verbose=True)
+                if len(lcs) == 0:
+                    raise PipelineError(target_id, "No lightcurves retained after grouping")
 
 
                 # Flatten (optional depending on morph), append delta_mag & delta_mag_err columns
@@ -292,10 +301,9 @@ if __name__ == "__main__":
 
 
                 # Review fitting metadata to check whether any of the fits are suspect.
-                warn_msg = ""
                 warn_ixs = [i for i, fd in enumerate(fitted_param_dicts) if not fd.get("converged")]
                 if len(warn_ixs) > 0:
-                    warn_msg = f"{len(warn_ixs)} LC fit(s) incomplete"
+                    warn_msg += f"{len(warn_ixs)} LC fit(s) incomplete;"
                     print("\n** The fit of the following lightcurve(s) did not converge:",
                           ", ".join(lcs[ix].meta["LABEL"] for ix in warn_ixs))
 
@@ -337,8 +345,8 @@ if __name__ == "__main__":
                 params["TeffR"] = TeffR
                 params["Teff_sys"] = Teff_sys   # These have come from TIC
                 params["logg_sys"] = logg_sys   # and will be used later in SED fitting
-                params["fitted_lcs"] = True
-                wset.write_values(target_id, errors="", warnings=warn_msg, **params)
+                wset.write_values(target_id, fitted_lcs=True,
+                                  errors="", warnings=warn_msg, **params)
 
 
                 if args.plot_figs and fitted_params.size > 1:
@@ -357,10 +365,12 @@ if __name__ == "__main__":
 
 
             except Exception as exc: # pylint: disable=broad-exception-caught
-                print(f"{target_id}: Failed with the following exception. Depending on the nature",
-                    "of the failure it may be possible to rerun this module to fit failed targets.")
+                print("\n*** Failed with the following error. Depending on the nature of the",
+                      "error, it may be possible to rerun this module to fit failed targets. ***")
                 traceback.print_exception(exc, file=log)
-                wset.write_values(target_id, errors=type(exc).__name__)
+                wset.write_values(target_id, fitted_lcs=False,
+                                  errors=type(exc).__name__, warnings=warn_msg)
+
 
         print("\n\n============================================================")
         print(f"Completed {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
