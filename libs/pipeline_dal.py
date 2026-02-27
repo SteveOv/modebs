@@ -93,7 +93,7 @@ class QTableDal(Dal):
     _col_dtype = [
         # SIMBAD and IDs
         ("target_id", "<U14"),
-        ("main_id", "<U20"),
+        ("search_term", "<U20"),
         ("tics", "<U40"),
         ("gaia_dr3_id", int),
         ("spt", "<U20"),
@@ -104,10 +104,6 @@ class QTableDal(Dal):
         ("dec_err", float),
         ("parallax", float),
         ("parallax_err", float),
-        ("G_mag", float),
-        ("V_mag", float),
-        ("BP_mag", float),
-        ("RP_mag", float),
         ("ruwe", float),
         # TESS-ebs
         ("t0", float),
@@ -191,10 +187,6 @@ class QTableDal(Dal):
         "dec_err": _u.deg,
         "parallax": _u.mas,
         "parallax_err": _u.mas,
-        "G_mag": _u.mag,
-        "V_mag": _u.mag,
-        "BP_mag": _u.mag,
-        "RP_mag": _u.mag,
         "period": _u.d,
         "period_err": _u.d,
         "Teff_sys": _u.K,

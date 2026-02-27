@@ -116,8 +116,8 @@ if __name__ == "__main__":
                     figs_dir = drop_dir / "figs" / pipeline.to_file_safe_str(target_id)
                     figs_dir.mkdir(parents=True, exist_ok=True)
 
-                main_id, k, TeffR, Teff_sys, logg_sys, st = wset.read_values(target_id,
-                                        "main_id", "k", "TeffR", "Teff_sys", "logg_sys", "spt")
+                search_term, k, TeffR, Teff_sys, logg_sys = wset.read_values(target_id,
+                                                "search_term", "k", "TeffR", "Teff_sys", "logg_sys")
                 ra, dec, parallax = wset.read_values(target_id, "ra", "dec", "parallax")
                 coords = SkyCoord(ra=nominal_value(ra) * u.deg, dec=nominal_value(dec) * u.deg,
                                   distance=(1000 / nominal_value(parallax)) * u.pc, frame="icrs")
@@ -125,10 +125,10 @@ if __name__ == "__main__":
 
                 # Get the SED for this target and de-duplicate (obs may appear multiple times).
                 print()
-                sed = get_sed_for_target(target_id, main_id,
+                sed = get_sed_for_target(target_id, search_term,
                                          radius=0.1, remove_duplicates=True, verbose=True)
                 if sed is None or len(sed) == 0:
-                    raise PipelineError(target_id, f"No SED observations found for {main_id}")
+                    raise PipelineError(target_id, f"No SED observations found for '{search_term}'")
 
                 sed = group_and_average_fluxes(sed, verbose=True)
 

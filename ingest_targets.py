@@ -59,23 +59,25 @@ if __name__ == "__main__":
               f"which contains {targets_config.count()} target(s) not excluded.")
 
 
-        print("\nSetting up a storage row for each target.")
+        print("\nSetting up a storage row and search_term for each target.")
         for ix, config in enumerate(targets_config.iterate_known_targets()):
             if (target_id := config.target_id).isnumeric():
                 search_term = config.get("search_term", f"TIC {int(target_id):d}")
             else:
-                search_term = config.get("search_term", target_id)
-            dal.write_values(target_id, main_id=search_term, morph=0.5, phiS=0.5,
+                search_term = config.get("search_term", target_id).strip()
+                if not search_term.startswith("TIC"):
+                    search_term = "V* " + search_term
+            dal.write_values(target_id, search_term=search_term, morph=0.5, phiS=0.5,
                              fitted_lcs=False, fitted_sed=False, fitted_masses=False)
 
 
-        # Get the basic published information from SIMBAD. We do batched queries
-        # and code is dependent on SIMBAD returning the rows in the requested order.
+        # Get the basic published information from SIMBAD (keyed on search_term). We do batched
+        # queries and code is dependent on SIMBAD returning the rows in the requested order.
         print("\nQuerying SIMBAD in batches for id, SpT & coordinate data.")
         simbad = Simbad()
         simbad.add_votable_fields("parallax", "sp", "ids")
         id_patt = re.compile(r"(Gaia DR3|V\*|TIC|HD|HIP|2MASS)\s+(.+?(?=\||$))", re.IGNORECASE)
-        st_index = {m: t for m, t in dal.yield_values("main_id", dal.key_name) if m is not None}
+        st_index = {m: t for m, t in dal.yield_values("search_term", dal.key_name) if m is not None}
         for sterms in pipeline.grouper(st_index.keys(), size=20, fillvalue=None):
             # zip strict so we get ValueError if not same len as the sterms
             sterms = [m for m in sterms if m is not None]
@@ -83,7 +85,6 @@ if __name__ == "__main__":
                 target_id = st_index[sterm]
                 ids = np.array(id_patt.findall(srow["ids"]), [("type", "O"), ("id", "O")])
                 params = {
-                    "main_id": srow["main_id"],
                     "tics": "|".join(f"{i}" for i in ids[ids["type"]=="TIC"]["id"]),
                     ** { col: srow[scol] for (col, scol) in [("ra", "ra"),
                                                             ("dec", "dec"),
@@ -97,7 +98,8 @@ if __name__ == "__main__":
                 dal.write_values(target_id, **params)
 
 
-        # Augment the basic information from Gaia DR3 (where target is in DR3)
+        # Augment the basic information from Gaia DR3 (where target is in DR3).
+        # Gaia DR3 queries are keyed on the gaia_dr3_id from above against the source_id field.
         print("\nQuerying Gaia DR3 in batches for coordinates and ruwe data.")
         gt_index = {g: t for g, t in dal.yield_values("gaia_dr3_id", dal.key_name) if g is not None}
         for gids in pipeline.grouper(gt_index.keys(), size=20, fillvalue=None):
@@ -114,8 +116,8 @@ if __name__ == "__main__":
                     dal.write_values(target_id, **params)
 
 
-        # Lookup ephemeris information primarily from TESS-ebs
-        # but also config overrides and estimate eclipse widths if missing
+        # Lookup ephemeris information primarily from TESS-ebs but also config overrides & estimate
+        # eclipse widths if missing. These queries are keyed on numerical part of the TIC.
         print("\nQuerying TESS-ebs for ephemeris data.")
         ephem_keys = ["t0", "period", "morph", "widthP", "depthP", "widthS", "depthS", "phiS"]
         for target_id, tics in dal.yield_values(dal.key_name, "tics"):

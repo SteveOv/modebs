@@ -95,12 +95,9 @@ if __name__ == "__main__":
                     figs_dir = drop_dir / "figs" / pipeline.to_file_safe_str(target_id)
                     figs_dir.mkdir(parents=True, exist_ok=True)
 
-                # Get ids and fix search_term: order of pref is override, target if TIC then main_id
-                main_id, tics = wset.read_values(target_id, "main_id", "tics")
-                search_term = config.get("search_term",
-                                         target_id if target_id.startswith("TIC") else main_id)
 
                 # It's quicker to get LCs once and cache the results than to continue to bother MAST
+                search_term, tics = wset.read_values(target_id, "search_term", "tics")
                 lcs = lightcurves.load_lightcurves(target_id,
                                                    search_term,
                                                    sectors=None,
