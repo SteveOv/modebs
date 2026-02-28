@@ -190,11 +190,11 @@ if __name__ == "__main__":
 
 
                 if args.plot_figs:
-                    print("\nCreating plot of the grouped lightcurves" +
+                    print("\nCreating plot of the prepared and grouped lightcurves" +
                           (" showing the eclipse masks used in flattening." if do_flatten else "."))
                     fig = plots.plot_lightcurves(lcs, "delta_mag", cols=lc_plot_cols,
                                                  ax_func=highlight_mask)
-                    fig.savefig(figs_dir / f"lcs-grouped.{args.figs_type}", dpi=args.figs_dpi)
+                    fig.savefig(figs_dir / f"lcs-prepared.{args.figs_type}", dpi=args.figs_dpi)
                     plt.close(fig)
 
 
@@ -294,8 +294,7 @@ if __name__ == "__main__":
                                                                      task=3,
                                                                      max_workers=8,
                                                                      max_attempts=3,
-                                                                     timeout=900,
-                                                                     file_prefix="fit-lcs")
+                                                                     timeout=900)
 
 
                 # Review fitting metadata to check whether any of the fits are suspect.
@@ -318,23 +317,6 @@ if __name__ == "__main__":
                     for k in read_keys:
                         fitted_params[ix][k] = fitted_param_dicts[ix][k]
 
-
-                write_keys = ["rA_plus_rB","k","J","ecosw","esinw","bP","inc","qphot","L3","LR"]
-                if args.plot_figs and fitted_params.size > 1:
-                    print("\nCreating plot of the scatter in the fitted params, by group.")
-                    xlim = (lcs.sector.min() - 2, lcs.sector.max() + 2)
-                    def median_and_uncertainty(key, ax):
-                        # pylint: disable=cell-var-from-loop, missing-function-docstring
-                        v = summary_params[key]
-                        ax.hlines([v.n], *xlim, "k", "-", lw=1.0, label="median")
-                        ax.axhspan(v.n-v.s, v.n+v.s, color="silver", zorder=-50,label="uncertainty")
-
-                    fig = plots.plot_parameter_scatter(fitted_params, lcs.sector, write_keys,
-                                                       ax_func=median_and_uncertainty, xlim=xlim)
-                    fig.savefig(figs_dir / f"lcs-fitted-params.{args.figs_type}", dpi=args.figs_dpi)
-                    plt.close(fig)
-
-
                 # Summarize the params into single set of values: if there's only 1 LC group use
                 # the predictions directly, otherwise use the predictions' median & 2-sigma of
                 # the scatter for the uncertainty (the sample is relatively small).
@@ -346,18 +328,38 @@ if __name__ == "__main__":
                     summary_params = fitted_params[0]
                     print("Using fitted values and formal error bars from 1 fitted lightcurve.")
 
+
+                write_keys = ["rA_plus_rB","k","J","ecosw","esinw","bP","inc","qphot","L3","LR"]
+                if args.plot_figs and fitted_params.size > 1:
+                    print("\nCreating plot of the scatter in the fitted params, by group.")
+                    xlim = (lcs.sector.min() - 2, lcs.sector.max() + 2)
+                    def median_and_uncertainty(key, ax):
+                        # pylint: disable=cell-var-from-loop, missing-function-docstring
+                        v = summary_params[key]
+                        ax.hlines([v.n], *xlim, "k", "-", lw=1.0, label="median")
+                        ax.axhspan(v.n-v.s, v.n+v.s,color="silver",zorder=-50,label=r"$\pm2\sigma$")
+
+                    fig = plots.plot_parameter_scatter(fitted_params, lcs.sector, write_keys,
+                                                    suptitle=f"Fitted params from {len(lcs)} LC(s)",
+                                                    ax_func=median_and_uncertainty, xlim=xlim,
+                                                    legend_loc="upper right", legend_ncol=2)
+                    fig.savefig(figs_dir / f"lcs-fit-scatter.{args.figs_type}", dpi=args.figs_dpi)
+                    plt.close(fig)
+
+
                 # Where error bars are likely over-optimistic we increase them to a defined minimum
                 if True is True: # Alternatively, a criterion based on a minimum #LCs being reliable
                     min_err_pc = 0.02
-                    print(f"Applying a minimum of {min_err_pc:.0%} to the uncertainties", end="...")
+                    print(f"\nApplying a minimum of {min_err_pc:.0%} to the uncertainties.",end=" ")
                     kup = []
                     for k in summary_params.dtype.names:
                         nom, err = nominal_value(summary_params[k]), std_dev(summary_params[k])
                         if err < (new_err:= abs(nom * min_err_pc)):
                             kup += [k]
                             summary_params[k] = ufloat(nom, new_err)
-                    print(f"revised {', '.join(k for k in kup)}." if len(kup)>0 else "no changes.")
+                    print(f"Revised {', '.join(k for k in kup)}." if len(kup)>0 else "No changes.")
 
+                print(f"\nFitted parameters and uncertainties from {len(lcs)} fitted lightcurve.")
                 print("\n".join(f"{k:>14s}: {summary_params[k]:12.6f}"
                                 for k in read_keys if summary_params[k] is not None))
                 TeffR = (summary_params["LR"] / summary_params["k"]**2)**0.25
