@@ -14,7 +14,7 @@ import astropy.units as u
 
 # pylint: disable=line-too-long, wrong-import-position
 warnings.filterwarnings("ignore", "Using UFloat objects with std_dev==0 may give unexpected results.", category=UserWarning)
-from uncertainties import UFloat, nominal_value
+from uncertainties import ufloat, UFloat, nominal_value, std_dev
 from uncertainties.unumpy import nominal_values
 import matplotlib.pyplot as plt
 
@@ -319,34 +319,7 @@ if __name__ == "__main__":
                         fitted_params[ix][k] = fitted_param_dicts[ix][k]
 
 
-                # Summarize the params into single set of values: if there's only 1 LC group use
-                # the predictions directly, otherwise use the predictions' median & 2-sigma of
-                # the scatter for the uncertainty (the sample is relatively small).
-                print()
-                if fitted_params.size > 1:
-                    summary_params = pipeline.median_params(fitted_params, 0.9545, True)
-                    print(f"Median values & 2-sigma uncertainties from {len(lcs)} fitted groups.")
-                else:
-                    summary_params = fitted_params[0]
-                    print("Fitted values and formal error bars from 1 fitted lightcurve.")
-                print("\n".join(f"{p:>14s}: {summary_params[p]:12.6f}"
-                                for p in read_keys if summary_params[p] is not None))
-                TeffR = (summary_params["LR"] / summary_params["k"]**2)**0.25
-                print(f"    Teff_ratio: {TeffR:12.6f} (calculated from LR & k)")
-
-
-                # Finally, store the params and the flag that indicates LC fitting has completed
-                write_params = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "bP",
-                                "inc", "qphot", "L3", "LR"]
-                print(f"\nWriting fitted params for {write_params} and TeffR to working-set.")
-                params = { k: summary_params[k] for k in write_params }
-                params["TeffR"] = TeffR
-                params["Teff_sys"] = Teff_sys   # These have come from TIC
-                params["logg_sys"] = logg_sys   # and will be used later in SED fitting
-                wset.write_values(target_id, fitted_lcs=True,
-                                  errors="", warnings=warn_msg, **params)
-
-
+                write_keys = ["rA_plus_rB","k","J","ecosw","esinw","bP","inc","qphot","L3","LR"]
                 if args.plot_figs and fitted_params.size > 1:
                     print("\nCreating plot of the scatter in the fitted params, by group.")
                     xlim = (lcs.sector.min() - 2, lcs.sector.max() + 2)
@@ -356,10 +329,50 @@ if __name__ == "__main__":
                         ax.hlines([v.n], *xlim, "k", "-", lw=1.0, label="median")
                         ax.axhspan(v.n-v.s, v.n+v.s, color="silver", zorder=-50,label="uncertainty")
 
-                    fig = plots.plot_parameter_scatter(fitted_params, lcs.sector, write_params,
+                    fig = plots.plot_parameter_scatter(fitted_params, lcs.sector, write_keys,
                                                        ax_func=median_and_uncertainty, xlim=xlim)
                     fig.savefig(figs_dir / f"lcs-fitted-params.{args.figs_type}", dpi=args.figs_dpi)
                     plt.close(fig)
+
+
+                # Summarize the params into single set of values: if there's only 1 LC group use
+                # the predictions directly, otherwise use the predictions' median & 2-sigma of
+                # the scatter for the uncertainty (the sample is relatively small).
+                print()
+                if fitted_params.size > 1:
+                    summary_params = pipeline.median_params(fitted_params, 0.9545, True)
+                    print(f"Using median & 2-sigma uncertainties from {len(lcs)} fitted groups.")
+                else:
+                    summary_params = fitted_params[0]
+                    print("Using fitted values and formal error bars from 1 fitted lightcurve.")
+
+                # Where error bars are likely over-optimistic we increase them to a defined minimum
+                if True is True: # Alternatively, a criterion based on a minimum #LCs being reliable
+                    min_err_pc = 0.02
+                    print(f"Applying a minimum of {min_err_pc:.0%} to the uncertainties", end="...")
+                    kup = []
+                    for k in summary_params.dtype.names:
+                        nom, err = nominal_value(summary_params[k]), std_dev(summary_params[k])
+                        if err < (new_err:= abs(nom * min_err_pc)):
+                            kup += [k]
+                            summary_params[k] = ufloat(nom, new_err)
+                    print(f"revised {', '.join(k for k in kup)}." if len(kup)>0 else "no changes.")
+
+                print("\n".join(f"{k:>14s}: {summary_params[k]:12.6f}"
+                                for k in read_keys if summary_params[k] is not None))
+                TeffR = (summary_params["LR"] / summary_params["k"]**2)**0.25
+                print(f"         TeffR: {TeffR:12.6f} (calculated from LR & k)")
+
+
+                # Finally, store the params and the flag that indicates LC fitting has completed
+                print(f"\nWriting final values for {', '.join(k for k in write_keys)},",
+                      "TeffR, Teff_sys & logg_sys to working-set.")
+                params = { k: summary_params[k] for k in write_keys }
+                params["TeffR"] = TeffR
+                params["Teff_sys"] = Teff_sys   # These have come from TIC
+                params["logg_sys"] = logg_sys   # and will be used later in SED fitting
+                wset.write_values(target_id, fitted_lcs=True,
+                                  errors="", warnings=warn_msg, **params)
 
 
             except Exception as exc: # pylint: disable=broad-exception-caught
