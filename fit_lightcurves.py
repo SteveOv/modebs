@@ -299,11 +299,11 @@ if __name__ == "__main__":
 
 
                 # Review fitting metadata to check whether any of the fits are suspect.
-                warn_ixs = [i for i, fd in enumerate(fitted_param_dicts) if not fd.get("converged")]
-                if len(warn_ixs) > 0:
-                    warn_msg += f"{len(warn_ixs)} LC fit(s) incomplete;"
-                    print("\n** The fit of the following lightcurve(s) did not converge:",
-                          ", ".join(lcs[ix].meta["LABEL"] for ix in warn_ixs))
+                wixs = [i for i, fd in enumerate(fitted_param_dicts) if not fd.get("converged")]
+                if len(wixs) > 0:
+                    warn_msg += f"{len(wixs)}/{len(lcs)} LC fits incomplete;"
+                    print(f"\nWarning: {len(wixs)} of {len(lcs)} LC fit(s) did not converge.",
+                          "Those for", ", ".join(lcs[ix].meta["LABEL"] for ix in wixs))
 
 
                 if args.plot_figs:
