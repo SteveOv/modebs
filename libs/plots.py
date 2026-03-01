@@ -21,8 +21,6 @@ from uncertainties.unumpy import nominal_values, std_devs
 
 from lightkurve import LightCurve as _LC, FoldedLightCurve as _FLC, LightCurveCollection as _LCC
 
-from deblib import vmath
-
 from sed_fit.stellar_grids import StellarGrid
 from sed_fit.fitter import model_func, iterate_theta
 
@@ -327,23 +325,31 @@ def plot_mass_radius_diagram(masses: ArrayLike,
         raise ValueError("labels do not match the masses or radii")
 
     fig, ax = plt.subplots(1, 1, figsize=(6, 4), constrained_layout=True)
-    ax.set(xlabel= r"$\log{(M\,/\,{\rm M_{\odot}})}$", xscale="linear", xlim=(-1, 1.5),
-           ylabel=r"$\log{(R\,/\,{\rm R_{\odot}})}$", yscale="linear", ylim=(-1, 1.5))
-
-    log_masses = vmath.log10(masses)
-    log_radii = vmath.log10(radii)
     labels = labels or [None] * masses.shape[0]
-    for ix, (mass_vals, rad_vals, label) in enumerate(zip(log_masses, log_radii, labels)):
+    for ix, (mass_vals, rad_vals, label) in enumerate(zip(masses, radii, labels)):
         ax.errorbar(x=nominal_values(mass_vals), xerr=std_devs(mass_vals),
                     y=nominal_values(rad_vals), yerr=std_devs(rad_vals),
-                    fmt="o", ms=5, markeredgewidth=1.5, fillstyle="full", zorder=-ix, label=label)
+                    fmt="o", ms=4, markeredgewidth=1, fillstyle="full", zorder=-ix, label=label)
+
+    xlim = (min(0.1, max(ax.get_xlim()[0]*0.9, 1e-3)), max(20, ax.get_xlim()[1]*1.1))
+    ylim = (min(0.1, max(ax.get_ylim()[0]*0.9, 1e-3)), max(20, ax.get_ylim()[1]*1.1))
+    ax.set(xlabel= r"$\log{(M\,/\,{\rm M_{\odot}})}$", xscale="log", xlim=xlim,
+           ylabel=r"$\log{(R\,/\,{\rm R_{\odot}})}$", yscale="log", ylim=ylim)
+
+    xticks = [x for x in [-2, -1, 0, 1, 2, 3] if min(xlim) < 10**x < max(xlim)]
+    ax.set_xticks([10**x for x in xticks], minor=False)
+    ax.set_xticklabels(xticks, minor=False)
+
+    yticks = [y for y in [-2, -1, 0, 1, 2, 3] if min(ylim) < 10**y < max(ylim)]
+    ax.set_yticks([10**y for y in yticks], minor=False)
+    ax.set_yticklabels(yticks, minor=False)
 
     if plot_zams:
         zams = _get_solar_isochrone_eep_values(eep=202, phase=0.0, cols=["star_mass", "log_R"])
         zmass = np.linspace(zams[0].min(), zams[0].max(), 250)
         zsort = np.argsort(zams[0])
         zrad = make_interp_spline(zams[0, zsort], zams[1, zsort], k=1)(zmass) # smoothing
-        ax.plot(vmath.log10(zmass), zrad, ls="--", lw=1, c="k", zorder=-100, alpha=.5, label="ZAMS")
+        ax.plot(zmass, 10**zrad, ls="--", lw=1, c="k", zorder=-100, alpha=.5, label="ZAMS")
 
     format_axes(ax, **format_kwargs)
     return fig
@@ -372,26 +378,34 @@ def plot_hr_diagram(teffs: ArrayLike,
         raise ValueError("labels do not match the teffs or luminosities")
 
     fig, ax = plt.subplots(1, 1, figsize=(6, 4), constrained_layout=True)
-    ax.set(xlabel=r"$\log{(T_{\rm eff}\,/\,{\rm K})}$", xscale="linear", xlim=(3.35, 4.45),
-           ylabel=r"$\log{(L\,/\,{\rm L_{\odot}})}$", yscale="linear", ylim=(-2.6, 4.5))
-
-    log_teffs = vmath.log10(teffs)
-    log_lums = vmath.log10(luminosities)
-
     labels = labels or [None] * teffs.shape[0]
-    for ix, (teff_vals, lum_vals, label) in enumerate(zip(log_teffs, log_lums, labels)):
+    for ix, (teff_vals, lum_vals, label) in enumerate(zip(teffs, luminosities, labels)):
         ax.errorbar(x=nominal_values(teff_vals), xerr=std_devs(teff_vals),
                     y=nominal_values(lum_vals), yerr=std_devs(lum_vals),
-                    fmt="o", ms=5, markeredgewidth=1.5, fillstyle="full", zorder=-ix, label=label)
+                    fmt="o", ms=4, markeredgewidth=1, fillstyle="full", zorder=-ix, label=label)
+
+    xlim = (min(3000, max(ax.get_xlim()[0]*0.9, 1e-3)), max(20000, ax.get_xlim()[1]*1.1))
+    ylim = (min(0.1, max(ax.get_ylim()[0]*0.9, 1e-3)), max(20, ax.get_ylim()[1]*1.1))
+    ax.set(xlabel=r"$\log{(T_{\rm eff}\,/\,{\rm K})}$", xscale="log", xlim=xlim,
+           ylabel=r"$\log{(L\,/\,{\rm L_{\odot}})}$", yscale="log", ylim=ylim)
+
+    xticks = [x for x in [3.2, 3.4, 3.6, 3.8, 4.0, 4.2, 4.4, 4.6, 4.8] if min(xlim)<10**x<max(xlim)]
+    ax.set_xticks([10**x for x in xticks], minor=False)
+    ax.set_xticklabels(xticks, minor=False)
+
+    yticks = [y for y in [-3, -2, -1, 0, 1, 2, 3, 4, 5] if min(ylim)<10**y<max(ylim)]
+    ax.set_yticks([10**y for y in yticks], minor=False)
+    ax.set_yticklabels(yticks, minor=False)
 
     if plot_zams:
         zams = _get_solar_isochrone_eep_values(eep=202, phase=0.0, cols=["log_Teff", "log_L"])
         zteff = np.linspace(zams[0].min(), zams[0].max(), 250)
         zsort = np.argsort(zams[0])
         zlum = make_interp_spline(zams[0, zsort], zams[1, zsort], k=1)(zteff) # smoothing
-        ax.plot(zteff, zlum, ls="--", lw=1, c="k", zorder=-100, alpha=0.5, label="ZAMS")
+        ax.plot(10**zteff, 10**zlum, ls="--", lw=1, c="k", zorder=-100, alpha=0.5, label="ZAMS")
 
     format_axes(ax, **format_kwargs)
+    ax.tick_params(axis="x", which="minor", top=False, bottom=False, labelbottom=False)
     return fig
 
 
