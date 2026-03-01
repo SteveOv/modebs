@@ -142,6 +142,7 @@ def plot_lightcurves(lcs: Union[_LCC, _LC, _FLC],
         ax_titles = [lc.meta.get(ax_titles, ax_titles) for lc in lcs]
 
     # Set up the figure and Axes
+    cols = min(cols, len(lcs))
     rows = int(np.ceil(count_lcs / cols))
     fig, axes = plt.subplots(rows, cols, figsize=(4*cols, 3*rows),
                              sharey=True, constrained_layout=True)
