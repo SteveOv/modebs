@@ -183,6 +183,70 @@ def plot_lightcurve_on_axes(ax: _Axes, lc: Union[_LC, _FLC],
             ax.set_ylabel("differential magnitude [mag]")
 
 
+def plot_lightcurve_fits_and_residuals(out_files: List[Path],
+                                       wrap_phase: Union[float, u.Quantity]=1,
+                                       ax_titles: Union[str, ArrayLike]=None,
+                                       cols: int=2) -> _Figure:
+    """
+    Will plot a matplotlib fig with pairs of axes showing the fits above and residuals below based
+    on reading the data from the JKTEBOP "out" file given by each of the out_files passed in.
+
+    :out_files: the path of the  JKTEBOP out files to read from
+    :wrap_phase: the phase above which to wrap the plot to control the positioning of the eclipses
+    :ax_titles: the titles to apply above each pair of fit & residual axes
+    :cols: the maximum number of axes columns for the figure
+    """
+    if ax_titles is None or isinstance(ax_titles, str):
+        ax_titles = [ax_titles] * len(out_files)
+    elif len(ax_titles) != len(out_files):
+        raise ValueError("titles as a list/array must be the same length as out_files")
+    if isinstance(wrap_phase, u.Quantity):
+        wrap_phase = wrap_phase.value
+
+    cols = min(cols, len(out_files))
+    rows = int(np.ceil(len(out_files) / cols))
+    fig, axes = plt.subplots(rows*2, cols, figsize=(4*cols, 3.5*rows),
+                             height_ratios=(3, 1)*rows, constrained_layout=True)
+
+    for ix in range(axes.size//2):
+        row, col = int(np.floor(ix / cols) * 2), ix % cols
+        if len(axes.shape) == 1: # If cols == 1 then we may not get axes with the second dimension
+            ax_lc, ax_res = axes[row], axes[row+1]
+        else:
+            ax_lc, ax_res = axes[row, col], axes[row+1, col]
+
+        if ix < len(out_files):
+            # Pick columns so they are ordered [phase, lc_mag, model_mag, residual]
+            out_data = np.loadtxt(fname=out_files[ix], dtype=float, comments="#",
+                                  usecols=[3, 1, 4, 5], unpack=True)
+            out_data[0][out_data[0] > wrap_phase] -= 1.
+
+            ax_lc.scatter(out_data[0], out_data[1], s=2.0, marker=".", label=None)
+            ax_lc.scatter(out_data[0], out_data[2], s=0.5, c="k", marker=".", label=None)
+            ax_res.scatter(out_data[0], out_data[3], s=2.0, marker=".", label=None)
+            ax_res.hlines([0.0], min(out_data[0]), max(out_data[0]), ls="-", color="k", lw=.5)
+
+            if ix == 0:
+                ax_lc.invert_yaxis()
+                ax_res.invert_yaxis()
+            else:
+                ax_lc.sharey(axes[0, 0])
+                ax_res.sharey(axes[1, 0])
+
+            # Hides tick labels on inner facing shared axes
+            plt.setp(ax_lc.get_xticklabels(), visible=False)
+            if col > 0:
+                plt.setp(ax_lc.get_yticklabels(), visible=False)
+                plt.setp(ax_res.get_yticklabels(), visible=False)
+            format_axes(ax_lc, title=ax_titles[ix],
+                        ylabel="" if ix % cols else "Relative magnitude [mag]")
+            format_axes(ax_res, ylabel="" if ix % cols else "Residual")
+        else:
+            ax_lc.axis("off")
+            ax_res.axis("off")
+    return fig
+
+
 def plot_sed(x: u.Quantity,
              fluxes: List[u.Quantity],
              flux_errs: List[u.Quantity]=None,

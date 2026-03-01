@@ -306,8 +306,13 @@ if __name__ == "__main__":
 
 
                 if args.plot_figs:
-                    # TODO: fit & residuals plot
-                    pass
+                    print("\nCreating a plot of the fit and residual of each lightcurve.")
+                    out_files = [fitted_param_dicts[ix]["out_fname"] for ix in range(len(lcs))]
+                    ax_titles = [lcs[ix].meta["LABEL"] for ix in range(len(lcs))]
+                    fig = plots.plot_lightcurve_fits_and_residuals(out_files, wrap_phase,
+                                                                   ax_titles, lc_plot_cols)
+                    fig.savefig(figs_dir / f"lcs-fit-residual.{args.figs_type}", dpi=args.figs_dpi)
+                    plt.close(fig)
 
 
                 # Get the results into a structured array format
@@ -331,7 +336,7 @@ if __name__ == "__main__":
 
                 write_keys = ["rA_plus_rB","k","J","ecosw","esinw","bP","inc","qphot","L3","LR"]
                 if args.plot_figs and fitted_params.size > 1:
-                    print("\nCreating plot of the scatter in the fitted params, by group.")
+                    print("\nCreating plot of the scatter in the fitted params, by lightcurve.")
                     xlim = (lcs.sector.min() - 2, lcs.sector.max() + 2)
                     def median_and_uncertainty(key, ax):
                         # pylint: disable=cell-var-from-loop, missing-function-docstring
