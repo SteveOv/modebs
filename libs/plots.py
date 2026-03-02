@@ -291,12 +291,12 @@ def plot_sed(x: u.Quantity,
     for flux, flux_err, fmt, label in zip(fluxes, flux_errs, fmts, labels):
         vfv, vfv_err = None, None
         if flux is not None:
-            if flux.unit.is_equivalent(vfv_unit):
-                vfv = flux.to(vfv_unit).to(vfv_unit , equivalencies=u.spectral_density(freq))
+            if flux.unit.is_equivalent(vfv_unit, equivalencies=u.spectral_density(freq)):
+                vfv = flux.to(vfv_unit , equivalencies=u.spectral_density(freq))
             else:
                 vfv = (flux * freq).to(vfv_unit , equivalencies=u.spectral_density(freq))
         if flux_err is not None:
-            if flux_err.unit.is_equivalent(vfv_unit):
+            if flux_err.unit.is_equivalent(vfv_unit, equivalencies=u.spectral_density(freq)):
                 vfv_err = flux_err.to(vfv_unit , equivalencies=u.spectral_density(freq))
             else:
                 vfv_err = (freq * flux_err).to(vfv_unit, equivalencies=u.spectral_density(freq))
@@ -304,8 +304,8 @@ def plot_sed(x: u.Quantity,
         if vfv is not None:
             ax.errorbar(lam, vfv, vfv_err, fmt=fmt, alpha=0.5, label=label)
 
-    ax.set(xscale="log", xlabel=f"Wavelength [{u.um:latex_inline}]",
-           yscale="log", ylabel=f"${{\\rm \\nu F(\\nu)}}$ [{u.W/u.m**2:latex_inline}]")
+    ax.set(xscale="log", xlabel=f"Wavelength [{lam.unit:latex_inline}]",
+           yscale="log", ylabel=f"$\\nu {{\\rm F}}(\\nu)$ [{vfv_unit:latex_inline}]")
     ax.grid(True, which="both", axis="both", alpha=0.33, color="lightgray")
     legend_loc = "best" if labels is not None and any(l is not None for l in labels) else None
     format_axes(ax, legend_loc=legend_loc, **format_kwargs)
