@@ -152,7 +152,7 @@ if __name__ == "__main__":
                 # Deredden the SED
                 print()
                 print(f"Locating extinction data based on {target_id} {coords}".replace("\n", ""))
-                if (Av := config.get("Av", None)) is None:
+                if (Av := config.get("Av", config.get("EB_V", 0) * ext_model.Rv)) == 0:
                     # Get the mean of the various catalogues, prioritising converged results
                     efunc = ["get_gontcharov_ebv", "get_bayestar_ebv"]
                     for conv in [True, False]:
@@ -163,7 +163,7 @@ if __name__ == "__main__":
                             print(f"Found mean extinction of {len(avs)} catalogue(s): A_V={Av:.6f}")
                             break
 
-                if Av is not None:
+                if Av:
                     print(f"Dereddening observations with A_V={Av:.3f}")
                     sed["sed_der_flux"] = \
                             sed["sed_flux"] / ext_model.extinguish(sed["sed_wl"].to(u.um), Av=Av)
