@@ -5,6 +5,7 @@ Low level utility functions for light curve ingest, pre-processing, estimation a
 from typing import Tuple, List, Callable, Generator
 import inspect
 from functools import lru_cache
+import traceback
 
 from requests.exceptions import HTTPError
 import numpy as np
@@ -49,15 +50,27 @@ def get_ebv(target_coords: SkyCoord,
                     break
 
         if isinstance(func, Callable):
-            val, flags = func(target_coords)
-            if val is not None and not np.isnan(val):
-                if verbose:
-                    print(f"{func.__name__}={val:.3f} [converged={flags.get('converged',False)}]")
-                if flags.get("type", "").lower() == "av" \
-                    or func.__name__.lower().endswith("_av"):
-                    val /= rv
-                flags["source"] = func.__name__
-                yield val, flags
+            fname = func.__name__
+            for attempt in range(2):
+                try:
+                    val, flags = func(target_coords)
+                    if val is not None and not np.isnan(val):
+                        if verbose:
+                            print(f"{fname} = {val:.6f} [converged={flags.get('converged',False)}]")
+                        if flags.get("type", "").lower() == "av" or fname.lower().endswith("_av"):
+                            val /= rv
+                        flags["source"] = fname
+                        yield val, flags
+                    elif verbose:
+                        print(f"{fname} = No data")
+                    break
+
+                except Exception as exc: # pylint: disable=broad-exception-caught
+                    if not isinstance(exc, HTTPError) or attempt > 0:
+                        print(f"Caught a {type(exc).__name__} when calling {fname}. Moving on.")
+                        traceback.print_exception(exc)
+                        break
+                    print(f"Caught a {type(exc).__name__} when calling {fname}. Trying again.")
 
 
 def get_av(target_coords: SkyCoord,
@@ -77,31 +90,8 @@ def get_av(target_coords: SkyCoord,
     :rv: the R_V value to use if it is necessary to convert E(B-V) values to A_V
     :verbose: whether or not to print progress/diagnostics to stdout
     """
-    if funcs is None:
-        funcs = [get_bayestar_ebv, get_vergely_av, get_gontcharov_ebv]
-    if isinstance(funcs, str | Callable):
-        funcs = [funcs]
-
-    for func in funcs:
-        if isinstance(func, str):
-            # Find the matching function in this module
-            # TODO: can this be more efficient? Also perhaps better validation of func signature
-            for name, member_func in inspect.getmembers(inspect.getmodule(get_av),
-                                                        lambda m: isinstance(m, Callable)):
-                if func in name:
-                    func = member_func
-                    break
-
-        if isinstance(func, Callable):
-            val, flags = func(target_coords)
-            if val is not None and not np.isnan(val):
-                if verbose:
-                    print(f"{func.__name__}={val:.3f} [converged={flags.get('converged',False)}]")
-                if flags.get("type", "").lower() == "E(B-V)" \
-                    or func.__name__.lower().endswith("_ebv"):
-                    val *= rv
-                flags["source"] = func.__name__
-                yield val, flags
+    for val, flags in get_ebv(target_coords, funcs, rv, verbose):
+        yield val * rv, flags
 
 
 def get_bayestar_ebv(target_coords: SkyCoord,
@@ -125,16 +115,11 @@ def get_bayestar_ebv(target_coords: SkyCoord,
     return conversion_factor * val, flags_dict
 
 @lru_cache
-def _get_bayestar_query(version: str):
+def _get_bayestar_query(version: str) -> bayestar.BayestarQuery:
     """ Gets a Bayestar query object. This function is cached as it's an expensive setup. """
-    try:
-        # Creates/confirms local cache of Bayestar data within the .cache directory
-        config.config['data_dir'] = '.cache/.dustmapsrc'
-        bayestar.fetch(version=version)
-    except HTTPError as exc:
-        print(f"Unable to (re)fetch data for {version}. Caught error '{exc}'")
-    except ValueError as exc:
-        print(f"Unable to parse response for {version}. Caught error '{exc}'")
+    # Creates/confirms local cache of Bayestar data within the .cache directory
+    config.config['data_dir'] = '.cache/.dustmapsrc'
+    bayestar.fetch(version=version)
 
     # Now we can use the local cache for the lookup - this takes some time to set up
     return bayestar.BayestarQuery(version=version)
