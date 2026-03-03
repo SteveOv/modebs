@@ -151,16 +151,18 @@ if __name__ == "__main__":
 
                 # Deredden the SED
                 print()
-                print(f"Locating extinction data based on {target_id} {coords}".replace("\n", ""))
-                if (Av := config.get("Av", config.get("EB_V", 0) * ext_model.Rv)) == 0:
+                if (Av := config.get("A_V", config.get("E(B-V)", 0) * ext_model.Rv)) > 0:
+                    print(f"Found extinction override in target config giving A_V={Av:.6f}")
+                else:
                     # Get the mean of the various catalogues, prioritising converged results
-                    efunc = ["get_gontcharov_av", "get_bayestar_ebv"]
+                    print(f"Getting extinction data based on {target_id} {coords}".replace("\n",""))
                     for conv in [True, False]:
-                        avs = [v for v,flags in extinction.get_av(coords, efunc, ext_model.Rv, True)
-                                    if flags.get("converged", False) == conv]
+                        avs = [v for v, flags
+                                    in extinction.get_av(coords, rv=ext_model.Rv, verbose=True)
+                                        if flags.get("converged", False) == conv]
                         if len(avs):
                             Av = np.mean(avs)
-                            print(f"Found mean extinction of {len(avs)} catalogue(s): A_V={Av:.6f}")
+                            print(f"Using mean extinction of {len(avs)} catalogue(s): A_V={Av:.6f}")
                             break
 
                 if Av:
