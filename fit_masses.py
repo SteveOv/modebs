@@ -55,7 +55,7 @@ if __name__ == "__main__":
     ap.add_argument("-ms", "--max-steps", dest="max_mcmc_steps", type=int, required=False,
                     help="the maximum number of MCMC steps to run for [100 000]")
     ap.set_defaults(plot_figs=False, figs_type="png", figs_dpi=100,
-                    max_mcmc_steps=100000, mcmc_walkers=100, mcmc_thin_by=10, mcmc_processes=8)
+                    max_mcmc_steps=100000, mcmc_walkers=100, mcmc_thin_by=10, mcmc_processes=5)
     args = ap.parse_args()
     drop_dir = Path.cwd() / f"drop/{args.targets_file.stem}"
     args.working_set_file = drop_dir / "working-set.table"
