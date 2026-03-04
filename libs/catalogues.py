@@ -127,9 +127,9 @@ def query_tess_ebs_in_sh(tics: List[Union[int, str]]) -> dict:
                 "ecosw": row["ecosw"],
                 "esinw": row["esinw"],
                 "inc": row["inc"],
-                "light_ratio": row["fp"],
-                "TeffA": row["Teff1"],
-                "TeffB": row["Teff2"]
+                "LR": row["fp"],
+                "TeffA": float(row["Teff1"]),
+                "TeffB": float(row["Teff2"])
             }
 
             # We have a match to a TIC number

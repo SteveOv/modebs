@@ -2,14 +2,14 @@
 # pylint: disable=no-member
 from inspect import getsourcefile
 from pathlib import Path
-import warnings
 import sys
 import json
 import argparse
 
 import numpy as np
-
 from mocpy import MOC
+
+from libs import catalogues
 
 THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 
@@ -85,14 +85,23 @@ if __name__ == "__main__":
                   "Phip-pf", "Phis-pf", "Wp-pf", "Ws-pf", "Dp-pf", "Ds-pf"]
     target_configs = targets_config["target_configs"]
     for ix, row in enumerate(all_tebs_lops[tebs_mask], start=0):
-        print(f"Target {ix+1}/{num_matching_rows}: {row['TIC']}")
-        target_configs[f"TIC {int(row['TIC']):d}"] = {
+        tic = int(row["TIC"])
+        print(f"Target {ix+1}/{num_matching_rows}: {tic}")
+        target_config = {
             "details": "",
             "notes": "",
             "TESS-ebs": ", ".join(k + ": " + tess_ebs_field_to_str(row, k) for k in notes_keys),
             "why-include": f"morph = {tess_ebs_field_to_str(row, 'Morph')} " \
                             + f"& min(Dp) = {min_ecl_depth[tebs_mask][ix]:.3f}"
         }
+
+        # Capture any known values for these targets
+        labels_dict = catalogues.query_tess_ebs_in_sh(tic)
+        if labels_dict:
+            target_config["labels"] = { "source": "JustesenAlbrecht21apj" }
+            target_config["labels"] |= { k: labels_dict[k] for k in labels_dict }
+
+        target_configs[f"TIC {tic:d}"] = target_config
 
 
     # Finally, save the dictionary as a formatted JSON file
