@@ -18,13 +18,14 @@ from dustmaps import config, bayestar           # Bayestar dustmaps/dereddening 
 from pyvo import registry, DALServiceError      # Vergeley at al. extinction catalogue
 
 
-def get_av(target_coords: SkyCoord,
-           funcs: List[str]=None,
-           rv: float=3.1,
-           verbose: bool=False) -> Generator[Tuple[float, dict], any, any]:
+def iterate(target_coords: SkyCoord,
+                     funcs: List[str]=None,
+                     rv: float=3.1,
+                     yield_ebv: bool=False,
+                     verbose: bool=False) -> Generator[Tuple[float, bool], None, None]:
     """
-    A convenience function which iterates through the requested extinction lookup functions,
-    published on this module, yielding the A_V extinction value and flags returned by each.
+    Iterates through calls to the requested extinction lookup functions, published on this
+    module, yielding a coefficient and reliability flag for each where a value available.
 
     If no funcs specified the following list will be used, in the order shown:
     [get_gontcharov_av, get_bayestar_ebv]
@@ -32,59 +33,10 @@ def get_av(target_coords: SkyCoord,
     :target_coords: the SkyCoords to get the extinction value for
     :funcs: optional list of functions to iterate over, either by name of function object.
     These must be callable as func(coords: SkyCoord) -> (value: float, flags: Dict)
-    :rv: the R_V value to use if it is necessary to convert Av values to E(B-V)
+    :rv: the R_V value to use if it is necessary to convert between Av and E(B-V) values
+    :yield_ebv: whether to yield E(B-V) (True) or A_V (False) values
     :verbose: whether or not to print progress/diagnostics to stdout
-    """
-    for val, flags in _get_extinction(target_coords, funcs, verbose):
-        source = flags.get("source", "")
-        if flags.get("type", "").lower() == "e(b-v)" or source.lower().endswith("_ebv"):
-            val *= rv
-            flags["type"] = "A_V"
-        if verbose:
-            print(f"{source}: A_V = {val:.6f} [converged={flags.get('converged', False)}]")
-        yield val, flags
-
-
-def get_ebv(target_coords: SkyCoord,
-            funcs: List[str]=None,
-            rv: float=3.1,
-            verbose: bool=False) -> Generator[Tuple[float, dict], any, any]:
-    """
-    A convenience function which iterates through the requested extinction lookup functions,
-    published on this module, yielding the E(B-V) extinction value and flags returned by each.
-
-    If no funcs specified the following list will be used, in the order shown:
-    [get_gontcharov_av, get_bayestar_ebv]
-
-    :target_coords: the SkyCoords to get the extinction value for
-    :funcs: optional list of functions to iterate over, either by name of function object.
-    These must be callable as func(coords: SkyCoord) -> (value: float, flags: Dict)
-    :rv: the R_V value to use if it is necessary to convert E(B-V) values to A_V
-    :verbose: whether or not to print progress/diagnostics to stdout
-    """
-    for val, flags in _get_extinction(target_coords, funcs, verbose):
-        source = flags.get("source", "")
-        if flags.get("type", "").lower() == "av" or source.lower().endswith("_av"):
-            val /= rv
-            flags["type"] = "E(B-V)"
-        if verbose:
-            print(f"{source}: E(B-V) = {val:.6f} [converged={flags.get('converged', False)}]")
-        yield val, flags
-
-
-def _get_extinction(target_coords: SkyCoord,
-                    funcs: List[str]=None,
-                    verbose: bool=False) -> Generator[Tuple[float, dict], any, any]:
-    """
-    Iterates through calls to the requested extinction lookup functions,
-    published on this module, yielding the value and flags returned by each.
-
-    If no funcs specified the following list will be used, in the order shown:
-    [get_gontcharov_av, get_bayestar_ebv]
-
-    :target_coords: the SkyCoords to get the extinction value for
-    :funcs: optional list of functions to iterate over, either by name of function object.
-    :verbose: whether or not to print progress/diagnostics to stdout
+    :returns: Generator yielding the chosen value (when found) and a flag indicating its reliability
     """
     if funcs is None:
         funcs = [get_gontcharov_av, get_bayestar_ebv] #, get_vergely_av]
@@ -95,7 +47,7 @@ def _get_extinction(target_coords: SkyCoord,
         if isinstance(func, str):
             # Find the matching function in this module
             # TODO: can this be more efficient? Also perhaps better validation of func signature
-            for name, member_func in inspect.getmembers(inspect.getmodule(get_av),
+            for name, member_func in inspect.getmembers(inspect.getmodule(iterate),
                                                         lambda m: isinstance(m, Callable)):
                 if func in name:
                     func = member_func
@@ -105,10 +57,16 @@ def _get_extinction(target_coords: SkyCoord,
             fname = func.__name__
             for attempt in range(2):
                 try:
-                    val, flags = func(target_coords)
+                    val, reliable = func(target_coords)
                     if val is not None and not np.isnan(val):
-                        flags["source"] = fname
-                        yield val, flags
+                        if yield_ebv and fname.lower().endswith("_av"):
+                            val /= rv
+                        elif not yield_ebv and fname.lower().endswith("_ebv"):
+                            val *= rv
+                        if verbose:
+                            print(f"{fname}:", "E(B-V)" if yield_ebv else "A_V", f"= {val:.6f}",
+                                  "(reliable)" if reliable else "")
+                        yield val, reliable
                     elif verbose:
                         print(f"{fname}: None")
                     break
@@ -125,7 +83,7 @@ def _get_extinction(target_coords: SkyCoord,
 
 def get_bayestar_ebv(target_coords: SkyCoord,
                      version: str="bayestar2019",
-                     conversion_factor: float=0.996) -> Tuple[float, dict]:
+                     conversion_factor: float=0.996) -> Tuple[float, bool]:
     """
     Queries the Bayestar dereddening map for the E(B-V) value for the target coordinates.
 
@@ -135,13 +93,12 @@ def get_bayestar_ebv(target_coords: SkyCoord,
     :target_coords: the astropy SkyCoords to query for
     :version: the version of the Bayestar dust maps to use
     :conversion_factor: the factor to apply to bayestar extinction for E(B-V)
-    :returns: tuple of the E(B-V) value and a dict of the diagnostic flags associated with the query
+    :returns: tuple of the E(B-V) value and a flags indicating whether it is reliable
     """
     query = _get_bayestar_query(version)
-    val, flags =  query(target_coords, mode='median', return_flags=True)
-    flags_dict = { n: flags[n] for n in flags.dtype.names }
-    flags_dict["type"] = "E(B-V)"
-    return conversion_factor * val, flags_dict
+    val, flags =  query(target_coords, mode="best", return_flags=True)
+    reliable = all(k in flags.dtype.names and flags[k] for k in ["converged", "reliable_dist"])
+    return conversion_factor * val, reliable
 
 @lru_cache
 def _get_bayestar_query(version: str) -> bayestar.BayestarQuery:
@@ -154,7 +111,7 @@ def _get_bayestar_query(version: str) -> bayestar.BayestarQuery:
     return bayestar.BayestarQuery(version=version)
 
 
-def get_gontcharov_av(target_coords: SkyCoord):
+def get_gontcharov_av(target_coords: SkyCoord) -> Tuple[float, bool]:
     """
     Queries the Gontcharov (2017) [2017AstL...43..472G] 3-d extinction map
     for the A_V value of the target coordinates.
@@ -166,7 +123,7 @@ def get_gontcharov_av(target_coords: SkyCoord):
     :target_coords: the astropy SkyCoords to query for   
     :returns: tuple of the A_V value and a dict of the diagnostic flags associated with the query
     """
-    ret_val, flags = None, { }
+    ret_val, reliable = None, False
     interp = _get_gontcharov_interp("Av")
     gal_xyz_coords = target_coords.transform_to("galactic").cartesian.xyz.value
 
@@ -174,9 +131,8 @@ def get_gontcharov_av(target_coords: SkyCoord):
     points = interp.y
     if all(points[..., d].min() < gal_xyz_coords[d] < points[..., d].max() for d in range(3)):
         ret_val = interp(np.expand_dims(gal_xyz_coords, axis=0))[0]
-        flags["converged"] = True
-        flags["type"] = "A_V"
-    return ret_val, flags
+        reliable = True
+    return ret_val, reliable
 
 @lru_cache
 def _get_gontcharov_interp(interp_field: str="Av"):
@@ -195,7 +151,7 @@ def _get_gontcharov_interp(interp_field: str="Av"):
     return RBFInterpolator(points, cat[interp_field].value, neighbors=3**points.shape[1])
 
 
-def get_vergely_av(target_coords: SkyCoord):
+def get_vergely_av(target_coords: SkyCoord) -> Tuple[float, bool]:
     """
     Queries the Vergely, Lallement & Cox (2022) [2022A&A...664A.174V] 3-d extinction map
     for the Av value of the target coordinates.
@@ -203,10 +159,9 @@ def get_vergely_av(target_coords: SkyCoord):
     TODO: this needs further work
 
     :target_coords: the astropy SkyCoords to query for   
-    :returns: the Av value
+    :returns: tuple of the A_V value and a flags indicating whether it is reliable
     """
-    av = None
-    flags = { "converged": False } # mimics Bayestar - will set true if we get a good match
+    av, reliable = None, False
     try:
         # Extinction map of Vergely, Lallement & Cox (2022)
         ivoid = 'ivo://CDS.VizieR/J/A+A/664/A174'
@@ -222,9 +177,8 @@ def get_vergely_av(target_coords: SkyCoord):
                 # TODO: anything extra to map these values to Av?
                 ext_nmag_per_pc = rec["Exti"][0] # nmag
                 av = (ext_nmag_per_pc * target_coords.distance.to(u.pc).value) / 10**9
-                flags['converged'] = True
-                flags["type"] = "A_V"
+                reliable = False
                 break
     except DALServiceError as exc:
         print(f"Failed to query: {exc}")
-    return av, flags
+    return av, reliable

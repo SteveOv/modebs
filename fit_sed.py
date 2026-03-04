@@ -154,23 +154,24 @@ if __name__ == "__main__":
                 if (Av := config.get("A_V", config.get("E(B-V)", 0) * ext_model.Rv)) > 0:
                     print(f"Found extinction override in target config giving A_V={Av:.6f}")
                 else:
-                    # Get the mean of the various catalogues, prioritising converged results
+                    # Get the mean of the various catalogues, prioritising reliable results
                     print(f"Getting extinction data based on {target_id} {coords}".replace("\n",""))
-                    for conv in [True, False]:
-                        avs = [v for v, flags
-                                    in extinction.get_av(coords, rv=ext_model.Rv, verbose=True)
-                                        if flags.get("converged", False) == conv]
-                        if len(avs):
-                            Av = np.mean(avs)
-                            print(f"Using mean extinction of {len(avs)} catalogue(s): A_V={Av:.6f}")
-                            break
+                    avs = np.array([*extinction.iterate(coords, rv=ext_model.Rv, verbose=True)]).T
+                    if any(rmask := np.array(avs[1], dtype=bool)):
+                        # We have some reliable extinction values, use only these
+                        Av = np.mean(avs[0][rmask])
+                        print(f"Using the mean of {sum(rmask)} reliable value(s): A_V={Av:.6f}")
+                    else:
+                        Av = np.mean(avs[0])
+                        print(f"Using the mean of {len(rmask)} value(s): A_V={Av:.6f}")
+                        warn_msg += "unreliable A_V;"
 
                 if Av:
                     print("Dereddening SED observations")
                     sed["sed_der_flux"] = \
                             sed["sed_flux"] / ext_model.extinguish(sed["sed_wl"].to(u.um), Av=Av)
                 else:
-                    warn_msg += "No Av found;"
+                    warn_msg += "No A_V found;"
                     sed["sed_der_flux"] = sed["sed_flux"]
 
 
