@@ -7,7 +7,7 @@ from inspect import getsourcefile
 
 import numpy as np
 
-from uncertainties import UFloat
+from uncertainties import UFloat, nominal_value, std_dev
 from uncertainties.unumpy import uarray, nominal_values, std_devs
 
 from scipy.interpolate import RBFInterpolator
@@ -63,9 +63,12 @@ mass_limits = (min(masses_list), max(masses_list))
 del x, ages_list, masses_list, radii_list, teffs_list, eep_list, iso
 
 def _objective_func(theta: np.ndarray[float],
-                    sys_mass: UFloat,
-                    obs_radii: np.ndarray[UFloat],
-                    obs_teffs: np.ndarray[UFloat],
+                    sys_mass_nom: float,
+                    mass_weight: float,
+                    radii_noms: np.ndarray[float],
+                    radii_weights: np.ndarray[float],
+                    teffs_noms: np.ndarray[float],
+                    teffs_weights: np.ndarray[float],
                     minimizable: bool=False) -> float:
     """
     Optimizable objective function combining a _ln_prior_func, model_func and _ln_likelihood_func
@@ -80,7 +83,7 @@ def _objective_func(theta: np.ndarray[float],
         or not all(mass_limits[0] <= mass <= mass_limits[1] for mass in masses):
         retval = np.inf
     else:
-        retval = 0.5 * ((sys_mass.n - np.sum(masses)) / sys_mass.s)**2
+        retval = 0.5 * mass_weight * (sys_mass_nom - np.sum(masses))**2
 
     # The "model func": gets the radii & teffs from stars' masses from MIST model via interpolators
     if np.isfinite(retval):
@@ -94,10 +97,9 @@ def _objective_func(theta: np.ndarray[float],
     if np.isfinite(retval):
         degr_free = len(theta)
         chisq = 0
-        for obs_vals, model_vals in [(obs_radii, model_radii),
-                                     (obs_teffs, model_teffs)]:
-            weights = 1 / std_devs(obs_vals)**2
-            chisq += np.sum(weights * (nominal_values(obs_vals) - model_vals)**2)
+        for weights, obs_val_noms, model_vals in [(radii_weights, radii_noms, model_radii),
+                                                  (teffs_weights, teffs_noms, model_teffs)]:
+            chisq += np.sum(weights * (obs_val_noms - model_vals)**2)
         retval += 0.5 * chisq / degr_free
 
     if minimizable != (retval >= 0):
@@ -129,6 +131,17 @@ def minimize_fit(theta0: np.ndarray[float],
 
     max_iters = int(1000 * len(theta0))
 
+    # Find the nominal values and chisq weights - do it outside fit loop as these don't change
+    objective_func_fixed_args = (
+        nominal_value(sys_mass),
+        1 if (mass_sigma := std_dev(sys_mass)) == 0 else (1 / mass_sigma)**2,
+        nominal_values(radii),
+        1 if any((radii_sigma := std_devs(radii)) == 0) else (1 / radii_sigma)**2,
+        nominal_values(teffs),
+        1 if any((teff_sigma := std_devs(teffs)) == 0) else (1 / teff_sigma)**2,
+        True # minimizable
+    )
+
     with catch_warnings(category=[RuntimeWarning, OptimizeWarning]):
         filterwarnings("ignore", "overflow encountered in scalar power")
         filterwarnings("ignore", "invalid value encountered in ")
@@ -137,8 +150,8 @@ def minimize_fit(theta0: np.ndarray[float],
 
         best_soln, best_meth = None, None
         for method in methods:
-            soln = minimize(_objective_func, x0=theta0, args=(sys_mass, radii, teffs, True),
-                              method=method, options={ "maxiter": max_iters, "maxfev": max_iters })
+            soln = minimize(_objective_func, x0=theta0, args=objective_func_fixed_args,
+                            method=method, options={ "maxiter": max_iters, "maxfev": max_iters })
             if verbose:
                 print(f"({method})", "succeeded" if soln.success else f"failed [{soln.message}]",
                       f"after {soln.nit:d} iterations & {soln.nfev:d} function evaluation(s)",
@@ -218,8 +231,19 @@ def mcmc_fit(theta0: np.ndarray[float],
             if early_stopping:
                 print(f"Early stopping will be considered after {early_stopping_from:d} steps.")
 
-        sampler = EnsembleSampler(int(nwalkers), ndim,
-                                  _objective_func, args=(sys_mass, radii, teffs), pool=pool)
+        # Find the nominal values and chisq weights - do it outside fit loop as these don't change
+        objective_func_fixed_args = (
+            nominal_value(sys_mass),
+            1 if (mass_sigma := std_dev(sys_mass)) == 0 else (1 / mass_sigma)**2,
+            nominal_values(radii),
+            1 if any((radii_sigma := std_devs(radii)) == 0) else (1 / radii_sigma)**2,
+            nominal_values(teffs),
+            1 if any((teff_sigma := std_devs(teffs)) == 0) else (1 / teff_sigma)**2,
+            False # minimizable
+        )
+
+        sampler = EnsembleSampler(int(nwalkers), ndim, _objective_func,
+                                  args=objective_func_fixed_args, pool=pool)
         step = 0
         for _ in sampler.sample(initial_state=p0, iterations=nsteps // thin_by,
                                 thin_by=thin_by, tune=True, progress=progress):
