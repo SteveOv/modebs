@@ -54,7 +54,7 @@ if __name__ == "__main__":
                     help="plot figs for each target as the process progresses")
     ap.add_argument("-ms", "--max-steps", dest="max_mcmc_steps", type=int, required=False,
                     help="the maximum number of MCMC steps to run for [100 000]")
-    ap.set_defaults(plot_figs=False, figs_type="png", figs_dpi=100,
+    ap.set_defaults(plot_figs=False, figs_type="png", figs_dpi=100, do_mcmc_fit=True,
                     max_mcmc_steps=100000, mcmc_walkers=100, mcmc_thin_by=10, mcmc_processes=5)
     args = ap.parse_args()
     drop_dir = Path.cwd() / f"drop/{args.targets_file.stem}"
@@ -137,28 +137,38 @@ if __name__ == "__main__":
                                             verbose=True)
                 print_mass_theta(theta_fit, "theta_min")
 
+                if args.do_mcmc_fit:
+                    print("\nPerforming a full MCMC fit for masses & log(age) with uncertainties.")
+                    theta_fit, sampler = mcmc_fit(theta0=theta_fit,
+                                                sys_mass=M_sys,
+                                                radii=prior_radii,
+                                                teffs=prior_Teffs,
+                                                nwalkers=args.mcmc_walkers,
+                                                nsteps=args.max_mcmc_steps,
+                                                thin_by=args.mcmc_thin_by,
+                                                seed=42,
+                                                early_stopping=True,
+                                                early_stopping_from=25000,
+                                                processes=args.mcmc_processes,
+                                                progress=True,
+                                                verbose=True)
+                    print_mass_theta(theta_fit, "theta_mcmc")
 
-                print("\nPerforming a full MCMC fit for masses and log(age) with uncertainties.")
-                theta_mcmc_fit, sampler = mcmc_fit(theta0=theta_fit,
-                                                   sys_mass=M_sys,
-                                                   radii=prior_radii,
-                                                   teffs=prior_Teffs,
-                                                   nwalkers=args.mcmc_walkers,
-                                                   nsteps=args.max_mcmc_steps,
-                                                   thin_by=args.mcmc_thin_by,
-                                                   seed=42,
-                                                   early_stopping=True,
-                                                   early_stopping_from=25000,
-                                                   processes=args.mcmc_processes,
-                                                   progress=True,
-                                                   verbose=True)
-                print_mass_theta(theta_mcmc_fit, "theta_mcmc")
+
+                    if args.plot_figs:
+                        print("\nCreating MCMC corner plot")
+                        _data = samples_from_sampler(sampler, thin_by=args.mcmc_thin_by, flat=True)
+                        fig = corner.corner(data=_data, show_titles=True, plot_datapoints=True,
+                                            quantiles=[0.16, 0.5, 0.84], labels=theta_labels,
+                                            truths=nominal_values(theta_fit))
+                        fig.savefig(figs_dir / f"masses-mcmc-corner.{args.figs_type}",
+                                    dpi=args.figs_dpi)
+                        plt.close(fig)
 
 
-                print(f"Parameters for {target_id} with nominals & 1-sigma uncertainties",
-                      "from MCMC fit ([known value])")
+                print(f"Final fitted parameters for {target_id} ([known value])")
                 write_params = { "M_sys": M_sys, "a": a }
-                for (k, unit), val in zip(theta_params_and_units, theta_mcmc_fit):
+                for (k, unit), val in zip(theta_params_and_units, theta_fit):
                     label = ""
                     if config.get("labels", {}).get(k, None) is not None:
                         lval = ufloat(config.labels.get(k, np.NaN), config.labels.get(k+"_err", 0))
@@ -173,16 +183,6 @@ if __name__ == "__main__":
                 print(f"\nWriting fitted params for {list(write_params.keys())} to working-set.")
                 wset.write_values(target_id, fitted_masses=True,
                                   errors="", warnings=warn_msg, **write_params)
-
-
-                if args.plot_figs:
-                    print("\nCreating MCMC corner plot")
-                    _data = samples_from_sampler(sampler, thin_by=args.mcmc_thin_by, flat=True)
-                    fig = corner.corner(data=_data, show_titles=True, plot_datapoints=True,
-                                        quantiles=[0.16, 0.5, 0.84], labels=theta_labels,
-                                        truths=nominal_values(theta_mcmc_fit))
-                    fig.savefig(figs_dir/f"masses-mcmc-corner.{args.figs_type}", dpi=args.figs_dpi)
-                    plt.close(fig)
 
 
             except Exception as exc: # pylint: disable=broad-exception-caught

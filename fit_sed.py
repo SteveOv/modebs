@@ -62,7 +62,7 @@ if __name__ == "__main__":
                     help="plot figs for each target as the process progresses")
     ap.add_argument("-ms", "--max-steps", dest="max_mcmc_steps", type=int, required=False,
                     help="the maximum number of MCMC steps to run for [100 000]")
-    ap.set_defaults(plot_figs=False, figs_type="png", figs_dpi=100,
+    ap.set_defaults(plot_figs=False, figs_type="png", figs_dpi=100, do_mcmc_fit=True,
                     max_mcmc_steps=100000, mcmc_walkers=100, mcmc_thin_by=10, mcmc_processes=5)
     args = ap.parse_args()
     drop_dir = Path.cwd() / f"drop/{args.targets_file.stem}"
@@ -236,32 +236,48 @@ if __name__ == "__main__":
 
 
                 print("\nPerforming an initial 'quick' minimize fit. Values marked * are fitted.")
-                theta_min_fit, _ = minimize_fit(x, y, y_err, theta0=theta0, fit_mask=fit_mask,
+                theta_fit, _ = minimize_fit(x, y, y_err, theta0=theta0, fit_mask=fit_mask,
+                                            ln_prior_func=ln_prior_func,
+                                            stellar_grid=model_grid, verbose=True)
+
+
+                if args.do_mcmc_fit:
+                    print("\nPerforming a full MCMC fit from the output from the 'quick' fit.",
+                        "Values marked * are fitted.")
+                    theta_fit, sampler = mcmc_fit(x, y, y_err,
+                                                theta0=theta_fit,
+                                                fit_mask=fit_mask,
                                                 ln_prior_func=ln_prior_func,
-                                                stellar_grid=model_grid, verbose=True)
+                                                stellar_grid=model_grid,
+                                                nwalkers=args.mcmc_walkers,
+                                                nsteps=args.max_mcmc_steps,
+                                                thin_by=args.mcmc_thin_by,
+                                                seed=42,
+                                                early_stopping=True,
+                                                processes=args.mcmc_processes,
+                                                progress=True,
+                                                verbose=True)
 
 
-                print("\nPerforming a full MCMC fit from the output from the 'quick' fit.",
-                      "Values marked * are fitted.")
-                theta_mcmc_fit, sampler = mcmc_fit(x, y, y_err,
-                                                   theta0=theta_min_fit,
-                                                   fit_mask=fit_mask,
-                                                   ln_prior_func=ln_prior_func,
-                                                   stellar_grid=model_grid,
-                                                   nwalkers=args.mcmc_walkers,
-                                                   nsteps=args.max_mcmc_steps,
-                                                   thin_by=args.mcmc_thin_by,
-                                                   seed=42,
-                                                   early_stopping=True,
-                                                   processes=args.mcmc_processes,
-                                                   progress=True,
-                                                   verbose=True)
+                    if args.plot_figs:
+                        print("\nCreating MCMC corner and fitted model vs SED observations plots")
+                        _data = samples_from_sampler(sampler, thin_by=args.mcmc_thin_by, flat=True)
+                        fig = corner.corner(data=_data, show_titles=True, plot_datapoints=True,
+                                            quantiles=[0.16, 0.5, 0.84],
+                                            labels=theta_labels[fit_mask],
+                                            truths=nominal_values(theta_fit[fit_mask]))
+                        fig.savefig(figs_dir/f"sed-mcmc-corner.{args.figs_type}", dpi=args.figs_dpi)
+                        plt.close(fig)
+
+                        fig = plots.plot_fitted_model_sed(sed, theta_fit, model_grid,
+                                                        title=f"{target_id} SED & MCMC model fit")
+                        fig.savefig(figs_dir / f"sed-mcmc-fit.{args.figs_type}", dpi=args.figs_dpi)
+                        plt.close(fig)
 
 
-                print(f"\nFinal parameters for {target_id} with nominals & 1-sigma uncertainties",
-                        "from MCMC fit ([known value])")
+                print(f"\nFinal fitted parameters for {target_id} ([known value])")
                 write_params = {}
-                for (k, unit), val, mask in zip(theta_params_and_units, theta_mcmc_fit, fit_mask):
+                for (k, unit), val, mask in zip(theta_params_and_units, theta_fit, fit_mask):
                     label = ""
                     if k == "dist":
                         label = f"({coords.distance.to(u.pc).value:.3f} pc)"
@@ -280,20 +296,6 @@ if __name__ == "__main__":
                 wset.write_values(target_id, fitted_sed=True,
                                   errors="", warnings=warn_msg, **write_params)
 
-
-                if args.plot_figs:
-                    print("\nCreating MCMC corner and fitted model vs SED observations plots")
-                    _data = samples_from_sampler(sampler, thin_by=args.mcmc_thin_by, flat=True)
-                    fig = corner.corner(data=_data, show_titles=True, plot_datapoints=True,
-                                        quantiles=[0.16, 0.5, 0.84], labels=theta_labels[fit_mask],
-                                        truths=nominal_values(theta_mcmc_fit[fit_mask]))
-                    fig.savefig(figs_dir / f"sed-mcmc-corner.{args.figs_type}", dpi=args.figs_dpi)
-                    plt.close(fig)
-
-                    fig = plots.plot_fitted_model_sed(sed, theta_mcmc_fit, model_grid,
-                                                      title=f"{target_id} SED & MCMC model fit")
-                    fig.savefig(figs_dir / f"sed-mcmc-fit.{args.figs_type}", dpi=args.figs_dpi)
-                    plt.close(fig)
 
 
             except Exception as exc: # pylint: disable=broad-exception-caught
