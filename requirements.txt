@@ -34,6 +34,7 @@ pandas
 
 # For interacting with the LOP sky regions via their MOC/HEALPix sky tessalations 
 mocpy
+cdshealpix
 
 # For NewEra stellar grids
 f90nml
