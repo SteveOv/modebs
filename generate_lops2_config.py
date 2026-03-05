@@ -18,8 +18,12 @@ exclude_tics = [
     # pylint: disable=line-too-long
     "0126446153",   # too close for JKTEBOP
     "0129268651",   # TESS-ebs eclipse depths incorrect - this has very shallow eclipses
+    "0140661916",   # too close for JKTEBOP (rA+rB ~ 0.5, morph 0.592)
+    "0142105299",   # highly eccentric, long period with shallow eclipses (Ds~0.062) - cannot get a durable fit
     "0150284425",   # cannot get a good fit to "hump" in LC prior to the primary eclipse
+    "0150357064",   # very shallow with variability as deep as eclipses - cannot get a good fit
     "0165186801",   # too close/tidally distorted for JKTEBOP (rA+rB ~ 0.55)
+    "0167692429",   # eclipses almost non-existent by the latter sectors - needs investigation
     "0220430912",   # too close for JKTEBOP (rA+rB ~ 0.5)
     "0257691369",   # too shallow (more than Ds-2g of 0.081 indicates), with long period - cannot get a durable fit
     "0259543079",   # extremely eccentric and cannot get a reliable fit, even with interventions
@@ -57,9 +61,11 @@ known_overrides = {
     "TIC 63579446": { "exclude_sectors": [87], },
     "TIC 80650858": { "Teff_sys": 20000, },
     "TIC 118313102": { "widthS": 0.0454, },
+    "TIC 153742549": { "flatten": True, },
     "TIC 160328766": { "widthP": 0.043, "widthS": 0.024, },
     "TIC 167756615": { "exptime": [120, 600], "period": 19.179, },
     "TIC 219362976": { "widthP": 0.0063, "widthS": 0.0094, "jktebop_overrides": { "esinw": 0.2 }, },
+    "TIC 220397947": { "flatten": True, },
     "TIC 259543079": { "widthP": 0.0049, "widthS": 0.0053, },
     "TIC 260504147": { "jktebop_overrides": { "inc": 89.3, "L3": 0.5 }, },
     "TIC 278826516": { "exclude_sectors": [61, 62], },
@@ -69,18 +75,10 @@ known_overrides = {
     "TIC 319558164": { "period": 16.596535, "phiS": 0.54, },
     "TIC 319863494": { "t0": 2206.68905, "period": 17.644114, "widthP": 0.101, "widthS": 0.101, "depthP": 0.20, "depthS": 0.15, "phiS": 0.29, },
     "TIC 350298314": { "jktebop_overrides": { "ecosw": -0.38, "esinw": 0.11, "period_fit": 0 }, },
+    "TIC 355152640": { "flatten": True, },
+    "TIC 386166904": { "widthS": 0.050, },
 }
 
-
-def tess_ebs_field_to_str(tess_ebs_row, name) -> str:
-    """ Context appropriate str representation of the value in a TESS-ebs field """
-    if isinstance(tess_ebs_row[name], str):
-        return tess_ebs_row[name]
-    if name in ["TIC"]:
-        return f"{int(tess_ebs_row[name]):.d}"
-    if name in ["BJD0", "e_BJD0", "Per", "e_Per"]:
-        return f"{tess_ebs_row[name]:.6f}"
-    return f"{tess_ebs_row[name]:.3f}"
 
 
 if __name__ == "__main__":
@@ -153,8 +151,8 @@ if __name__ == "__main__":
         config = {
             "details": "",
             "notes": "",
-            "why-include": f"morph = {tess_ebs_field_to_str(row, 'Morph')} " \
-                            + f"& min(Dp) = {min_ecl_depth[include_mask][ix]:.3f}"
+            "why_include": f"morph={row['Morph']:.3f} " +
+                            f"& min(Dp)={min_ecl_depth[include_mask][ix]:.3f}"
         }
 
 
