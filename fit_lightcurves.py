@@ -216,6 +216,8 @@ if __name__ == "__main__":
                 print(("Mean predicted" if preds.size > 1 else "Predicted"), "parameters",
                       f"from {len(lcs)} LC group(s), including the value calculated for inc.")
                 print("\n".join(f"{p:>14s}: {preds_dict[p]:12.6f}" for p in preds_dict))
+                if preds_dict["rA_plus_rB"] > 0.4:
+                    warn_msg += "EM rA+rB high;"
 
 
                 # Clip masks retain only obs within 2.5 d of an eclipse for fitting. Can optimise
