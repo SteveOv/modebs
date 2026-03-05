@@ -13,6 +13,32 @@ from libs import catalogues
 
 THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 
+# These are systems which may be picked up by selection criteria but are known to not fit
+exclude_tics = [ "0278826996" ]
+
+# These are systems which are known to need hard-coded overrides to some config settings
+known_overrides = {
+    # pylint: disable=line-too-long
+    "TIC 7695666": { "jktebop_overrides": { "ecosw": -0.56, "esinw": 0.08, "inc": 88.7 }, },
+    "TIC 30034081": { "period_factor": 2, },
+    "TIC 31810287": { "flatten": True, },
+    "TIC 55659311": { "parallax": 2.0, },
+    "TIC 63579446": { "exclude_sectors": [87], },
+    "TIC 80650858": { "Teff_sys": 20000, },
+    "TIC 118313102": { "widthS": 0.0454, },
+    "TIC 160328766": { "widthP": 0.043, "widthS": 0.024, },
+    "TIC 167756615": { "exptime": [120, 600], "period": 19.179, },
+    "TIC 173756896": { "exclude_sectors": [61], },
+    "TIC 219362976": { "widthP": 0.0063, "widthS": 0.0094, "jktebop_overrides": { "esinw": 0.2 }, },
+    "TIC 259543079": { "widthP": 0.0049, "widthS": 0.0053, },
+    "TIC 260504147": { "jktebop_overrides": { "inc": 89.3, "L3": 0.5 }, },
+    "TIC 279741942": { "jktebop_overrides": { "ecosw": 0.36, "esinw": 0.06 }, },
+    "TIC 299903137": { "period": 26.3811, "phiS": 0.365, "jktebop_overrides": { "period_fit": 0 }, },
+    "TIC 319558164": { "period": 16.596535, "phiS": 0.54, },
+    "TIC 319863494": { "t0": 2206.68905, "period": 17.644114, "widthP": 0.101, "widthS": 0.101, "depthP": 0.20, "depthS": 0.15, "phiS": 0.29, },
+    "TIC 350298314": { "jktebop_overrides": { "ecosw": -0.38, "esinw": 0.11, "period_fit": 0 }, },
+}
+
 
 def tess_ebs_field_to_str(tess_ebs_row, name) -> str:
     """ Context appropriate str representation of the value in a TESS-ebs field """
@@ -49,9 +75,10 @@ if __name__ == "__main__":
 
 
     # Exclude those targets that are not suited to our needs
+    include_mask = np.in1d(all_tebs_lops["TIC"], exclude_tics, invert=True)
+
     # TESS-ebs morphology; we're interested in well-detached so we cut-off Morph at 0.6
-    tebs_mask = np.ones(len(all_tebs_lops), dtype=bool)
-    tebs_mask &= all_tebs_lops["Morph"] <= 0.6
+    include_mask &= all_tebs_lops["Morph"] <= 0.6
 
     # Eclipse depths: need eclipses sufficiently deep to be able to fit with EBOP MAVEN & JKTEBOP.
     # There are 2 algorithms used to characterise the eclipses; a 2-Gaussian fit & the polyfit algo.
@@ -63,10 +90,10 @@ if __name__ == "__main__":
                                   np.ma.filled(all_tebs_lops["Ds-pf"], -100))
     missing_2g = min_ecl_depth == -100
     min_ecl_depth[missing_2g] = min_ecl_depth_pf[missing_2g]
-    tebs_mask &= (min_ecl_depth >= 0.05) | (min_ecl_depth == -100)
+    include_mask &= (min_ecl_depth >= 0.05) | (min_ecl_depth == -100)
 
     # Any further criteria/evaluation should go here
-    num_matching_rows = sum(tebs_mask)
+    num_matching_rows = sum(include_mask)
 
 
     # Now build up a dictionary from which we'll generate the target config json
@@ -79,32 +106,81 @@ if __name__ == "__main__":
         "target_configs": {}
     }
 
-    # TESS-ebs fields to serialize into a summary "TESS-ebs" config item for each target
-    notes_keys = ["BJD0", "e_BJD0", "Per", "e_Per", "Morph",
-                  "Phip-2g", "Phis-2g", "Wp-2g", "Ws-2g", "Dp-2g", "Ds-2g",
-                  "Phip-pf", "Phis-pf", "Wp-pf", "Ws-pf", "Dp-pf", "Ds-pf"]
+    # Now create a target_config for each target
     target_configs = targets_config["target_configs"]
-    for ix, row in enumerate(all_tebs_lops[tebs_mask], start=0):
+    for ix, row in enumerate(all_tebs_lops[include_mask], start=0):
         tic = int(row["TIC"])
-        print(f"Target {ix+1}/{num_matching_rows}: {tic}")
-        target_config = {
+        target_id = f"TIC {tic:d}"
+        print(f"Target {ix+1}/{num_matching_rows}: {target_id}")
+
+        # Start this target's config with some basic info
+        # ----------------------------------------------------------------------
+        config = {
             "details": "",
             "notes": "",
-            "TESS-ebs": ", ".join(k + ": " + tess_ebs_field_to_str(row, k) for k in notes_keys),
             "why-include": f"morph = {tess_ebs_field_to_str(row, 'Morph')} " \
-                            + f"& min(Dp) = {min_ecl_depth[tebs_mask][ix]:.3f}"
+                            + f"& min(Dp) = {min_ecl_depth[include_mask][ix]:.3f}"
         }
 
-        # Capture any known values for these targets
+
+        # TESS-ebs fields to the ephemeris config item for each target.
+        # These first set of fields are easy as there are direct 1-1 mappings.
+        # ----------------------------------------------------------------------
+        for kfrom, kto in [("BJD0", "t0"), ("Per", "period"), ("Morph", "morph")]:
+            if (val := row.get(kfrom, None)) is not None and not np.isnan(val):
+                config[kto] = round(float(val), 6) if kfrom in ["Morph"] else val
+
+        # There are two sets of eclipse data; those based on the 2-Gaussian algorithm and those on
+        # a polyfit algorithm. For the best chance of consistent values we use one or other.
+        vals = np.array([[row[k+algo] for k in ["Phip", "Phis", "Wp", "Ws", "Dp", "Ds"]]
+                                        for algo in ["-2g","-pf"]], dtype=float)
+
+        # Prefer the set with the most data, and break a tie in favour of the 2g values (set 0)
+        # as these tend to wider eclipse widths (we find polyfit tends to under value).
+        is_num = ~np.isnan(vals)
+        vals_row_ix = np.argmax(np.sum(is_num, axis=1))
+
+        # We want to get the phases so that the primary is zero and the secondary is
+        # offset from this. Within TESS-ebs Phip is often near 1 and Phis < Phip.
+        if all(is_num[vals_row_ix, 0:2]):
+            while vals[vals_row_ix, 0] > vals[vals_row_ix, 1]:
+                vals[vals_row_ix, 0] -= 1
+            config["phiS"] = round(vals[vals_row_ix, 1] - vals[vals_row_ix, 0], 6)
+        else:
+            config["phiP"], config["phiS"] = 0, None
+
+        # TESS-ebs eclipse widths are in units of phase and depth in units of normalized flux
+        for cix, kto in enumerate(["widthP", "widthS", "depthP", "depthS"], start=2):
+            config[kto] = round(vals[vals_row_ix, cix], 6) if is_num[vals_row_ix, cix] else None
+
+
+        # Apply any overrides now, before we try to fix any data by inspection
+        # ----------------------------------------------------------------------
+        config |= known_overrides.get(target_id, { })
+
+
+        # Now download & inspect any light-curves to confirm/improve the ephemeris
+        # For now, we're skipping these targets with insufficient ephemeris data to be fitted
+        # ----------------------------------------------------------------------
+        if any(config.get(k, None) is None for k in ["phiS", "widthP", "widthS"]):
+            continue
+
+
+        # Capture any known values for these targets as labels
+        # ----------------------------------------------------------------------
         labels_dict = catalogues.query_tess_ebs_in_sh(tic)
         if labels_dict:
-            target_config["labels"] = { "source": "JustesenAlbrecht21apj" }
-            target_config["labels"] |= { k: labels_dict[k] for k in labels_dict }
+            config["labels"] = { "source": "JustesenAlbrecht21apj" }
+            config["labels"] |= { k: labels_dict[k] for k in labels_dict }
 
-        target_configs[f"TIC {tic:d}"] = target_config
+
+        # If we got here, everything is OK with the target so we add it to the config to be written
+        # ----------------------------------------------------------------------
+        target_configs[target_id] = config
 
 
     # Finally, save the dictionary as a formatted JSON file
     with open(args.targets_file, mode="w", encoding="utf8") as jsonf:
-        print(f"Saving {num_matching_rows} target config(s) to {jsonf.name}")
+        num_saved_rows = len(targets_config["target_configs"].keys())
+        print(f"Saving {num_saved_rows} target config(s) to {jsonf.name}")
         json.dump(targets_config, jsonf, indent=4, default=str)
