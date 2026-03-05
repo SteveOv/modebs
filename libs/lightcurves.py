@@ -6,6 +6,7 @@ from typing import Union, List, Iterable, Tuple, Generator
 from pathlib import Path
 import re
 from sys import stdout
+from datetime import datetime, timezone, timedelta
 
 import numpy as np
 from scipy.signal import find_peaks
@@ -28,6 +29,7 @@ def load_lightcurves(target: str,
                      flux_column: str="sap_flux",
                      force_mast: bool=False,
                      cache_dir: Path=Path("./.cache"),
+                     cache_timeout: timedelta=timedelta(days=28),
                      verbose: bool=False) -> LightCurveCollection:
     """
     This is a wrapper for lightkurve's search_lightcurves and SearchResults download_all funcs
@@ -57,6 +59,7 @@ def load_lightcurves(target: str,
     :flux_column: the flux column to select when loading the assets
     :force_mast: if True will always bypass local files and search/download from MAST
     :cache_dir: the local directory under which the assets are/will be stored
+    :cache_timeout: elapsed time after which cached results are expired [28 days]
     :verbose: if True will output some diagnostics text to the console
     """
     # pylint: disable=too-many-locals, too-many-arguments, too-many-positional-arguments
@@ -75,11 +78,18 @@ def load_lightcurves(target: str,
         print(f"Searching for light curves for search term='{search_term}', sectors={sectors},",
               f"mission={mission}, author={author} and exptime={exptime}")
 
+    # Work out whether we need to perform a MAST query or whether we can use a cached response.
+    result = None
     if not force_mast and result_file.exists():
-        result = SearchResult(Table.read(result_file, format=result_format))
-        if verbose:
-            print("Loaded previously cached search results matching these criteria.")
-    else:
+        last_mod_time = datetime.fromtimestamp(result_file.stat().st_mtime, tz=timezone.utc)
+        if datetime.now(tz=timezone.utc) - last_mod_time < cache_timeout:
+            result = SearchResult(Table.read(result_file, format=result_format))
+            if verbose:
+                print("Loaded previously cached search results matching these criteria.")
+        elif verbose:
+            print("Previously cached search results have expired.")
+
+    if result is None:
         if verbose:
             print("Performing a MAST query based on these criteria.")
         result = lk.search_lightcurve(search_term, sector=sectors, mission=mission,
