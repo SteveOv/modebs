@@ -13,8 +13,38 @@ from libs import catalogues
 
 THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 
-# These are systems which may be picked up by selection criteria but are known to not fit
-exclude_tics = [ "0278826996" ]
+# These are systems which may be included up by selection criteria but are known to not fit
+exclude_tics = [
+    # pylint: disable=line-too-long
+    "0126446153",   # too close for JKTEBOP
+    "0129268651",   # TESS-ebs eclipse depths incorrect - this has very shallow eclipses
+    "0150284425",   # cannot get a good fit to "hump" in LC prior to the primary eclipse
+    "0165186801",   # too close/tidally distorted for JKTEBOP (rA+rB ~ 0.55)
+    "0220430912",   # too close for JKTEBOP (rA+rB ~ 0.5)
+    "0257691369",   # too shallow (more than Ds-2g of 0.081 indicates), with long period - cannot get a durable fit
+    "0259543079",   # extremely eccentric and cannot get a reliable fit, even with interventions
+    "0260124760",   # too close for JKTEBOP (rA+rB ~ 0.6, morph 0.590), however the fit is plausible
+    "0278826996",   # highly eccentric and cannot get a reliable fit even with interventions
+    "0299906906",   # low SNR and quite shallow eclipses (although ~0.1) - together make a difficult fit
+    "0300654002",   # too close for JKTEBOP (rA+rB ~ 0.5, morph 0.563)
+    "0310308203",   # too close for JKTEBOP (rA+rB ~ 0.5, morph 0.593)
+    "0349835367",   # too close for JKTEBOP (rA+rB ~ 0.45, morph 0.544)
+    "0393344055",   # too close for JKTEBOP (rA+rB ~ 0.5, morph 0.600)
+    "0393491149",   # too close for JKTEBOP (rA+rB ~ 0.5, morph 0.595)
+]
+
+# Too shallow (review depth criteria)
+exclude_tics += ["0064783257", "0150357064"]
+
+# These may be excluded by selection criteria but are included as they're known to fit well
+include_tics = [
+    # pylint: disable=line-too-long
+    "0030034081",   # TESS-ebs misses the secondary, however double the period and it fits well
+    "0031810287",   # secondary eclipses are "borderline" (Ds-2g 0.049) but this fits with flattening
+    "0037606218",   # secondary eclipses are very shallow (Ds-2g 0.013) but mitigated by being total
+    "0220420534",   # secondary eclipses are "borderline" (Ds-2g 0.05) but we easily get good consistent fits
+    "0307488184",   # secondary eclipses are very shallow (Ds-2g 0.017) but mitigated by being total
+]
 
 # These are systems which are known to need hard-coded overrides to some config settings
 known_overrides = {
@@ -22,18 +52,20 @@ known_overrides = {
     "TIC 7695666": { "jktebop_overrides": { "ecosw": -0.56, "esinw": 0.08, "inc": 88.7 }, },
     "TIC 30034081": { "period_factor": 2, },
     "TIC 31810287": { "flatten": True, },
+    "TIC 53292822": { "t0": 1519.046, "period": 4.93495, "phiS": 0.67 },
     "TIC 55659311": { "parallax": 2.0, },
     "TIC 63579446": { "exclude_sectors": [87], },
     "TIC 80650858": { "Teff_sys": 20000, },
     "TIC 118313102": { "widthS": 0.0454, },
     "TIC 160328766": { "widthP": 0.043, "widthS": 0.024, },
     "TIC 167756615": { "exptime": [120, 600], "period": 19.179, },
-    "TIC 173756896": { "exclude_sectors": [61], },
     "TIC 219362976": { "widthP": 0.0063, "widthS": 0.0094, "jktebop_overrides": { "esinw": 0.2 }, },
     "TIC 259543079": { "widthP": 0.0049, "widthS": 0.0053, },
     "TIC 260504147": { "jktebop_overrides": { "inc": 89.3, "L3": 0.5 }, },
+    "TIC 278826516": { "exclude_sectors": [61, 62], },
     "TIC 279741942": { "jktebop_overrides": { "ecosw": 0.36, "esinw": 0.06 }, },
-    "TIC 299903137": { "period": 26.3811, "phiS": 0.365, "jktebop_overrides": { "period_fit": 0 }, },
+    # The following may fail fit_lightcurve for not meeting 2+1 eclipse criterion without the sectors override
+    "TIC 299903137": { "sectors": [[6], [87]], "period": 26.3811, "phiS": 0.365, "jktebop_overrides": { "period_fit": 0 }, },
     "TIC 319558164": { "period": 16.596535, "phiS": 0.54, },
     "TIC 319863494": { "t0": 2206.68905, "period": 17.644114, "widthP": 0.101, "widthS": 0.101, "depthP": 0.20, "depthS": 0.15, "phiS": 0.29, },
     "TIC 350298314": { "jktebop_overrides": { "ecosw": -0.38, "esinw": 0.11, "period_fit": 0 }, },
@@ -78,7 +110,7 @@ if __name__ == "__main__":
     include_mask = np.in1d(all_tebs_lops["TIC"], exclude_tics, invert=True)
 
     # TESS-ebs morphology; we're interested in well-detached so we cut-off Morph at 0.6
-    include_mask &= all_tebs_lops["Morph"] <= 0.6
+    include_mask &= all_tebs_lops["Morph"] < 0.6
 
     # Eclipse depths: need eclipses sufficiently deep to be able to fit with EBOP MAVEN & JKTEBOP.
     # There are 2 algorithms used to characterise the eclipses; a 2-Gaussian fit & the polyfit algo.
@@ -93,6 +125,9 @@ if __name__ == "__main__":
     include_mask &= (min_ecl_depth >= 0.05) | (min_ecl_depth == -100)
 
     # Any further criteria/evaluation should go here
+
+    # The final selections, including any hard-coded inclusion overrides
+    include_mask |= np.in1d(all_tebs_lops["TIC"], include_tics)
     num_matching_rows = sum(include_mask)
 
 
