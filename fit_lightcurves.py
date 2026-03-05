@@ -107,7 +107,8 @@ if __name__ == "__main__":
                                                    exptime=config.exptime,
                                                    quality_bitmask=config.quality_bitmask,
                                                    flux_column=config.flux_column,
-                                                   force_mast=False, cache_dir=Path() / ".cache/",
+                                                   force_mast=False,
+                                                   cache_dir=Path() / ".cache/.mast/",
                                                    verbose=True)
                 if lcs is None or len(lcs) == 0:
                     raise PipelineError(target_id, f"No lightcurves found for {search_term}.")
