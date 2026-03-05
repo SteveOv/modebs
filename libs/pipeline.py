@@ -777,10 +777,10 @@ def _fit_target(time: ArrayLike,
             if max_attempts > 1:
                 if attempt < max_attempts:
                     # Copy the output from this, to the input of the next attempt except ephemeris.
-                    # Leave ephemeris unchanged as it should not be greatly perturbed by fitting &
-                    # we avoid a problem with unphysical times if the prev fit haywire (bug #25).
+                    # Leave ephem & LD params unchanged as shouldn't be highly perturbed by fitting
+                    # & we avoid a problem with unphysical params if the prev fit haywire (bug #25).
                     next_att_in_params |= { k: v for k, v in att_out_params.items()
-                                                                if k not in ["period", "t0"] }
+                                        if k not in ["period", "t0"] and not k.startswith("LD") }
                     msg += " Will retry from the final position of this attempt."
                 else:
                     msg += f" Will revert to the results from attempt {best_attempt}."
