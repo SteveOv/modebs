@@ -38,6 +38,11 @@ class Testsed(unittest.TestCase):
         copy(Testsed._this_dir / "data/sed/zz-boo-0.1.vot", Testsed._zz_boo_test_file)
         copy(Testsed._this_dir / "data/sed/cw-eri-0.1.vot", Testsed._cw_eri_test_file)
 
+        # Make sure they don't expire from the cache
+        Testsed._cm_dra_test_file.touch(exist_ok=True)
+        Testsed._zz_boo_test_file.touch(exist_ok=True)
+        Testsed._cw_eri_test_file.touch(exist_ok=True)
+
     @classmethod
     def tearDownClass(cls):
         for testsed in Testsed._cache_dir.glob("testsed-*.*"):
@@ -74,7 +79,8 @@ class Testsed(unittest.TestCase):
         ]:
             with self.subTest(msg=msg):
                 sed = get_sed_for_target(Testsed._cw_eri_test_target,
-                                         flux_unit=flux_unit, freq_unit=freq_unit, wl_unit=wl_unit)
+                                         flux_unit=flux_unit, freq_unit=freq_unit, wl_unit=wl_unit,
+                                         verbose=True)
                 self.assertIsInstance(sed, Table)
                 self.assertEqual(sed["sed_flux"].unit, flux_unit)
                 self.assertEqual(sed["sed_eflux"].unit, flux_unit)
@@ -113,7 +119,7 @@ class Testsed(unittest.TestCase):
             with self.subTest():
                 with self.assertRaises(UnitConversionError,
                                     msg=f"Expected **{unit_kwargs} to cause a UnitConversionError"):
-                    get_sed_for_target("CW Eri", "V* CW Eri", **unit_kwargs)
+                    get_sed_for_target("CW Eri", "V* CW Eri", **unit_kwargs, verbose=True)
 
     def test_get_sed_for_target_handle_unknown_target(self):
         """ Tests get_sed_for_target() asserts correct ValueError when no match on target """

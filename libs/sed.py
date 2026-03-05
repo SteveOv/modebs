@@ -9,6 +9,7 @@ from pathlib import Path
 import re
 from urllib.parse import quote_plus
 from numbers import Number
+from datetime import datetime, timezone, timedelta
 
 import astropy.units as u
 from astropy.table import Table, unique
@@ -62,12 +63,24 @@ def get_sed_for_target(target: str,
 
     # Read in the SED for this target via the cache (filename includes both search criteria)
     sed_fname = sed_cache_dir / (re.sub(r"[^\w\d-]", "-", target.lower()) + f"-{radius}.vot")
-    if not sed_fname.exists():
-        if verbose: print(f"Table {sed_fname.name} not cached so will query the VizieR SED service")
+
+    # Check for the existence of a non-expired cached copy
+    load_from_cache = False
+    if sed_fname.exists():
+        last_mod_time = datetime.fromtimestamp(sed_fname.stat().st_mtime, tz=timezone.utc)
+        load_from_cache = datetime.now(tz=timezone.utc) - last_mod_time < timedelta(days=28)
+        if verbose:
+            print(f"Previously cached {sed_fname.name} table file found"
+                  + ("." if load_from_cache else ", however it has expired."))
+
+    if not load_from_cache:
+        if verbose:
+            print("Querying the VizieR service to download a table of SED observations.")
         try:
             targ = quote_plus(search_term or target)
             sed = Table.read(f"https://vizier.cds.unistra.fr/viz-bin/sed?-c={targ}&-c.rs={radius}")
-            sed.write(sed_fname, format="votable") # votable matches that published in link above
+            # votable matches that published in link above
+            sed.write(sed_fname, format="votable", overwrite=True)
         except ValueError as err:
             raise ValueError(f"No SED for target={target} and search_term={search_term}") from err
 
