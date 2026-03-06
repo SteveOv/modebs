@@ -61,7 +61,7 @@ if __name__ == "__main__":
         plt.close(fig)
 
 
-        print("Plotting a Hurtzsprung-Russell diagram")
+        print("Plotting a Hertzsprung-Russell diagram")
         row_gen = wset.yield_values("target_id", "TeffA", "TeffB", "RA", "RB")
         Teffs_and_radii = np.array([row[1:] for row in row_gen if row[0] in to_plot_target_ids]).T
         Teffs = Teffs_and_radii[:2]
@@ -69,7 +69,7 @@ if __name__ == "__main__":
 
         fig = plots.plot_hr_diagram(Teffs, lums, labels=["star A", "star B"],
                                     plot_zams=True, legend_loc="best", invertx=True)
-        fig.savefig(figs_dir / f"hurtzsprung-russell.{args.figs_type}", dpi=args.figs_dpi)
+        fig.savefig(figs_dir / f"hertzsprung-russell.{args.figs_type}", dpi=args.figs_dpi)
         plt.close(fig)
 
 
