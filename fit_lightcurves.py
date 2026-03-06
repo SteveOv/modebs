@@ -91,7 +91,7 @@ if __name__ == "__main__":
                 print(f"Processing target {fit_counter} of {to_fit_count}: {target_id}")
                 print("------------------------------------------------------------")
                 config = targets_config.get(target_id)
-                warn_msg = wset.read_values(target_id, "warnings") or ""
+                warn_msgs = (wset.read_values(target_id, "warnings") or "").split(";")
                 if args.plot_figs:
                     figs_dir = drop_dir / "figs" / pipeline.to_file_safe_str(target_id)
                     figs_dir.mkdir(parents=True, exist_ok=True)
@@ -217,7 +217,7 @@ if __name__ == "__main__":
                       f"from {len(lcs)} LC group(s), including the value calculated for inc.")
                 print("\n".join(f"{p:>14s}: {preds_dict[p]:12.6f}" for p in preds_dict))
                 if nominal_value(preds_dict["rA_plus_rB"]) > 0.4:
-                    warn_msg += "MAVEN rA+rB>0.4;"
+                    warn_msgs += ["MAVEN rA+rB>0.4"]
 
 
                 # Clip masks retain only obs within 2.5 d of an eclipse for fitting. Can optimise
@@ -303,7 +303,7 @@ if __name__ == "__main__":
                 # Review fitting metadata to check whether any of the fits are suspect.
                 wixs = [i for i, fd in enumerate(fitted_param_dicts) if not fd.get("converged")]
                 if len(wixs) > 0:
-                    warn_msg += f"{len(wixs)}/{len(lcs)} LC fits incomplete;"
+                    warn_msgs += [f"{len(wixs)}/{len(lcs)} LC fits incomplete"]
                     print(f"\nWarning: {len(wixs)} of {len(lcs)} LC fit(s) did not converge.",
                           "Those for", ", ".join(lcs[ix].meta["LABEL"] for ix in wixs))
 
@@ -379,8 +379,8 @@ if __name__ == "__main__":
                         print()
                 TeffR = (summary_params["LR"] / summary_params["k"]**2)**0.25
                 print(f"         TeffR: {TeffR:12.6f} (calculated from LR & k)")
-                warn_msg += "".join(f"Fitted {k}<0;" for k in ["k", "J"]
-                                                            if nominal_value(summary_params[k]) < 0)
+                warn_msgs += [f"fitted {k}<0" for k in ["k", "J"]
+                                                            if nominal_value(summary_params[k]) < 0]
 
                 # Finally, store the params and the flag that indicates LC fitting has completed
                 print(f"\nWriting final values for {', '.join(k for k in write_keys)},",
@@ -389,16 +389,17 @@ if __name__ == "__main__":
                 params["TeffR"] = TeffR
                 params["Teff_sys"] = Teff_sys   # These have come from TIC
                 params["logg_sys"] = logg_sys   # and will be used later in SED fitting
-                wset.write_values(target_id, fitted_lcs=True,
-                                  errors="", warnings=warn_msg, **params)
+                wset.write_values(target_id, fitted_lcs=True, errors="",
+                                  warnings=";".join(w for w in dict.fromkeys(warn_msgs) if len(w)),
+                                  **params)
 
 
             except Exception as exc: # pylint: disable=broad-exception-caught
                 print("\n*** Failed with the following error. Depending on the nature of the",
                       "error, it may be possible to rerun this module to fit failed targets. ***")
                 traceback.print_exception(exc, file=log)
-                wset.write_values(target_id, fitted_lcs=False,
-                                  errors=type(exc).__name__, warnings=warn_msg)
+                wset.write_values(target_id, fitted_lcs=False, errors=type(exc).__name__,
+                                  warnings=";".join(w for w in dict.fromkeys(warn_msgs) if len(w)))
 
 
         print("\n\n============================================================")

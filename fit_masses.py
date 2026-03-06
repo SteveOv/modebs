@@ -84,7 +84,7 @@ if __name__ == "__main__":
                 print(f"Processing target {fit_counter} of {to_fit_count}: {target_id}")
                 print("------------------------------------------------------------")
                 config = targets_config.get(target_id)
-                warn_msg = wset.read_values(target_id, "warnings") or ""
+                warn_msgs = (wset.read_values(target_id, "warnings") or "").split(";")
                 if args.plot_figs:
                     figs_dir = drop_dir / "figs" / pipeline.to_file_safe_str(target_id)
                     figs_dir.mkdir(parents=True, exist_ok=True)
@@ -181,16 +181,17 @@ if __name__ == "__main__":
 
                 # Finally, store the params and the flag that indicates fitting has completed
                 print(f"\nWriting fitted params for {list(write_params.keys())} to working-set.")
-                wset.write_values(target_id, fitted_masses=True,
-                                  errors="", warnings=warn_msg, **write_params)
+                wset.write_values(target_id, fitted_masses=True, errors="",
+                                  warnings=";".join(w for w in dict.fromkeys(warn_msgs) if len(w)),
+                                  **write_params)
 
 
             except Exception as exc: # pylint: disable=broad-exception-caught
                 print("\n*** Failed with the following error. Depending on the nature of the",
                       "error, it may be possible to rerun this module to fit failed targets. ***")
                 traceback.print_exception(exc, file=log)
-                wset.write_values(target_id, fitted_masses=False,
-                                  errors=type(exc).__name__, warnings=warn_msg)
+                wset.write_values(target_id, fitted_masses=False, errors=type(exc).__name__,
+                                  warnings=";".join(w for w in dict.fromkeys(warn_msgs) if len(w)))
 
 
         print("\n\n============================================================")
