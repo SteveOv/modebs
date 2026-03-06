@@ -3,7 +3,7 @@ Low level utility functions for light curve ingest, pre-processing, estimation a
 """
 # pylint: disable=no-member, too-many-arguments, too-many-positional-arguments
 from typing import Union, Tuple, Dict, List, Iterable
-from io import TextIOBase
+from io import TextIOBase, StringIO
 from sys import stdout
 import warnings
 import re
@@ -717,6 +717,7 @@ def _fit_target(time: ArrayLike,
     best_attempt = 1
     msgs = []
     all_keys = list(jktebop._param_file_line_beginswith.keys()) # pylint: disable=protected-access
+    stdout_to_log = StringIO()
 
     # JKTEBOP will fail if it finds files from a previous fitting
     fit_dir = jktebop.get_jktebop_dir()
@@ -755,52 +756,56 @@ def _fit_target(time: ArrayLike,
         next_att_in_params["file_name_stem"] = att_fname_stem
 
         msg = None
-        with PassthroughTextWriter(stdout_to, hold_output=hold_stdout,
+        with PassthroughTextWriter(stdout_to, output2=stdout_to_log, hold_output=hold_stdout,
                                 inspect_func=lambda ln: "Warning: a good fit was not found" in ln) \
-                            as stdout_cap:
+                            as stdout_inspect:
             jktebop.write_in_file(in_fname, append_lines=append_lines, **next_att_in_params)
 
             # Blocks on the JKTEBOP task until we can parse the newly written par file contents
             # to read out the revised values for the superset of potentially fitted parameters.
-            plines = jktebop.run_jktebop_task(in_fname, par_fname, None, stdout_cap, timeout)
+            plines = jktebop.run_jktebop_task(in_fname, par_fname, None, stdout_inspect, timeout)
             att_out_params = jktebop.read_fitted_params_from_par_lines(plines, all_keys, True)
-            converged = not stdout_cap.inspect_flag
+            converged = not stdout_inspect.inspect_flag
 
-        if attempt == 1:
-            # The fallback position, being the outputs from the first attempt regardless of success
-            best_attempt = 1
-            best_out_params = att_out_params.copy()
-            best_file_params = att_file_params.copy()
+            if attempt == 1:
+                # The fallback position being the outputs from the 1st attempt regardless of success
+                best_attempt = 1
+                best_out_params = att_out_params.copy()
+                best_file_params = att_file_params.copy()
 
-        if not converged:
-            msg = f"Attempt {attempt} of {max_attempts} of {file_stem} didn't fully converge."
-            if max_attempts > 1:
-                if attempt < max_attempts:
-                    # Copy the output from this, to the input of the next attempt except ephemeris.
-                    # Leave ephem & LD params unchanged as shouldn't be highly perturbed by fitting
-                    # & we avoid a problem with unphysical params if the prev fit haywire (bug #25).
-                    next_att_in_params |= { k: v for k, v in att_out_params.items()
+            if not converged:
+                msg = f"Attempt {attempt} of {max_attempts} of {file_stem} didn't fully converge."
+                if max_attempts > 1:
+                    if attempt < max_attempts:
+                        # Copy the output from this, to the input of the next attempt. Leave ephem
+                        # & LD params at original values as they shouldn't be highly perturbed in
+                        # fitting and we avoid a problem with unphysical params if prev fit haywire.
+                        next_att_in_params |= { k: v for k, v in att_out_params.items()
                                         if k not in ["period", "t0"] and not k.startswith("LD") }
-                    msg += " Will retry from the final position of this attempt."
+                        msg += " Will retry from the final position of this attempt."
+                    else:
+                        msg += f" Will revert to the results from attempt {best_attempt}."
                 else:
-                    msg += f" Will revert to the results from attempt {best_attempt}."
+                    msg += " Only 1 attempt allowed so will return these results."
             else:
-                msg += " Only 1 attempt allowed so will return these results."
-        else:
-            msg = f"Attempt {attempt} of {max_attempts} to fit {file_stem} completed successfully."
-            if attempt > 1: # A retry fit worked, these become the best params
-                best_out_params = att_out_params
-                best_file_params = att_file_params
+                msg = f"Attempt {attempt} of {max_attempts} to fit " \
+                        + f"{file_stem} completed successfully."
+                if attempt > 1: # A retry fit worked, these become the best params
+                    best_out_params = att_out_params
+                    best_file_params = att_file_params
 
-        if msg is not None:
-            if stdout_to:
-                stdout_to.write("** " + msg + "\n")
-            msgs += [msg]
+            if msg is not None:
+                if stdout_to:
+                    stdout_inspect.write("** " + msg + "\n")
+                msgs += [msg]
 
-        if converged:
-            break
+            if converged:
+                break
 
     # Include any progress messages we've generated across all attempts
     best_file_params["msgs"] = msgs
     best_file_params["converged"] = converged
+    if stdout_to_log is not None:
+        stdout_to_log.seek(0)
+        best_file_params["log"] = stdout_to_log.read()
     return { k: best_out_params.get(k, None) for k in read_keys } | best_file_params

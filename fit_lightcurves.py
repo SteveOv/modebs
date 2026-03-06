@@ -67,7 +67,7 @@ if __name__ == "__main__":
     # EBOP MAVEN estimator for JKTEBOP input params; rA+rB, k, J, ecosw, esinw and bP/inc
     estimator = Estimator()
 
-    with redirect_stdout(Tee(open(drop_dir / f"{THIS_STEM}.log", "a", encoding="utf8"))) as log:
+    with open(drop_dir/f"{THIS_STEM}.log", "a", encoding="utf8") as log, redirect_stdout(Tee(log)):
         print("\n\n============================================================")
         print(f"Started {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
         print("============================================================")
@@ -299,6 +299,9 @@ if __name__ == "__main__":
                                                                      max_attempts=3,
                                                                      timeout=900)
 
+                # If >1 worker then jktebop stdout was written in another process and is not seen
+                # by redirect_stdout/Tee. A copy is in the params dicts, so log it manually.
+                log.writelines(d.pop("log", []) for d in fitted_param_dicts)
 
                 # Review fitting metadata to check whether any of the fits are suspect.
                 wixs = [i for i, fd in enumerate(fitted_param_dicts) if not fd.get("converged")]
