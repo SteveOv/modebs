@@ -201,10 +201,13 @@ if __name__ == "__main__":
 
         # Capture any known values for these targets as labels
         # ----------------------------------------------------------------------
-        labels_dict = catalogues.query_tess_ebs_in_sh(tic)
-        if labels_dict:
-            config["labels"] = { "source": "JustesenAlbrecht21apj" }
-            config["labels"] |= { k: labels_dict[k] for k in labels_dict }
+        label_keys = ["t0", "period", "rA_plus_rB", "k", "J", "ecosw", "esinw", "inc",
+                      "LR", "TeffR", "TeffA", "TeffB", "RA", "RB", "MA", "MB", "log_age", "dist"]
+        if labels_dict := catalogues.query_tess_ebs_in_sh(tic):
+            config["labels"] = { "source": "JustesenAlbrecht21apj" }    # No errorbars in this
+            config["labels"] |= { k: labels_dict[k] for k in label_keys if k in labels_dict }
+            if "rA_plus_rB" not in config["labels"] and "rA" in labels_dict and "rB" in labels_dict:
+                config["labels"]["rA_plus_rB"] = labels_dict["rA"] + labels_dict["rB"]
 
 
         # If we got here, everything is OK with the target so we add it to the config to be written
