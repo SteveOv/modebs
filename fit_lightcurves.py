@@ -367,12 +367,14 @@ if __name__ == "__main__":
                             summary_params[k] = ufloat(nom, new_err)
                     print(f"Revised {', '.join(k for k in kup)}." if len(kup)>0 else "No changes.")
 
-                print(f"\nFitted parameters and uncertainties from {len(lcs)} fitted lightcurve.")
+                print(f"\nFinal parameters and uncertainties for {target_id}",
+                      f"from {len(lcs)} fitted lightcurve ([known value])")
                 for k in [rk for rk in read_keys if summary_params[rk] is not None]:
                     print(f"{k:>14s}: {summary_params[k]:12.6f}", end="")
-                    if config.get("labels", {}).get(k, None) is not None:
-                        lval = ufloat(config.labels.get(k, np.NaN), config.labels.get(k+"_err", 0))
-                        print(f"\t({lval:.3f})")
+                    if (lval := config.get("labels", {}).get(k, None)) is not None:
+                        if (lerr := config.get("labels", {}).get(k + "_err")) is not None:
+                            lval = ufloat(lval, lerr)
+                        print(f"\t({lval})")
                     else:
                         print()
                 TeffR = (summary_params["LR"] / summary_params["k"]**2)**0.25
