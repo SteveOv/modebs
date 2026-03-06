@@ -88,6 +88,7 @@ if __name__ == "__main__":
                     ** { col: srow[scol] for (col, scol) in [("ra", "ra"),
                                                             ("dec", "dec"),
                                                             ("parallax", "plx_value"),
+                                                            ("coords_source", "plx_bibcode"),
                                                             ("spt", "sp_type")]
                                                         if scol in srow.colnames }
                 }
@@ -107,11 +108,15 @@ if __name__ == "__main__":
                 + f"WHERE source_id in ({','.join(f'{i:d}' for i in gids if i is not None)})"
             for srow in Gaia.launch_job(AQL).get_results():
                 if (target_id := gt_index.get(srow["source_id"], None)) is not None:
-                    params = { col: srow[scol] for (col, scol) in [("ra", "ra"),
-                                                                ("dec", "dec"),
-                                                                ("parallax", "parallax"),
-                                                                ("parallax_err", "parallax_error"),
-                                                                ("ruwe", "ruwe")]}
+                    params = { "ruwe": srow["ruwe"]}
+                    if all((srow[k] or 0) != 0 for k in ["ra", "dec", "parallax"]):
+                        params |= {
+                            "ra": srow["ra"],
+                            "dec": srow["dec"],
+                            "parallax": srow["parallax"],
+                            "parallax_err": srow["parallax_error"],
+                            "coords_source": "2022yCat.1355....0G", # GaiaDR3 Part 1. Main source
+                        }
                     dal.write_values(target_id, **params)
 
 

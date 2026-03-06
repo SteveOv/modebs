@@ -105,6 +105,7 @@ class QTableDal(Dal):
         ("parallax", float),
         ("parallax_err", float),
         ("ruwe", float),
+        ("coords_source", "<U20"),
         # TESS-ebs
         ("t0", float),
         ("t0_err", float),
