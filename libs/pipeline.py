@@ -600,7 +600,7 @@ def fit_target_lightcurves(lcs: LightCurveCollection,
     the timeout arg indicating the maximum number of seconds to allow for a fit (None == forever).
 
     Each lightcurve will be fitted from mostly the same input settings with the exception of;
-        - primary_epoch, which may be varied by lightcurve (see primary_epoch parameter)
+        - t0, which may be varied by lightcurve (see t0 parameter)
         - poly fit instructions, which are calculated for the timings of each lightcurve
 
     :lcs: the source lightcurves, which must have the time, delta_mag and delta_mag_err columns

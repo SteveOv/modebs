@@ -56,7 +56,7 @@ class Testjktebop(unittest.TestCase):
         "LDA2_fit": 0,      "LDB2_fit": 0,
         "reflA_fit": 1,     "reflB_fit": 1,
                             "sf_fit": 1,
-        "period_fit": 1,    "primary_epoch_fit": 1, 
+        "period_fit": 1,    "t0_fit": 1, 
 
         "data_file_name": "cw_eri_s0004.dat"
     }

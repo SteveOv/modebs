@@ -274,7 +274,7 @@ if __name__ == "__main__":
                     "LDA2_fit": 0,              "LDB2_fit": 0,
                     "reflA_fit": refl_fit,      "reflB_fit": refl_fit,
                     "sf_fit": 1,
-                    "period_fit": 1,            "primary_epoch_fit": 1,
+                    "period_fit": 1,            "t0_fit": 1,
 
                     **preds_dict,
                     **ld_params,
