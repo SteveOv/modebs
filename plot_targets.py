@@ -42,35 +42,46 @@ if __name__ == "__main__":
 
         figs_dir = drop_dir / "figs"
         figs_dir.mkdir(parents=True, exist_ok=True)
-
         wset = QTableFileDal(args.working_set_file)
-        to_plot_target_ids = list(wset.yield_keys("fitted_lcs", "fitted_sed", "fitted_masses",
-                                                  where=lambda fl, fs, fm: fl == fs == fm == True))
-        to_fit_count = len(to_plot_target_ids)
-        print(f"The working-set indicates there are {to_fit_count} targets to be plotted.")
 
 
-        print("Plotting a Mass-Radius log-log diagram")
-        row_gen = wset.yield_values("target_id", "MA", "MB", "RA", "RB")
-        masses_and_radii = np.array([row[1:] for row in row_gen if row[0] in to_plot_target_ids]).T
-        masses = masses_and_radii[:2]
-        radii = masses_and_radii[2:]
-        fig = plots.plot_mass_radius_diagram(masses, radii, labels=["star A", "star B"],
-                                             plot_zams=True, legend_loc="best", invertx=True)
-        fig.savefig(figs_dir / f"mass-radius.{args.figs_type}", dpi=args.figs_dpi)
-        plt.close(fig)
+        # These plots require the pipeline to fitted SEDs for Teffs & Radii
+        # ----------------------------------------------------------------------
+        to_plot_target_ids = list(wset.yield_keys("fitted_sed", where=lambda fs: fs == True))
+        to_plot_count = len(to_plot_target_ids)
+        print(f"\nThe working-set has {to_plot_count} targets that have fitted for Teffs & radii.")
+        if to_plot_count:
+
+            print("Plotting a Hertzsprung-Russell diagram")
+            rows = wset.yield_values("target_id", "TeffA", "TeffB", "RA", "RB")
+            Teffs_and_radii = np.array([row[1:] for row in rows if row[0] in to_plot_target_ids]).T
+            Teffs = Teffs_and_radii[:2]
+            radii = Teffs_and_radii[2:]
+            lums = ((4 * np.pi * (radii * R_sun)**2 * sigma_sb * Teffs**4) / L_sun).value
+
+            fig = plots.plot_hr_diagram(Teffs, lums, labels=["star A", "star B"],
+                                        plot_zams=True, legend_loc="best", invertx=True)
+            fig.savefig(figs_dir / f"hertzsprung-russell.{args.figs_type}", dpi=args.figs_dpi)
+            plt.close(fig)
 
 
-        print("Plotting a Hertzsprung-Russell diagram")
-        row_gen = wset.yield_values("target_id", "TeffA", "TeffB", "RA", "RB")
-        Teffs_and_radii = np.array([row[1:] for row in row_gen if row[0] in to_plot_target_ids]).T
-        Teffs = Teffs_and_radii[:2]
-        lums = ((4 * np.pi * (Teffs_and_radii[2:] * R_sun)**2 * sigma_sb * Teffs**4) / L_sun).value
+        # These plots require the pipeline to have fitted for radii (SED) & masses
+        # ----------------------------------------------------------------------
+        to_plot_target_ids = list(wset.yield_keys("fitted_sed", "fitted_masses",
+                                                  where=lambda fs, fm: fs == fm == True))
+        to_plot_count = len(to_plot_target_ids)
+        print(f"\nThe working-set has {to_plot_count} targets that have fitted for radii & masses.")
+        if to_plot_count:
 
-        fig = plots.plot_hr_diagram(Teffs, lums, labels=["star A", "star B"],
-                                    plot_zams=True, legend_loc="best", invertx=True)
-        fig.savefig(figs_dir / f"hertzsprung-russell.{args.figs_type}", dpi=args.figs_dpi)
-        plt.close(fig)
+            print("Plotting a Mass-Radius log-log diagram")
+            rows = wset.yield_values("target_id", "MA", "MB", "RA", "RB")
+            masses_and_radii = np.array([row[1:] for row in rows if row[0] in to_plot_target_ids]).T
+            masses = masses_and_radii[:2]
+            radii = masses_and_radii[2:]
+            fig = plots.plot_mass_radius_diagram(masses, radii, labels=["star A", "star B"],
+                                                plot_zams=True, legend_loc="best", invertx=True)
+            fig.savefig(figs_dir / f"mass-radius.{args.figs_type}", dpi=args.figs_dpi)
+            plt.close(fig)
 
 
         print("\n\n============================================================")
