@@ -123,14 +123,18 @@ def query_tess_ebs_in_sh(tics: List[Union[int, str]]) -> dict:
                 "t0": row["t1"],
                 "period": row["Per"],
                 "k": row["rp"],
-                "a/R1": row["a/R1"],
+                "a/RA": row["a/R1"],
                 "ecosw": row["ecosw"],
                 "esinw": row["esinw"],
                 "inc": row["inc"],
                 "LR": row["fp"],
                 "TeffA": float(row["Teff1"]),
-                "TeffB": float(row["Teff2"])
+                "TeffB": float(row["Teff2"]),
             }
+
+            if (recip_ra := data["a/RA"] or 0) != 0:
+                data["rA"] = 1 / recip_ra
+                data["rB"] = (data["k"] or 0) / recip_ra
 
             # We have a match to a TIC number
             break
