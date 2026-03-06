@@ -217,7 +217,7 @@ if __name__ == "__main__":
                       f"from {len(lcs)} LC group(s), including the value calculated for inc.")
                 print("\n".join(f"{p:>14s}: {preds_dict[p]:12.6f}" for p in preds_dict))
                 if nominal_value(preds_dict["rA_plus_rB"]) > 0.4:
-                    warn_msg += "MAVEN rA+rB high;"
+                    warn_msg += "MAVEN rA+rB>0.4;"
 
 
                 # Clip masks retain only obs within 2.5 d of an eclipse for fitting. Can optimise
@@ -374,10 +374,11 @@ if __name__ == "__main__":
                         lval = ufloat(config.labels.get(k, np.NaN), config.labels.get(k+"_err", 0))
                         print(f"\t({lval:.3f})")
                     else:
-                        print()                 
+                        print()
                 TeffR = (summary_params["LR"] / summary_params["k"]**2)**0.25
                 print(f"         TeffR: {TeffR:12.6f} (calculated from LR & k)")
-
+                warn_msg += "".join(f"Fitted {k}<0;" for k in ["k", "J"]
+                                                            if nominal_value(summary_params[k]) < 0)
 
                 # Finally, store the params and the flag that indicates LC fitting has completed
                 print(f"\nWriting final values for {', '.join(k for k in write_keys)},",
