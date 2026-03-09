@@ -11,7 +11,7 @@ from contextlib import redirect_stdout
 
 # pylint: disable=line-too-long, wrong-import-position
 warnings.filterwarnings("ignore", "Using UFloat objects with std_dev==0 may give unexpected results.", category=UserWarning)
-from uncertainties import ufloat
+from uncertainties import ufloat, nominal_value
 from astroquery.simbad import Simbad
 from astroquery.gaia import Gaia
 import numpy as np
@@ -118,6 +118,17 @@ if __name__ == "__main__":
                             "coords_source": "2022yCat.1355....0G", # GaiaDR3 Part 1. Main source
                         }
                     dal.write_values(target_id, **params)
+
+
+        # Highlight missing coords as this will inhibit accounting for extinction when fitting SED
+        print()
+        for target_id, ra, dec, par, warn_msgs in \
+                dal.yield_values(dal.key_name, "ra", "dec", "parallax", "warnings"):
+            if any(v is None for v in [ra, dec, par]) or nominal_value(par) == 0:
+                warn_msgs = (warn_msgs or "").split(";") + ["coords incomplete"]
+                dal.write_values(target_id,
+                                 warnings=";".join(w for w in dict.fromkeys(warn_msgs) if len(w)))
+                print(f"Warning: {target_id} coords incomplete; ra={ra}, dec={dec}, parallax={par}")
 
 
         # Lookup ephemeris information primarily from TESS-ebs but also config overrides & estimate
