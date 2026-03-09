@@ -82,8 +82,10 @@ class Testpipeline(unittest.TestCase):
             # for test which address the values
             self.assertIn("t0", lc.meta)
             self.assertIn("primary_times", lc.meta)
+            self.assertIn("primary_depths", lc.meta)
             self.assertIn("primary_completeness", lc.meta)
             self.assertIn("secondary_times", lc.meta)
+            self.assertIn("secondary_depths", lc.meta)
             self.assertIn("secondary_completeness", lc.meta)
 
     #

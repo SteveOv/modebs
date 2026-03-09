@@ -264,10 +264,10 @@ def find_eclipses_and_completeness(lc: LightCurve,
                                    verbose: bool=False) \
         -> Tuple[float, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
-    Will find the times of all primary and secondary eclipses within the bounds of the
-    passed LightCurve. The eclipse timings will be refined by inspecting the LightCurve fluxes.
-    For each eclipse a completeness metric will be calculated, which is the ratio of the number
-    of fluxes recorded against the maximum possible based on the supplied eclipse duration.
+    Will find the times of all primary and secondary eclipses within the bounds of the passed
+    LightCurve. The eclipse timings will be refined by inspecting the LightCurve fluxes. For each
+    eclipse the depth and a completeness metric will be calculated (this is the ratio of the number
+    of fluxes recorded against the maximum possible based on the supplied eclipse duration).
     Will also return the time of the most complete primary eclipse as a refined reference time (t0).
 
     The func can use peak prominences to improve discrimination when locating the eclipses, which is
@@ -284,12 +284,14 @@ def find_eclipses_and_completeness(lc: LightCurve,
     :phis: the phase of the secondary eclipses relative to the primary eclipses
     :search_window_phase: size of the window, in units of phase, within which to find each eclipse
     :verbose: whether or not to send messages to stdout with details the search
-    :returns: a tuple of (t0, prim_times, prim_completeness, sec_times, sec_completeness)
+    :returns: tuple (t0, prim_times, pri_depths, prim_complete, sec_times, sec_depths, sec_complete)
     """
     ref_t0 = to_lc_time(ref_t0, lc).value if isinstance(ref_t0, Time) else nominal_value(ref_t0)
     period = period.to(u.d).value if isinstance(period, u.Quantity) else nominal_value(period)
-    widthp = nominal_value(widthp)
-    widths = nominal_value(widths)
+    widthp = round(nominal_value(widthp), 3)
+    widths = round(nominal_value(widths), 3)
+    depthp = round(nominal_value(depthp or 0), 3)
+    depths = round(nominal_value(depths or 0), 3)
 
     # Invert the fluxes so that eclipses are peaks
     times = lc.time.value
@@ -297,14 +299,16 @@ def find_eclipses_and_completeness(lc: LightCurve,
     fluxes = fluxes.max() - fluxes
     half_window_dur = period * max(search_window_phase / 2, widthp, widths)
 
-    def find_eclipses_and_mask(ref_time, ecl_dur, min_ecl_prom) -> Tuple[np.ndarray, np.ndarray]:
+    def find_eclipses_and_mask(ref_time, ecl_dur, ecl_depth) \
+                                    -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
-        Parse LC for an array of contained eclipse timings and corresponding completeness metrics
+        Parse LC for arrays of contained eclipse timings, depths & completeness metrics
         """
-        ecl_times, ecl_completeness = [], []
+        ecl_times, ecl_depths, ecl_compls = [], [], []
         half_ecl_dur = ecl_dur / 2
         ecl_exp_bins = np.ceil(ecl_dur * 86400 / lc.meta['FRAMETIM'] / lc.meta['NUM_FRM'])
-        ecl_min_find_bins = ecl_exp_bins * 0.25     # For potential eclipses with find_peaks
+        ecl_min_find_bins = ecl_exp_bins * 0.20  # For eclipses with find_peaks, we handle
+        ecl_min_find_prom = ecl_depth * 0.50     # potential over-reporting of widths/depths.
 
         # Subtract extra period so that, whatever the offset, we're always before the sector start
         ecl_time = ref_time - period + (period * int((times.min()-ref_time) / period))
@@ -315,37 +319,40 @@ def find_eclipses_and_completeness(lc: LightCurve,
             if np.any(window_mask):
                 window_fluxes = fluxes[window_mask]
                 peaks, props = find_peaks(window_fluxes, width=ecl_min_find_bins,
-                                          prominence=min_ecl_prom, wlen=ecl_exp_bins)
+                                          prominence=ecl_min_find_prom, wlen=ecl_exp_bins)
                 if is_ecl_found := len(peaks) > 0:
                     # Currently unweighted, but if we find the incorrect peak is being picked in
                     # noisy/pulsator LCs, we can add weighting based on proximity to expected time.
-                    peak_ix = np.argmax(props["prominences"])
+                    prominences = props["prominences"]
+                    peak_ix = np.argmax(prominences)
 
-                    # Found the eclipse, so we can refine its time and decide whether it's complete
+                    # Found the eclipse, so we can refine its time and decide whether it's complete.
+                    # Because the fluxes may not be detrended we use the eclipse prominence, rather
+                    # than a flux value, for the depth as this is the peak flux c/w its suroundings.
                     ecl_time = times[window_mask][peaks[peak_ix]]
                     ecl_times += [ecl_time]
+                    ecl_depths += [prominences[peak_ix]]
                     ecl_mask = (ecl_time-half_ecl_dur <= times) & (times <= ecl_time+half_ecl_dur)
-                    ecl_completeness += [sum(ecl_mask) / ecl_exp_bins]
+                    ecl_compls += [sum(ecl_mask) / ecl_exp_bins]
 
             if not is_ecl_found and times.min()-half_ecl_dur < ecl_time < times.max()+half_ecl_dur:
                 ecl_times += [ecl_time]
+                ecl_depths += [None]    # We simply don't know
                 ecl_mask = (ecl_time-half_ecl_dur <= times) & (times <= ecl_time+half_ecl_dur)
-                ecl_completeness += [sum(ecl_mask) / ecl_exp_bins]
+                ecl_compls += [sum(ecl_mask) / ecl_exp_bins]
 
             ecl_time += period
-        return np.array(ecl_times), np.array(ecl_completeness)
+        return np.array(ecl_times, float), np.array(ecl_depths, float), np.array(ecl_compls, float)
 
     t0 = ref_t0
-    min_promp = None if depthp is None else round(nominal_value(depthp) * 0.66, 3)
-    min_proms = None if depths is None else round(nominal_value(depths) * 0.66, 3)
     if verbose:
-        print(f"Finding (pri, sec) eclipses in sector {lc.sector} with min width {widthp:.3f} &",
-              f"{widths:.3f} [phase] and min depth {min_promp} & {min_proms} [flux]", end="...")
+        print(f"Finding eclipses in sector {lc.sector} with pri & sec widths {widthp} &",
+              f"{widths} [phase] and depths {depthp} & {depths} [flux]", end="...")
     for p in range(1, 3):
-        pri_times, pri_compl = find_eclipses_and_mask(t0, widthp * period, min_promp)
+        pri_times, pri_depths, pri_compl = find_eclipses_and_mask(t0, widthp * period, depthp)
 
         t0 += period * nominal_value(phis)
-        sec_times, sec_compl = find_eclipses_and_mask(t0, widths * period, min_proms)
+        sec_times, sec_depths, sec_compl = find_eclipses_and_mask(t0, widths * period, depths)
 
         if verbose and p == 2:
             print(f"found {sum(pri_compl>0)} & {sum(sec_compl>0)} eclipse(s) with fluxes.")
@@ -360,7 +367,7 @@ def find_eclipses_and_completeness(lc: LightCurve,
         else:
             t0 = ref_t0
 
-    return (t0, pri_times, pri_compl, sec_times, sec_compl)
+    return (t0, pri_times, pri_depths, pri_compl, sec_times, sec_depths, sec_compl)
 
 
 def create_eclipse_mask(lc: LightCurve,

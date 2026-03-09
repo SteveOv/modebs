@@ -217,12 +217,15 @@ class Testlightcurves(unittest.TestCase):
 
             # self._plot_lcs_and_eclipses(lcs, ret_vals, completeness_th)
 
-            for lc, (t0, pri_times, pri_compl, sec_times, sec_compl), exp_num_prim, exp_num_sec in zip(lcs, ret_vals, exp_prim, exp_sec):
+            for lc, ret_val, exp_num_prim, exp_num_sec in zip(lcs, ret_vals, exp_prim, exp_sec):
+                (t0, pri_times, pri_depths, pri_compl, sec_times, sec_depths, sec_compl) = ret_val
                 with self.subTest(lc.meta["LABEL"]):
                     if exp_num_prim > 0:
                         self.assertTrue(lc.time.value.min() <= t0 <= lc.time.value.max())
                     self.assertEqual(len(pri_times), len(pri_compl))
                     self.assertEqual(len(sec_times), len(sec_compl))
+                    self.assertEqual(len(pri_times), len(pri_depths))
+                    self.assertEqual(len(sec_times), len(sec_depths))
                     self.assertEqual(sum(pri_compl > completeness_th), exp_num_prim)
                     self.assertEqual(sum(sec_compl > completeness_th), exp_num_sec)
 
@@ -235,15 +238,20 @@ class Testlightcurves(unittest.TestCase):
 
         def plot_eclipses(ix, ax, _):
             ed = data[ix]
-            ax.plot(ed[0], -0.1, marker="*", markersize=10, color="r")
-            for times, compl, ls, c, label in [(ed[1], ed[2], "-.", "r", "primary"), (ed[3], ed[4], "--", "g", "secondary")]:
+            ax.text(ed[0], 1.025, r"$t_{\rm 0}$", c="k", size="large", fontweight="bold",
+                    ha="center", zorder=-10, alpha=1, backgroundcolor="w")
+            for times, depths, compl, ls, c, label in [
+                (ed[1], ed[2], ed[3], "-.", "r", "primary"),
+                (ed[4], ed[5], ed[6], "--", "g", "secondary")
+            ]:
                 alphas = [0.66 if c > completeness_th else 0.20 for c in compl]
-                ax.vlines(times, -0.2, 1.0, c, ls, label, alpha=alphas, zorder=-20, transform=ax.get_xaxis_transform())
-                for times, compl, a in zip(times, compl, alphas):
-                    ax.text(times, 0, f"{compl:.0%}", c=c, rotation=90, alpha=a + 0.3,
-                            va="center", ha="center", zorder=-10, backgroundcolor="w")
+                ax.vlines(times, 0.4, 1.05, c, ls, label, alpha=alphas, zorder=-20)
+                for times, dps, compl, a in zip(times, depths, compl, alphas):
+                    ax.plot(times, 1.0-dps, marker="+", markersize=10, color=c, zorder=-10, alpha=a)
+                    ax.text(times, 0.45, f"{compl:.0%}", c=c, rotation=90, size="x-small",
+                            va="center", ha="center", zorder=-10, alpha=a+0.3, backgroundcolor="w")
 
-        plots.plot_lightcurves(lcs, cols=min(len(lcs), 3), column="delta_mag", ax_func=plot_eclipses, legend_loc="best")
+        plots.plot_lightcurves(lcs, cols=min(len(lcs), 3), ax_func=plot_eclipses)
         plt.show()
         plt.close()
 

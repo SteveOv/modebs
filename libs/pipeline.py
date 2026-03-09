@@ -179,7 +179,8 @@ def add_eclipse_meta_to_lightcurves(lcs: LightCurveCollection,
         # We will use the revised/refined reference time as a starting position for the next sector
         ref_t0 = lc.meta["t0"] = ecl_data[0] or ref_t0
         lc.meta |= dict(zip(
-            ["primary_times", "primary_completeness", "secondary_times", "secondary_completeness"],
+            ["primary_times", "primary_depths", "primary_completeness",
+             "secondary_times", "secondary_depths", "secondary_completeness"],
             ecl_data[1:]
         ))
 

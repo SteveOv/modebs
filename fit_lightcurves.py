@@ -39,12 +39,16 @@ FLATTEN_TH = 0.2
 
 # Plotting ax_func callback functions
 def indicate_eclipses(_, ax, lc): # pylint: disable=redefined-outer-name
-    """ Vertical line for each pri/sec eclipse times with extra + marker for t0 eclipse """
-    for ecl_type, ls, c in [("secondary", "--", "g"), ("primary", "-.", "r")]:
+    """ Draw lines for each identified pri/sec eclipse time & depth and highlight the t0 time """
+    for ecl_type, ls, c in [
+        ("secondary", "--", "g"),
+        ("primary", "-.", "r")
+    ]:
         alphas = [0.33 if cf else 0.1 for cf in lc.meta[f"{ecl_type}_completeness"] >= ECLIPSE_COMPLETE_TH]
-        if len(lc.meta[f"{ecl_type}_times"]) > 0:
-            ax.vlines(lc.meta[f"{ecl_type}_times"], 0.5, 1.05, c, ls, label=ecl_type, alpha=alphas, zorder=-20)
-        ax.plot(lc.meta["t0"], 1.03, marker="+", markersize=10, color="r", zorder=-10, alpha=0.33)
+        if len(times := lc.meta[f"{ecl_type}_times"]) > 0:
+            ax.vlines(times, 0.5, 1.1, c, ls, label=ecl_type, alpha=alphas, zorder=-20)
+            ax.plot(times, 1.0-lc.meta[f"{ecl_type}_depths"], f"{c}+", markersize=10, alpha=0.33, zorder=-20)
+    ax.plot(lc.meta["t0"], 1.08, "rv", markersize=6, alpha=0.5, zorder=-20)
 
 def highlight_mask(_, ax, lc): # pylint: disable=redefined-outer-name
     """ Grey background for timespans in the lcs' meta[flat_mask] """
