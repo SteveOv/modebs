@@ -15,7 +15,7 @@ import astropy.units as u
 
 # pylint: disable=line-too-long, wrong-import-position
 warnings.filterwarnings("ignore", "Using UFloat objects with std_dev==0 may give unexpected results.", category=UserWarning)
-from uncertainties import ufloat, nominal_value
+from uncertainties import ufloat, nominal_value, std_dev
 from uncertainties.unumpy import nominal_values
 
 from deblib.constants import G, R_sun, M_sun
@@ -181,6 +181,8 @@ if __name__ == "__main__":
 
                     # *** also updates the target data ***
                     write_params[k] = val
+                    if std_dev(val) > nominal_value(val) / 10:
+                        warn_msgs += [f"{k} uncertainty>10%"]
 
 
                 # Finally, store the params and the flag that indicates fitting has completed
