@@ -263,7 +263,7 @@ class Testpipeline(unittest.TestCase):
             "LDA2_fit": 0,          "LDB2_fit": 0,
             "reflA_fit": 0,         "reflB_fit": 0,
                                     "sf_fit": 1,
-            "period_fit": 1,        "primary_epoch_fit": 1,
+            "period_fit": 1,        "t0_fit": 1,
 
         }
 
