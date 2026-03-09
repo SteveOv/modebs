@@ -7,6 +7,7 @@ import argparse
 from datetime import datetime
 from contextlib import redirect_stdout
 import traceback
+from time import sleep
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -106,6 +107,9 @@ if __name__ == "__main__":
         radius_limits = (0.1, 100)
 
         for fit_counter, target_id in enumerate(to_fit_target_ids, start=1):
+            if fit_counter > 1:
+                sleep(10) # Give emcee a quick break, in prep for the next target
+
             try:
                 print("\n\n------------------------------------------------------------")
                 print(f"Processing target {fit_counter} of {to_fit_count}: {target_id}")
