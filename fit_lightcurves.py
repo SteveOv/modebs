@@ -6,6 +6,7 @@ import warnings
 import argparse
 from datetime import datetime
 from contextlib import redirect_stdout
+from sys import stdout
 import copy
 import traceback
 
@@ -400,7 +401,7 @@ if __name__ == "__main__":
             except Exception as exc: # pylint: disable=broad-exception-caught
                 print("\n*** Failed with the following error. Depending on the nature of the",
                       "error, it may be possible to rerun this module to fit failed targets. ***")
-                traceback.print_exception(exc, file=log)
+                traceback.print_exception(exc, file=stdout)
                 wset.write_values(target_id, fitted_lcs=False, errors=type(exc).__name__,
                                   warnings=";".join(w for w in dict.fromkeys(warn_msgs) if len(w)))
 
