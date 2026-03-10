@@ -179,10 +179,11 @@ if __name__ == "__main__":
                         label = f"({lval:.3f} {unit:unicode})"
                     print(f"{k:>12s} = {val:.3f} {unit:unicode} \t", label)
 
+                    if std_dev(val) > nominal_value(val) * 0.20:
+                        warn_msgs += [f"{k} uncertainty>20%"]
+
                     # *** also updates the target data ***
                     write_params[k] = val
-                    if std_dev(val) > nominal_value(val) / 10:
-                        warn_msgs += [f"{k} uncertainty>10%"]
 
 
                 # Finally, store the params and the flag that indicates fitting has completed
