@@ -16,7 +16,7 @@ from astroquery.simbad import Simbad
 from astroquery.gaia import Gaia
 import numpy as np
 
-from libs import pipeline, catalogues
+from libs import pipeline
 from libs.iohelpers import Tee
 from libs.targets import Targets
 from libs.pipeline_dal import QTableFileDal
@@ -128,46 +128,31 @@ if __name__ == "__main__":
                 warn_msgs = (warn_msgs or "").split(";") + ["coords incomplete"]
                 dal.write_values(target_id,
                                  warnings=";".join(w for w in dict.fromkeys(warn_msgs) if len(w)))
-                print(f"Warning: {target_id} coords incomplete; ra={ra}, dec={dec}, parallax={par}")
+                print(f"** Warning {target_id} coords incomplete: ra={ra},dec={dec},parallax={par}")
 
 
-        # Lookup ephemeris information primarily from TESS-ebs but also config overrides & estimate
-        # eclipse widths if missing. These queries are keyed on numerical part of the TIC.
-        print("\nQuerying TESS-ebs for ephemeris data.")
+        print("\nGathering ephemeris, morphology and eclipse data.")
         ephem_keys = ["t0", "period", "morph", "widthP", "depthP", "widthS", "depthS", "phiS"]
-        for target_id, tics in dal.yield_values(dal.key_name, "tics"):
+        for target_id, tics, warn_msgs in dal.yield_values(dal.key_name, "tics", "warnings"):
+            warn_msgs = (dal.read_values(target_id, "warnings") or "").split(";")
+            params = {}
+
             config = targets_config.get(target_id)
-            params = catalogues.query_tess_ebs_ephemeris(tics.split("|"), config.period_factor)
-            if params is None:
-                print(f"{target_id}: no TESS-ebs ephmeris so override values will be required.")
-                params = { }
-
-            # Special case: if no secondary data and we know period is doubled. This is likely to
-            # be a system with very similar primary and secondary eclipses, so copy values over.
-            if config.period_factor == 2 \
-                    and all(params[v] is None for v in ["widthS", "depthS", "phiS"]):
-                print(f"{target_id}: No secondary data in TESS-ebs & the period is to be doubled.",
-                      "Copying primary data to the secondary (assume similar eclipses & phiS=0.5).")
-                params["widthS"] = params["widthP"]
-                params["depthS"] = params["depthP"]
-                params["phiS"] = 0.5
-
-            ephem_overs_keys = [k for k in ephem_keys if config.has_value(k)]
-            if len(ephem_overs_keys) > 0:
-                print(f"{target_id}: copying ephemeris overrides of {ephem_overs_keys} from config")
-                for k in ephem_overs_keys:
+            if len(ephem_config_keys := [k for k in ephem_keys if config.has_value(k)]) > 0:
+                print(f"{target_id}: copying ephemeris values for {ephem_config_keys} from config")
+                for k in ephem_config_keys:
                     if config.has_value(k_err := f"{k}_err"):
                         params[k] = ufloat(config.get(k), config.get(k_err, 0))
                     else:
                         params[k] = config.get(k)
 
-            if params.get("widthP", None) is None or params.get("widthS", None) is None:
-                widthP, _ = catalogues.estimate_eclipse_widths_from_morphology(params["morph"])
-                params["widthP"] = params["widthS"] = widthP
-                print(f"{target_id}: no eclipse widths found, so an estimated a value of",
-                    f"{params['widthP']:.3f} is being used for both (based on morph).")
+            if missing_ephem_keys := [k for k in ephem_keys if k not in params]:
+                print(f"** Warning the following ephemeris values were not in {target_id} config:",
+                      ",".join(k for k in missing_ephem_keys))
+                warn_msgs += ["incomplete ephemeris"]
 
-            dal.write_values(target_id, **params)
+            dal.write_values(target_id, **params,
+                             warnings=";".join(w for w in dict.fromkeys(warn_msgs) if len(w)))
 
 
         print("\nApplying any non-ephemeris overrides from config.")
