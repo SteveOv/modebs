@@ -17,6 +17,7 @@ import astropy.units as u
 warnings.filterwarnings("ignore", "Using UFloat objects with std_dev==0 may give unexpected results.", category=UserWarning)
 from uncertainties import ufloat, UFloat, nominal_value, std_dev
 from uncertainties.unumpy import nominal_values
+from matplotlib import use as mpl_use
 import matplotlib.pyplot as plt
 
 from ebop_maven.estimator import Estimator
@@ -36,6 +37,8 @@ ECLIPSE_COMPLETE_TH = 0.9
 # The morph value for systems considered very well detached & from which we invoke flattening & clip
 FLATTEN_TH = 0.2
 
+# Use a non-interactive matplotlib backend to avoid threading errors (issue #36).
+mpl_use("agg")
 
 # Plotting ax_func callback functions
 def indicate_eclipses(_, ax, lc): # pylint: disable=redefined-outer-name

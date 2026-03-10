@@ -10,6 +10,7 @@ import traceback
 from time import sleep
 
 import numpy as np
+from matplotlib import use as mpl_use
 import matplotlib.pyplot as plt
 import astropy.units as u
 from astropy.coordinates import SkyCoord
@@ -53,6 +54,9 @@ fit_mask = np.array([True] * NUM_STARS      # Teff
                   + [True] * NUM_STARS      # radius
                   + [True]                  # dist
                   + [False])                # Av (we handle av by derredening the SED)
+
+# Use a non-interactive matplotlib backend to avoid threading errors (issue #36).
+mpl_use("agg")
 
 
 if __name__ == "__main__":

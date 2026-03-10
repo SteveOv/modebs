@@ -10,6 +10,7 @@ import traceback
 from time import sleep
 
 import numpy as np
+from matplotlib import use as mpl_use
 import matplotlib.pyplot as plt
 import astropy.units as u
 
@@ -40,6 +41,9 @@ theta_labels = np.array([f"$M_{{\\rm {sub}}} / {{\\rm R_{{\\odot}}}}$" for sub i
 
 theta_params_and_units = np.array([(f"M{sub}", u.Msun) for sub in subs] \
                                 + [("log_age", u.dex(u.yr))])
+
+# Use a non-interactive matplotlib backend to avoid threading errors (issue #36).
+mpl_use("agg")
 
 
 def print_mass_theta(theta, name: str="theta"):
@@ -170,7 +174,7 @@ if __name__ == "__main__":
                         plt.close(fig)
 
 
-                print(f"Final fitted parameters for {target_id} ([known value])")
+                print(f"\nFinal fitted parameters for {target_id} ([known value])")
                 write_params = { "M_sys": M_sys, "a": a }
                 for (k, unit), val in zip(theta_params_and_units, theta_fit):
                     label = ""
