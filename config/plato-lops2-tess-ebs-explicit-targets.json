@@ -7,7 +7,7 @@
     "target_configs": {
         "TIC 7695666": {
             "details": "2 short cadence sectors (4 & 5); tess-ebs morph 0.093 & period ~17.554 d; Gaia DR3 ruwe 1.717; eclipses of ~0.5 & ~0.4 mag; S4 has 2 of each & S5 has 1 of each; highly eccentric with phiS ~0.16;",
-            "notes": "in the 2021ApJ...912..123J catalogue; as so highly eccentric need help with overrides to fit;",
+            "notes": "as so highly eccentric need help with overrides to fit;",
             "t0": 1429.2434042886318,
             "t0_err": 0.00003960879985243082,
             "period": 17.553700894345678,
@@ -18,11 +18,24 @@
             "depthP": 0.372,
             "depthS": 0.338,
             "phiS": 0.164,
-            "jktebop_overrides": { "ecosw": -0.56, "esinw": 0.08, "inc": 88.7 }
+            "jktebop_overrides": { "ecosw": -0.56, "esinw": 0.08, "inc": 88.7 },
+            "labels": {
+                "source": "2021ApJ...912..123J",
+                "t0": 1411.69019,
+                "period": 17.55313263,
+                "k": 0.7236965958,
+                "ecosw": -0.5570177428,
+                "esinw": 0.07526052144,
+                "inc": 88.79511608,
+                "LR": 0.5194208953,
+                "TeffA": 5961.0,
+                "TeffB": 5946.0,
+                "rA_plus_rB": 0.07999961629626154
+            }
         },
         "TIC 30034081": {
             "details": "38 short cadence sectors (4-13, 27, 29-39, 61-69, 87-90 & 93-96); tess-ebs morph 0.506 & period ~2.345 d (incorrect); Gaia DR3 ruwe 0.744; AKA AT Men; SpT G0; deep eclipses of ~0.60 mag; low noise; slow variability across sectors;",
-            "notes": "in the 2021ApJ...912..123J catalogue; using TESS-ebs period looses the secondary eclipses; doubling TESS-ebs period, copying primary width/depth to secondary and halving widths;",
+            "notes": "using TESS-ebs period looses the secondary eclipses; doubling TESS-ebs period, copying primary width/depth to secondary and halving widths;",
             "t0": 1411.5531160193027,
             "t0_err": 0.000007046963924097794,
             "period": 4.6892177144299785,
@@ -32,11 +45,24 @@
             "widthS": 0.068,
             "depthP": 0.452,
             "depthS": 0.452,
-            "phiS": 0.500
+            "phiS": 0.500,
+            "labels": {
+                "source": "2021ApJ...912..123J",
+                "t0": 1439.690062,
+                "period": 4.689181915,
+                "k": 1.061373177,
+                "ecosw": -9.099225854e-05,
+                "esinw": -0.01098989617,
+                "inc": 89.65608193,
+                "LR": 1.133751875,
+                "TeffA": 6398.0,
+                "TeffB": 6412.0,
+                "rA_plus_rB": 0.1994957919708466
+            }
         },
         "TIC 30313682": {
             "details": "27 short cadence sectors (1-13, 61-68, 87-90, 90-95); tess-ebs morph 0.422 & period ~5.727 d; Gaia DR3 ruwe 0.920; eclipses of ~0.17 & ~0.12 mag; secondary is total; lots of variability (starspots?); crowded FoV so expect L3>0;",
-            "notes": "in the 2021ApJ...912..123J catalogue;",
+            "notes": "",
             "t0": 1329.8969399482096,
             "t0_err": 0.00007285406559276453,
             "period": 5.727367397661838,
@@ -46,11 +72,24 @@
             "widthS": 0.076,
             "depthP": 0.169,
             "depthS": 0.128,
-            "phiS": 0.500
+            "phiS": 0.500,
+            "labels": {
+                "source": "2021ApJ...912..123J",
+                "t0": 1473.080986,
+                "period": 5.727366726,
+                "k": 0.3942547434,
+                "ecosw": -1.3297386e-05,
+                "esinw": -0.003649045366,
+                "inc": 87.35226344,
+                "LR": 0.1256848531,
+                "TeffA": 6303.0,
+                "TeffB": 5903.0,
+                "rA_plus_rB": 0.17514983867288095
+            }
         },
         "TIC 31810287": {
             "details": "6 short cadence sectors (8-9, 35-36 & 62-63); tess-ebs morph 0.233 & period ~4.762 d; Gaia DR3 ruwe 1.071; eclipses of ~0.35 & ~0.05 mag; lots of wide variability - may require flattening; sparse FoV;",
-            "notes": "in the 2021ApJ...912..123J catalogue;",
+            "notes": "",
             "t0": 1519.9896862515548,
             "t0_err": 0.0001161816335297,
             "period": 4.761550558703659,
@@ -61,11 +100,24 @@
             "depthP": 0.287,
             "depthS": 0.049,
             "phiS": 0.500,
-            "flatten": true
+            "flatten": true,
+            "labels": {
+                "source": "2021ApJ...912..123J",
+                "t0": 1548.558995,
+                "period": 4.761538442,
+                "k": 0.5334471034,
+                "ecosw": 0.0001777156831,
+                "esinw": -0.01021533034,
+                "inc": 87.69792252,
+                "LR": 0.05283918099,
+                "TeffA": 6003.0,
+                "TeffB": 4003.0,
+                "rA_plus_rB": 0.12084559251645699
+            }
         },        
         "TIC 32759110": {
             "details": "1 short cadence sector (6); tess-ebs morph 0.128 & period ~4.077 d; Gaia DR3 ruwe 1.226; SpT M4.5Ve; eclipses of ~0.17 & ~0.15 mag, some noise & flares;",
-            "notes": "in the 2021ApJ...912..123J catalogue;",
+            "notes": "",
             "t0": 1469.6063077865567,
             "t0_err": 0.0003451971774666,
             "period": 4.0770359457173475,
@@ -75,11 +127,24 @@
             "widthS": 0.018,
             "depthP": 0.162,
             "depthS": 0.143,
-            "phiS": 0.500
+            "phiS": 0.500,
+            "labels": {
+                "source": "2021ApJ...912..123J",
+                "t0": 1469.606855,
+                "period": 4.076990542,
+                "k": 0.6511693457,
+                "ecosw": 4.512378824e-05,
+                "esinw": -0.02623195283,
+                "inc": 88.23474493,
+                "LR": 0.3262496619,
+                "TeffA": 3002.0,
+                "TeffB": 2883.0,
+                "rA_plus_rB": 0.056867747007500885
+            }
         },
         "TIC 37606218": {
             "details": "2 short cadence sectors (6 & 87); tess-ebs morph 0.210 & period ~7.836 d; Gaia DR3 ruwe 1.270; flat LCs with shallow eclipses of ~0.12 & 0.015 mag (secondary total); discontinuities in S87;",
-            "notes": "in the 2021ApJ...912..123J catalogue;",
+            "notes": "",
             "t0": 1469.61221486677,
             "t0_err": 0.0001851572519626,
             "period": 7.835854454657059,
@@ -89,7 +154,20 @@
             "widthS": 0.046,
             "depthP": 0.106,
             "depthS": 0.013,
-            "phiS": 0.537
+            "phiS": 0.537,
+            "labels": {
+                "source": "2021ApJ...912..123J",
+                "t0": 1469.608819,
+                "period": 7.839473762,
+                "k": 0.3062587812,
+                "ecosw": 0.06562936808,
+                "esinw": -0.4996869102,
+                "inc": 89.04317726,
+                "LR": 0.004046566757,
+                "TeffA": 6306.0,
+                "TeffB": 3118.0,
+                "rA_plus_rB": 0.060356430704564125
+            }
         },
         "TIC 55497281": {
             "details": "41 short cadence sectors (S1-13, 27-39, 61-69, 87-90, 93 & 95-97); tess-ebs morph 0.070 & period ~14.905 d; Gaia DR3 ruwe 0.989; aka AL Dor; SpT F8V; eclipses of ~0.5 & ~0.4 mag;",
@@ -105,6 +183,7 @@
             "depthS": 0.314,
             "phiS": 0.462,
             "labels": {
+                "source": "GraczykPietrzynski+21aa",
                 "RA": 1.0917,       "RA_err": 0.0020,
                 "RB": 1.0983,       "RB_err": 0.0020,
                 "TeffA": 6056,      "TeffA_err": 60,
@@ -114,8 +193,7 @@
                 "loggA": 4.404,     "loggA_err": 0.002,
                 "loggB": 4.399,     "loggB_err": 0.002,
                 "ebv": 0.002,       "ebv_err": 0.002,
-                "dist": 66,         "dist_err": 1,
-                "source": "GraczykPietrzynski+21aa"
+                "dist": 66,         "dist_err": 1
             }
         },
         "TIC 55659311": {
@@ -135,7 +213,7 @@
         },
         "TIC 63192395": {
             "details": "3 short cadence sectors (6, 7 & 87); tess-ebs morph 0.528 & period ~3.065 d; Gaia DR3 ruwe 1.259; eclipses of ~0.33 & ~0.30 mag; some ellipsoidal effect; eclipses have shifted by +0.05 by sector 87; some crowding in FoV so expect L3>0;",
-            "notes": "in the 2021ApJ...912..123J catalogue; in TBOSB;",
+            "notes": "in TBOSB;",
             "t0": 1468.8105305003464,
             "t0_err": 0.0006972086935093,
             "period": 3.0649390079212417,
@@ -145,7 +223,20 @@
             "widthS": 0.123,
             "depthP": 0.334,
             "depthS": 0.319,
-            "phiS": 0.500
+            "phiS": 0.500,
+            "labels": {
+                "source": "2021ApJ...912..123J",
+                "t0": 1493.330175,
+                "period": 3.064975172,
+                "k": 0.665433803,
+                "ecosw": -0.0005927903684,
+                "esinw": -0.0244914431,
+                "inc": 85.52430355,
+                "LR": 0.4340774533,
+                "TeffA": 6522.0,
+                "TeffB": 6480.0,
+                "rA_plus_rB": 0.3359346214945581
+            }
         },
         "TIC 63579446": {
             "details": "2 short cadence sectors (7 & 87); tess-ebs morph 0.382 & period ~5.583 d; Gaia DR3 ruwe 1.003; sector 87 heavily distorted in both SAP & PDCSAP (lower pdc_tot, 0.960 v 0.986); eclipses of ~0.35 & ~0.30 mag; secondary may be total; some slow variability; some crowding in FoV so expect L3>0;",
@@ -164,7 +255,7 @@
         },
         "TIC 66602813": {
             "details": "6 short cadence sectors (7, 33-34, 61, 87-88); tess-ebs morph 0.352 & period ~2.764 d; Gaia DR3 ruwe 0.985; eclipses of ~0.6 & ~0.2 mag; slow variability - starspots?; crowded FoV so expected L3>0;",
-            "notes": "in the 2021ApJ...912..123J catalogue;",
+            "notes": "",
             "t0": 1493.9209582604026,
             "t0_err": 0.0030758091422740004,
             "period": 2.764074003601624,
@@ -174,11 +265,24 @@
             "widthS": 0.071,
             "depthP": 0.465,
             "depthS": 0.214,
-            "phiS": 0.500
+            "phiS": 0.500,
+            "labels": {
+                "source": "2021ApJ...912..123J",
+                "t0": 1493.917801,
+                "period": 2.764082172,
+                "k": 0.7172238866,
+                "ecosw": -0.000109066799,
+                "esinw": -0.0004769307319,
+                "inc": 88.75641173,
+                "LR": 0.2518869063,
+                "TeffA": 6353.0,
+                "TeffB": 5176.0,
+                "rA_plus_rB": 0.1920692266249016
+            }
         },
         "TIC 77158150": {
             "details": "2 short cadence sectors (4 & 5); tess-ebs morph 0.466 & period ~2.487 d; not found in Gaia DR3; aka RZ Cae; SpT A4V; eclipses of ~0.25 & ~0.15 mag; ellipsoidal variation;",
-            "notes": "in the 2021ApJ...912..123J catalogue;",
+            "notes": "",
             "t0": 1413.1698587202868,
             "t0_err": 0.0002858762975392,
             "period": 2.4869478793574284,
@@ -188,11 +292,24 @@
             "widthS": 0.092,
             "depthP": 0.257,
             "depthS": 0.178,
-            "phiS": 0.500
+            "phiS": 0.500,
+            "labels": {
+                "source": "2021ApJ...912..123J",
+                "t0": 1438.039319,
+                "period": 2.486970396,
+                "k": 0.6529711482,
+                "ecosw": 1.629361025e-05,
+                "esinw": -0.0155702197,
+                "inc": 82.19474504,
+                "LR": 0.2829439215,
+                "TeffA": 7971.0,
+                "TeffB": 6889.0,
+                "rA_plus_rB": 0.26975438100197036
+            }
         },
         "TIC 78568736": {
             "details": "3 short cadence sectors (6-7 & 33); tess-ebs morph 0.159 & period ~8.220 d; Gaia DR3 ruwe 1.738; SpT G; eclipses of ~0.60 & ~0.12 mag; slow variability; crowded FoV so expected L3>0;",
-            "notes": "in the 2021ApJ...912..123J catalogue;",
+            "notes": "",
             "t0": 1475.4638441602765,
             "t0_err": 0.0002663532447968,
             "period": 8.219787735005955,
@@ -202,11 +319,24 @@
             "widthS": 0.032,
             "depthP": 0.454,
             "depthS": 0.131,
-            "phiS": 0.503
+            "phiS": 0.503,
+            "labels": {
+                "source": "2021ApJ...912..123J",
+                "t0": 1491.903414,
+                "period": 8.219668638,
+                "k": 0.6613733485,
+                "ecosw": 0.004638046314,
+                "esinw": -0.01025957284,
+                "inc": 89.56425847,
+                "LR": 0.1345208755,
+                "TeffA": 5379.0,
+                "TeffB": 4105.0,
+                "rA_plus_rB": 0.08337241355381787
+            }
         },
         "TIC 80556181": {
             "details": "2 short cadence sectors (7 & 87); tess-ebs morph 0.481 & period ~2.820 d; Gaia DR3 ruwe 1.705; eclipses of ~0.40 & ~0.26 mag; secondary eclipse may be total; crowded FoV so expected L3>0;",
-            "notes": "in the 2021ApJ...912..123J catalogue;",
+            "notes": "",
             "t0": 1493.7793164487894,
             "t0_err": 0.00005652876279782504,
             "period": 2.8195817169353794,
@@ -216,11 +346,24 @@
             "widthS": 0.099,
             "depthP": 0.373,
             "depthS": 0.272,
-            "phiS": 0.500
+            "phiS": 0.500,
+            "labels": {
+                "source": "2021ApJ...912..123J",
+                "t0": 1493.779739,
+                "period": 2.819471123,
+                "k": 0.6501862408,
+                "ecosw": 7.459361021e-07,
+                "esinw": -0.004415433859,
+                "inc": 87.96379898,
+                "LR": 0.3248112386,
+                "TeffA": 6363.0,
+                "TeffB": 5865.0,
+                "rA_plus_rB": 0.25985131042007065
+            }
         },
         "TIC 80650858": {
             "details": "4 short cadence sectors (7, 8, 61 & 62); tess-ebs morph 0.517 & period ~1.916 d; Gaia DR3 ruwe 0.963; aka BH Pup; SpT B3/5III; eclipses of ~0.32 & ~0.10 mag; some variability; S8 heavily distorted after mid-sector break (known common region for distortion); secondary eclipse may be total; crowded FoV so expected some L3;",
-            "notes": "in the 2021ApJ...912..123J catalogue; override Teff_sys with starting value appropriate for B-type;",
+            "notes": "override Teff_sys with starting value appropriate for B-type;",
             "Teff_sys": 20000,
             "t0": 1492.2622523570126,
             "t0_err": 0.0003133141383386,
@@ -231,11 +374,24 @@
             "widthS": 0.127,
             "depthP": 0.339,
             "depthS": 0.112,
-            "phiS": 0.500
+            "phiS": 0.500,
+            "labels": {
+                "source": "2021ApJ...912..123J",
+                "t0": 1519.084475,
+                "period": 1.915855413,
+                "k": 0.5576903002,
+                "ecosw": -9.649285159e-06,
+                "esinw": -0.0162773706,
+                "inc": 87.20580023,
+                "LR": 0.1157148737,
+                "TeffA": 30912.0,
+                "TeffB": 16506.0,
+                "rA_plus_rB": 0.34057572457456137
+            }
         },
         "TIC 118313102": {
             "details": "8 short cadence sectors (8-10, 35-36, 61-63); tess-ebs morph 0.180 & period ~9.256 d; Gaia DR3 ruwe 0.962; aka NT Vel; SpT B6V(n); deep eclipses of ~0.69 & ~0.66 mag; clear pulsations; S8 heavily distorted after mid-sector break (known common region for distortion);",
-            "notes": "in the 2021ApJ...912..123J catalogue;",
+            "notes": "",
             "t0": 1518.556196525303,
             "t0_err": 0.0002486295261405,
             "period": 9.255726955582213,
@@ -245,7 +401,20 @@
             "widthS": 0.052,
             "depthP": 0.450,
             "depthS": 0.449,
-            "phiS": 0.400
+            "phiS": 0.400,
+            "labels": {
+                "source": "2021ApJ...912..123J",
+                "t0": 1546.322133,
+                "period": 9.255864371,
+                "k": 0.9228168306,
+                "ecosw": -0.1562833465,
+                "esinw": 0.1167588347,
+                "inc": 89.63811932,
+                "LR": 0.8782354699,
+                "TeffA": 11184.0,
+                "TeffB": 11391.0,
+                "rA_plus_rB": 0.13637444288428316
+            }
         },
         "TIC 140209204": {
             "details": "1 short cadence sector (5); tess-ebs morph 0.528 & period ~2.752 d; Gaia DR3 ruwe 0.868; aka SV Col; deep eclipses of ~0.46 & ~0.44 mag; ellipsoidal effect;",
@@ -263,7 +432,7 @@
         },
         "TIC 141685465": {
             "details": "26 short cadence sectors (4-13, 61-65, 67-69, 87-90, 93-96); tess-ebs morph 0.220 & period ~7.807 d; Gaia DR3 ruwe 1.882; flat LCs with eclipses of ~0.28 & ~0.06 mag; secondary likely total; crowded FoV so expect L3>0;",
-            "notes": "in the 2021ApJ...912..123J catalogue;",
+            "notes": "",
             "t0": 1416.1994505721334,
             "t0_err": 0.0014156166157589997,
             "period": 7.807422532611081,
@@ -273,11 +442,24 @@
             "widthS": 0.045,
             "depthP": 0.251,
             "depthS": 0.061,
-            "phiS": 0.500
+            "phiS": 0.500,
+            "labels": {
+                "source": "2021ApJ...912..123J",
+                "t0": 1548.925796,
+                "period": 7.80752676,
+                "k": 0.4621989266,
+                "ecosw": -0.003744088524,
+                "esinw": 0.002022147153,
+                "inc": 89.05621485,
+                "LR": 0.05814243951,
+                "TeffA": 5532.0,
+                "TeffB": 4089.0,
+                "rA_plus_rB": 0.1006736852631186
+            }
         },
         "TIC 160328766": {
             "details": "5 short cadence sectors (6, 32-33, 87 & 98); tess-ebs morph 0.199 & period ~10.318 d; Gaia DR3 ruwe 1.148; aka AW Col; SpT A3(m)A7-A7; eclipses of ~0.50 & ~0.15 mag; well detached and highly eccentric; some slow variability; all sectors have at least 1 of each eclipse type;",
-            "notes": "in the 2021ApJ...912..123J catalogue;",
+            "notes": "",
             "t0": 1470.0264426494273,
             "t0_err": 0.0067029799818101,
             "period": 10.317649481241766,
@@ -287,7 +469,20 @@
             "widthS": 0.022,
             "depthP": 0.398,
             "depthS": 0.171,
-            "phiS": 0.780
+            "phiS": 0.780,
+            "labels": {
+                "source": "2021ApJ...912..123J",
+                "t0": 1470.032924,
+                "period": 10.31873586,
+                "k": 0.6483761977,
+                "ecosw": 0.4303525798,
+                "esinw": -0.3266811858,
+                "inc": 89.7772399,
+                "LR": 0.1829033341,
+                "TeffA": 7605.0,
+                "TeffB": 5785.0,
+                "rA_plus_rB": 0.0897214509219045
+            }
         },
         "TIC 167756615": {
             "details": "3 short cadence sectors (5 @ 120s & 32-33 @ 600s); tess-ebs morph 0.159 & period ~19.430 d (incorrect); Gaia DR3 ruwe 2.227; eclipses of ~0.18 & ~0.13 mag; S5 has 1 of each sector; S32 has 2 secondaries & S33 has 3 primaries;",
@@ -316,11 +511,24 @@
             "widthS": 0.047,
             "depthP": 0.368,
             "depthS": 0.127,
-            "phiS": 0.602
+            "phiS": 0.602,
+            "labels": {
+                "source": "2021ApJ...912..123J",
+                "t0": 1495.614112,
+                "period": 11.34217321,
+                "k": 0.5793020043,
+                "ecosw": 0.15805579,
+                "esinw": 0.1851356983,
+                "inc": 89.92061897,
+                "LR": 0.1316858975,
+                "TeffA": 3529.0,
+                "TeffB": 2991.0,
+                "rA_plus_rB": 0.09627934484386667
+            }
         },
         "TIC 198011271": {
             "details": "5 short cadence sectors (3-5, 69 & 97); S97 covers >50 days; tess-ebs morph 0.429 & period ~1.934 d; Gaia DR3 ruwe 0.852; high snr; eclipses of ~0.60 & ~0.35 mag; slow and random variability;",
-            "notes": "in the 2021ApJ...912..123J catalogue;",
+            "notes": "",
             "t0": 1385.7986605188876,
             "t0_err": 0.0012825358385271,
             "period": 1.9335603655401719,
@@ -330,7 +538,20 @@
             "widthS": 0.085,
             "depthP": 0.418,
             "depthS": 0.283,
-            "phiS": 0.501
+            "phiS": 0.501,
+            "labels": {
+                "source": "2021ApJ...912..123J",
+                "t0": 1410.935816,
+                "period": 1.933528189,
+                "k": 0.9897197572,
+                "ecosw": -9.866608504e-05,
+                "esinw": -0.007046622866,
+                "inc": 86.44246762,
+                "LR": 0.6623365495,
+                "TeffA": 6431.0,
+                "TeffB": 5704.0,
+                "rA_plus_rB": 0.23829736077569819
+            }
         },
         "TIC 219362976": {
             "details": "5 short cadence sectors (4-6 & 31-32); tess-ebs morph 0.020 & period ~15.954 d; Gaia DR3 ruwe 1.221; high snr; eclipses of ~0.25 & ~0.07 mag; slow variability; highly eccentric with secondary at phase ~ 0.25;",
@@ -349,7 +570,7 @@
         },
         "TIC 219421171": {
             "details": "3 short cadence sectors (4-5 & 67); tess-ebs morph 0.165 & period ~8.303 d; Gaia DR3 ruwe 0.812; high snr; eclipses of ~0.20 & ~0.07 mag; slight eccentricity; discontinuity in S4 near 1412.5; potential nearby sources of L3;",
-            "notes": "in the 2021ApJ...912..123J catalogue; pdc_tot 0.899, 0.959 & 0.961 although S5 'best' on inspection;",
+            "notes": "pdc_tot 0.899, 0.959 & 0.961 although S5 'best' on inspection;",
             "t0": 1412.324120763006,
             "t0_err": 0.0009709444673262,
             "period": 8.302977031461277,
@@ -359,7 +580,20 @@
             "widthS": 0.037,
             "depthP": 0.177,
             "depthS": 0.066,
-            "phiS": 0.517
+            "phiS": 0.517,
+            "labels": {
+                "source": "2021ApJ...912..123J",
+                "t0": 1445.536111,
+                "period": 8.302998276,
+                "k": 0.6149680416,
+                "ecosw": 0.02700164345,
+                "esinw": 0.08613719343,
+                "inc": 86.04179942,
+                "LR": 0.201964501,
+                "TeffA": 6930.0,
+                "TeffB": 5686.0,
+                "rA_plus_rB": 0.11381324804431513
+            }
         },
         "TIC 238896417": {
             "details": "10 short cadence sectors (5-7, 61, 65, 68, 87-88, 95 & 98); tess-ebs morph 0.153 & period ~16.244 d; Gaia DR3 ruwe 6.978; good snr; eclipses of ~0.28 & ~0.24 mag; some discontinuities in LCs; slight eccentricity; 2 nearby bright sources of potential L3;",
@@ -407,7 +641,7 @@
         },
         "TIC 260502102": {
             "details": "41 short cadence sectors (1-13, 28-36, 38-39, 61-69 & 93-96); tess-ebs morph 0.125 & period ~7.315 d; Gaia DR3 ruwe 1.316; ok snr; eclipses of ~0.22 & ~0.18 mag; highly eccentric;",
-            "notes": "in the 2021ApJ.*..912..123J catalogue;",
+            "notes": "",
             "t0": 1600.0802653311275,
             "t0_err": 0.0000802082167865592,
             "period": 7.315208263471821,
@@ -417,7 +651,20 @@
             "widthS": 0.023,
             "depthP": 0.178,
             "depthS": 0.171,
-            "phiS": 0.678
+            "phiS": 0.678,
+            "labels": {
+                "source": "2021ApJ...912..123J",
+                "t0": 1468.407099,
+                "period": 7.31520456,
+                "k": 0.7564902686,
+                "ecosw": 0.2766596605,
+                "esinw": -0.1122952312,
+                "inc": 87.57676075,
+                "LR": 0.3930793172,
+                "TeffA": 5077.0,
+                "TeffB": 4648.0,
+                "rA_plus_rB": 0.07695067721695956
+            }
         },
         "TIC 260504147": {
             "details": "38 short cadence sectors (1-9, 11-13, 27-39, 61-62, 65-66, 87-89 & 93-96); tess-ebs morph 0.179 & period ~8.418 d; slightly eccentric; some slow variability; not in Gaia DR3; SpT F6V; good snr; eclipses of ~0.20 & ~0.18 mag; likely source of significant L3 nearby;",
@@ -452,7 +699,7 @@
             "exclude": true,
             "why_exclude": "cannot get a fit so will need investigation and probable intervention. Not even overriding ecosw & esinw with values calculated from J+A works!",
             "details": "14 short cadence sectors (6-7, 61, 66-69, 87-89 & 93-96); tess-ebs morph 0.088 & period ~19.169 d; Gaia DR3 ruwe 1.016; good snr; highly eccentric; eclipses of ~0.45 & ~0.30 mag; S67, 69, 87 & 94 likely insufficient coverage for single sector fits; sparce field so may be able to fix L3=0;",
-            "notes": "in the 2021ApJ...912..123J catalogue;",
+            "notes": "",
             "t0": 1468.4022822989011,
             "t0_err": 0.0003216476361558,
             "period": 19.168974575735646,
@@ -463,7 +710,20 @@
             "depthP": 0.360,
             "depthS": 0.252,
             "phiS": 0.226,
-            "jktebop_overrides": { "period_fit": 0, "ecosw": -0.45, "esinw": -0.26 }
+            "jktebop_overrides": { "period_fit": 0, "ecosw": -0.45, "esinw": -0.26 },
+            "labels": {
+                "source": "2021ApJ...912..123J",
+                "t0": 1487.57072,
+                "period": 19.1686576,
+                "k": 0.652308331,
+                "ecosw": -0.445710069,
+                "esinw": -0.0265117510,
+                "inc": 89.1868686,
+                "LR": 0.315259467,
+                "TeffA": 5800.0,
+                "TeffB": 5336.0,
+                "rA_plus_rB": 0.057532452
+            }
         },
         "TIC 279741942": {
             "details": "10 short cadence sectors (2-4, 28-30, 68-69 & 95-96); tess-ebs morph 0.091 & period ~14.216 d; Gaia DR3 ruwe 1.025; aka VY Ret; SpT F5V; excellent snr; highly eccentric; eclipses of ~0.58 & ~0.55 mag; potential sources of L3 nearby; S2 & 3 lack complete secondary eclipses, but other sectors generally have at least 1 of each type;",
@@ -498,7 +758,7 @@
         },
         "TIC 307488184": {
             "details": "15 short cadence sectors (5, 8-12, 62-65, 69, 89-90, 96 & 98); tess-ebs morph 0.142 & period ~10.067 d; Gaia DR3 ruwe 1.307; OK SNR; eclipses of ~0.17 & ~0.02 mag; secondary is total; potential sources of L3 nearby;",
-            "notes": "in the 2021ApJ...912..123J catalogue;",
+            "notes": "",
             "t0": 1447.4301008902453,
             "t0_err": 0.0001495413100656,
             "period": 10.066884225792148,
@@ -508,7 +768,20 @@
             "widthS": 0.028,
             "depthP": 0.161,
             "depthS": 0.017,
-            "phiS": 0.509
+            "phiS": 0.509,
+            "labels": {
+                "source": "2021ApJ...912..123J",
+                "t0": 1578.299686,
+                "period": 10.06688996,
+                "k": 0.3589824894,
+                "ecosw": 0.01459351646,
+                "esinw": -0.04781201134,
+                "inc": 89.52630135,
+                "LR": 0.01402981112,
+                "TeffA": 5610.0,
+                "TeffB": 3432.0,
+                "rA_plus_rB": 0.06118409187999211
+            }
         },
         "TIC 319558164": {
             "details": "5 short cadence sectors (7, 61-62, 66 & 69); tess-ebs morph 0.115 & period ~8.980 d; Gaia DR3 ruwe 1.107; good SNR; discontuities all sectors except 7; eclipses of ~0.29 & ~0.23 mag; S66 & 69 have no primary eclipses; TESS-ebs period & phiS incorrect; source of L3 nearby;",
