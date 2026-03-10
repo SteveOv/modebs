@@ -53,27 +53,33 @@ include_tics = [
 # These are systems which are known to need hard-coded overrides to some config settings
 known_overrides = {
     # pylint: disable=line-too-long
+    # Highly eccentric and needs assistance to fit
     "TIC 7695666": { "jktebop_overrides": { "ecosw": -0.56, "esinw": 0.08, "inc": 88.7 }, },
-    "TIC 30034081": { "period_factor": 2, },
+    # Need to double the TESS-ebs period, copy the primary meta to secondary and halve the widths
+    "TIC 30034081": { "period": 4.6892177144299785, "period_err": 0.0002550268060178, "widthP": 0.068, "widthS": 0.068, "depthP": 0.452, "depthS": 0.452, "phiS": 0.500 },
+    # Flattening to combat variability
     "TIC 31810287": { "flatten": True, },
     "TIC 53292822": { "t0": 1519.046, "period": 4.93495, "phiS": 0.67 },
+    # Gaia DR3 with no parallax; dist from Gaia DR2 ~500 pc so set parallax to 2.0;
     "TIC 55659311": { "parallax": 2.0, },
     "TIC 63579446": { "exclude_sectors": [87], },
     "TIC 80650858": { "Teff_sys": 20000, },
-    "TIC 118313102": { "widthS": 0.0454, },
     "TIC 153742549": { "flatten": True, },
-    "TIC 160328766": { "widthP": 0.043, "widthS": 0.024, },
+    # overriding the TESS-ebs period with value from inspecting S32+33 (left the rest of the ephemeris unchanged)
     "TIC 167756615": { "exptime": [120, 600], "period": 19.179, },
-    "TIC 219362976": { "widthP": 0.0063, "widthS": 0.0094, "jktebop_overrides": { "esinw": 0.2 }, },
+    # highly eccentric and gives nonsense fit without assistance (esinw)
+    "TIC 219362976": { "jktebop_overrides": { "esinw": 0.2 }, },
     "TIC 220397947": { "flatten": True, },
-    "TIC 259543079": { "widthP": 0.0049, "widthS": 0.0053, },
     "TIC 260504147": { "jktebop_overrides": { "inc": 89.3, "L3": 0.5 }, },
-    "TIC 278826516": { "exclude_sectors": [61, 62], },
+    # highly eccentric and needs help
     "TIC 279741942": { "jktebop_overrides": { "ecosw": 0.36, "esinw": 0.06 }, },
-    # The following may fail fit_lightcurve for not meeting 2+1 eclipse criterion without the sectors override
+    # will not meet 2+1 eclipse criterion, so no fit without the sectors override; period override from insepcting S87
     "TIC 299903137": { "sectors": [[6], [87]], "period": 26.3811, "phiS": 0.365, "jktebop_overrides": { "period_fit": 0 }, },
-    "TIC 319558164": { "period": 16.596535, "phiS": 0.54, },
-    "TIC 319863494": { "t0": 2206.68905, "period": 17.644114, "widthP": 0.101, "widthS": 0.101, "depthP": 0.20, "depthS": 0.15, "phiS": 0.29, },
+    # TESS-ebs period and phiS corrected and corresponding reduction in eclipse widths
+    "TIC 319558164": { "period": 16.596535, "widthP": 0.013, "widthS": 0.012, "phiS": 0.540, },
+    # TESS-ebs ephemeris values not usable for this target - ephemeris set by inspection;
+    "TIC 319863494": { "t0": 2206.68905, "period": 17.644121, "widthP": 0.035, "widthS": 0.031, "depthP": 0.20, "depthS": 0.15, "phiS": 0.290, },
+    # highly eccentric and gives nonsense fits without assistance - particularly sensitive to the Poincare elements
     "TIC 350298314": { "jktebop_overrides": { "ecosw": -0.38, "esinw": 0.11, "period_fit": 0 }, },
     "TIC 355152640": { "flatten": True, },
     "TIC 386166904": { "widthS": 0.050, },
@@ -173,6 +179,10 @@ if __name__ == "__main__":
         is_num = ~np.isnan(vals)
         vals_row_ix = np.argmax(np.sum(is_num, axis=1))
 
+        # TESS-ebs eclipse widths are in units of phase and depth in units of normalized flux
+        for cix, kto in enumerate(["widthP", "widthS", "depthP", "depthS"], start=2):
+            config[kto] = round(vals[vals_row_ix, cix], 6) if is_num[vals_row_ix, cix] else None
+
         # We want to get the phases so that the primary is zero and the secondary is
         # offset from this. Within TESS-ebs Phip is often near 1 and Phis < Phip.
         if all(is_num[vals_row_ix, 0:2]):
@@ -180,11 +190,7 @@ if __name__ == "__main__":
                 vals[vals_row_ix, 0] -= 1
             config["phiS"] = round(vals[vals_row_ix, 1] - vals[vals_row_ix, 0], 6)
         else:
-            config["phiP"], config["phiS"] = 0, None
-
-        # TESS-ebs eclipse widths are in units of phase and depth in units of normalized flux
-        for cix, kto in enumerate(["widthP", "widthS", "depthP", "depthS"], start=2):
-            config[kto] = round(vals[vals_row_ix, cix], 6) if is_num[vals_row_ix, cix] else None
+            config["phiS"] = None
 
 
         # Apply any overrides now, before we try to fix any data by inspection
