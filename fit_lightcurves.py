@@ -6,7 +6,6 @@ import warnings
 import argparse
 from datetime import datetime
 from contextlib import redirect_stdout
-from sys import stdout
 import copy
 import traceback
 
@@ -75,7 +74,8 @@ if __name__ == "__main__":
     # EBOP MAVEN estimator for JKTEBOP input params; rA+rB, k, J, ecosw, esinw and bP/inc
     estimator = Estimator()
 
-    with open(drop_dir/f"{THIS_STEM}.log", "a", encoding="utf8") as log, redirect_stdout(Tee(log)):
+    with open(drop_dir/f"{THIS_STEM}.log", "a", encoding="utf8") as lf, \
+                                                                    redirect_stdout(Tee(lf)) as log:
         print("\n\n============================================================")
         print(f"Started {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
         print("============================================================")
@@ -308,8 +308,8 @@ if __name__ == "__main__":
                                                                      timeout=900)
 
                 # If >1 worker then jktebop stdout was written in another process and is not seen
-                # by redirect_stdout/Tee. A copy is in the params dicts, so log it manually.
-                log.writelines(d.pop("log", []) for d in fitted_param_dicts)
+                # by redirect_stdout/Tee. A copy is in the params dicts, so log it manually to file.
+                lf.writelines(d.pop("log", []) for d in fitted_param_dicts)
 
                 # Review fitting metadata to check whether any of the fits are suspect.
                 wixs = [i for i, fd in enumerate(fitted_param_dicts) if not fd.get("converged")]
@@ -408,7 +408,7 @@ if __name__ == "__main__":
             except Exception as exc: # pylint: disable=broad-exception-caught
                 print("\n*** Failed with the following error. Depending on the nature of the",
                       "error, it may be possible to rerun this module to fit failed targets. ***")
-                traceback.print_exception(exc, file=stdout)
+                traceback.print_exception(exc, file=log)
                 wset.write_values(target_id, fitted_lcs=False, errors=type(exc).__name__,
                                   warnings=";".join(w for w in dict.fromkeys(warn_msgs) if len(w)))
 
