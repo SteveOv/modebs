@@ -67,6 +67,8 @@ known_overrides = {
     "TIC 153742549": { "flatten": True, },
     # overriding the TESS-ebs period with value from inspecting S32+33 (left the rest of the ephemeris unchanged)
     "TIC 167756615": { "exptime": [120, 600], "period": 19.179, },
+    # overriding the TESS-ebs eclipse data which overstates eclipse widths & depths
+    "TIC 173756896": { "widthP": 0.025, "widthS": 0.043, "depthP": 0.100, "depthS": 0.020, },
     # highly eccentric and gives nonsense fit without assistance (esinw)
     "TIC 219362976": { "jktebop_overrides": { "esinw": 0.2 }, },
     "TIC 220397947": { "flatten": True, },
