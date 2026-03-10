@@ -181,14 +181,15 @@ if __name__ == "__main__":
                 else:
                     warn_msgs += ["No A_V found"]
                     sed["sed_der_flux"] = sed["sed_flux"]
+                    Av = 0
 
 
                 if args.plot_figs:
                     print("\nCreating SED observations plot")
                     _fluxes = [sed["sed_flux"], sed["sed_der_flux"]] if Av else [sed["sed_flux"]]
                     fig = plots.plot_sed(sed["sed_wl"].quantity, _fluxes, [sed["sed_eflux"]]*2,
-                                         fmts=["or", ".b"], labels=["observed", "dereddened"],
-                                         title=f"{target_id} SED")
+                                    fmts=["or", ".b"], title=f"{target_id} SED",
+                                    labels=["observed",f"dereddened\n($A_{{\\rm V}}={Av:.3f})$"])
                     fig.savefig(figs_dir / f"sed-observations.{args.figs_type}", dpi=args.figs_dpi)
                     plt.close(fig)
 
