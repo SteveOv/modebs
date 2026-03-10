@@ -309,7 +309,7 @@ def stitch_lightcurve_groups(lcs: LightCurveCollection,
                 # lightkurve's stitch appears smart enough to concat ndarray & list meta values.
                 # However, some of the singular values seem to be from the last sector, when it is
                 # useful if it were from the first sector (i.e.: t0, TSTART). Fix where necessary.
-                for k in ["t0", "TSTART", "DATE-OBS"]:
+                for k in ["t0", "TSTART", "DATE-OBS", "SECTOR"]:
                     if k in lcs[mask][0].meta:
                         grp_lcs[-1].meta[k] = lcs[mask][0].meta[k]
 
@@ -319,6 +319,10 @@ def stitch_lightcurve_groups(lcs: LightCurveCollection,
 
                 for (k, d) in [("CROWDSAP", 1)]:
                     grp_lcs[-1].meta[k] = np.mean([lc.meta.get(k, d) for lc in lcs[mask]])
+
+                # Revise the t0 time to that of the most complete primary eclipse in the combined LC
+                if len(pri_compl := grp_lcs[-1].meta["primary_completeness"]) > 0:
+                    grp_lcs[-1].meta["t0"] = grp_lcs[-1].meta["primary_times"][np.argmax(pri_compl)]
 
     return LightCurveCollection(grp_lcs)
 
