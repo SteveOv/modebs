@@ -742,7 +742,7 @@
         },
         "TIC 299903137": {
             "details": "2 short cadence sectors (6 & 87); tess-ebs morph 0.139 & period ~18.3 d; Gaia DR3 ruwe 0.858; excellent snr; differing eclipse widths suggest eccentricity; eclipses of ~0.6 & ~0.5 mag; potential sources of L3 nearby; TESS-ebs and TBOSB period values are incorrect, so overriding period and phiS;",
-            "notes": "overrding the sectors as by default they fail the minimum coverage criterion with only 1 pri & 1 sec each; override TESS-ebs period and phiS based on inspection of sector 87;",
+            "notes": "override TESS-ebs period and phiS based on inspection of sector 87;overriding the sectors as they fail the minimum coverage criterion with only 1 pri & 1 sec each; borderline orbital coverage so fixing period;",
             "sectors": [[6], [87]],
             "quality_bitmask": "default",
             "t0": 1473.3393089017761,

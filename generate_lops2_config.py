@@ -75,7 +75,7 @@ known_overrides = {
     "TIC 260504147": { "jktebop_overrides": { "inc": 89.3, "L3": 0.5 }, },
     # highly eccentric and needs help
     "TIC 279741942": { "jktebop_overrides": { "ecosw": 0.36, "esinw": 0.06 }, },
-    # will not meet 2+1 eclipse criterion, so no fit without the sectors override; period override from insepcting S87
+    # will not meet 2+1 eclipse criterion, so no fit without the sectors override & fixed period; period override from insepcting S87
     "TIC 299903137": { "sectors": [[6], [87]], "period": 26.3811, "phiS": 0.365, "jktebop_overrides": { "period_fit": 0 }, },
     # TESS-ebs period and phiS corrected and corresponding reduction in eclipse widths
     "TIC 319558164": { "period": 16.596535, "widthP": 0.013, "widthS": 0.012, "phiS": 0.540, },
