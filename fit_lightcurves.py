@@ -187,7 +187,7 @@ if __name__ == "__main__":
                 # and then detrend & rectify the mags to zero by subtracting a low order polynomial
                 do_flatten = config.flatten or (config.flatten is None and morph <= FLATTEN_TH)
                 print("\nAppending detrended delta_mags & delta_mags_err columns (rectified to 0).",
-                    (f"Fluxes will be flattened first as morph={morph:.3f}." if do_flatten else ""))
+                    (f"Fluxes will be flattened first (morph={morph:.3f}.)" if do_flatten else ""))
                 pipeline.append_mags_to_lightcurves_and_detrend(lcs,
                                                                 config.detrend_gap_threshold,
                                                                 config.detrend_poly_degree,
