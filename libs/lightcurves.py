@@ -312,7 +312,7 @@ def find_and_characterise_eclipses(lc: LightCurve,
 
         # Subtract extra period so that, whatever the offset, we're always before the sector start
         ecl_time = ref_time - period + (period * int((times.min()-ref_time) / period))
-        while ecl_time < times.max() + half_window_dur:
+        while ecl_time < times.max() + half_window_dur and ecl_exp_bins > 1:
             is_ecl_found = False
             window_mask = (ecl_time-half_window_dur <= times) & (times <= ecl_time+half_window_dur)
 
