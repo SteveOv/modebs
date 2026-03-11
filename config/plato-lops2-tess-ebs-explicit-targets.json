@@ -683,7 +683,7 @@
         },
         "TIC 278826516": {
             "details": "9 short cadence sectors (7, 9, 12, 61-62 & 66-69); tess-ebs morph 0.082 & period ~14.084 d; Gaia DR3 ruwe 0.899; ok snr; eclipses of ~0.12 mag; discontinuities in S61, 62, 67 & 68; 4 sectors unlikely to have sufficient coverage for solo fit; potential sources of L3 nearby; ",
-            "notes": "",
+            "notes": "LC fit is extremely sensitive to Poincare elements on S61+62 with repeated gaussj warning for esinw and non-convergence unless init values are zero;",
             "t0": 1494.5227005736238,
             "t0_err": 0.0003027317702617,
             "period": 14.083605129362805,
@@ -693,7 +693,8 @@
             "widthS": 0.012,
             "depthP": 0.110,
             "depthS": 0.108,
-            "phiS": 0.500
+            "phiS": 0.500,
+            "jktebop_overrides": { "ecosw": 0, "esinw": 0 }
         },
         "TIC 278826996": {
             "exclude": true,

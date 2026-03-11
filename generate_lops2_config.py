@@ -73,6 +73,8 @@ known_overrides = {
     "TIC 219362976": { "jktebop_overrides": { "esinw": 0.2 }, },
     "TIC 220397947": { "flatten": True, },
     "TIC 260504147": { "jktebop_overrides": { "inc": 89.3, "L3": 0.5 }, },
+    # Repeated gaussj warnings on S61+62 and a failure to converge after retries unless we start ecosw/esinw at zero
+    "TIC 278826516": { "jktebop_overrides": { "ecosw": 0, "esinw": 0 }, },
     # highly eccentric and needs help
     "TIC 279741942": { "jktebop_overrides": { "ecosw": 0.36, "esinw": 0.06 }, },
     # will not meet 2+1 eclipse criterion, so no fit without the sectors override & fixed period; period override from insepcting S87
