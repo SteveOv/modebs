@@ -252,7 +252,7 @@ def fit_polynomial(times: Time,
     return (fit_ydata, coeffs) if include_coeffs else fit_ydata
 
 
-def find_eclipses_and_completeness(lc: LightCurve,
+def find_and_characterise_eclipses(lc: LightCurve,
                                    ref_t0: Union[Time, float, UFloat],
                                    period: Union[u.Quantity, float, UFloat],
                                    widthp: Union[float, UFloat],
@@ -267,8 +267,8 @@ def find_eclipses_and_completeness(lc: LightCurve,
     Will find the times of all primary and secondary eclipses within the bounds of the passed
     LightCurve. The eclipse timings will be refined by inspecting the LightCurve fluxes. For each
     eclipse the depth and a completeness metric will be calculated (this is the ratio of the number
-    of fluxes recorded against the maximum possible based on the supplied eclipse duration).
-    Will also return the time of the most complete primary eclipse as a refined reference time (t0).
+    of fluxes recorded against the maximum possible based on the supplied eclipse width). Will also
+    return the time of the most complete primary eclipse for use as a refined reference time (t0).
 
     The func can use peak prominences to improve discrimination when locating the eclipses, which is
     especially useful if a LightCurve contains strong pulsation. This depends on the optional depthp
@@ -333,39 +333,49 @@ def find_eclipses_and_completeness(lc: LightCurve,
                     ecl_times += [ecl_time]
                     ecl_depths += [prominences[peak_ix]]
                     ecl_mask = (ecl_time-half_ecl_dur <= times) & (times <= ecl_time+half_ecl_dur)
-                    ecl_compls += [sum(ecl_mask) / ecl_exp_bins]
+                    ecl_compls += [min(sum(ecl_mask) / ecl_exp_bins, 1)]
 
             if not is_ecl_found and times.min()-half_ecl_dur < ecl_time < times.max()+half_ecl_dur:
                 ecl_times += [ecl_time]
                 ecl_depths += [None]    # We simply don't know
                 ecl_mask = (ecl_time-half_ecl_dur <= times) & (times <= ecl_time+half_ecl_dur)
-                ecl_compls += [sum(ecl_mask) / ecl_exp_bins]
+                ecl_compls += [min(sum(ecl_mask) / ecl_exp_bins, 1)]
 
             ecl_time += period
         return np.array(ecl_times, float), np.array(ecl_depths, float), np.array(ecl_compls, float)
 
-    t0 = ref_t0
+    t0, time_to_sec = ref_t0, period * nominal_value(phis)
     if verbose:
         print(f"Finding eclipses in sector {lc.sector} with pri & sec widths {widthp} &",
               f"{widths} [phase] and depths {depthp} & {depths} [flux]", end="...")
-    for p in range(1, 3):
+    for _ in range(2):
+        # Go through twice, as the second time we will benefit from a refined reference time.
         pri_times, pri_depths, pri_compl = find_eclipses_and_mask(t0, widthp * period, depthp)
+        sec_times, sec_depths, sec_compl = find_eclipses_and_mask(t0 + time_to_sec,
+                                                                  widths * period, depths)
 
-        t0 += period * nominal_value(phis)
-        sec_times, sec_depths, sec_compl = find_eclipses_and_mask(t0, widths * period, depths)
+        # If possible, avoid using eclipses at the ends of the LC as these are more likely distorted
+        if (pri_mask := np.ones_like(pri_compl, bool)).shape[0] > 4:
+            pri_mask[0] = pri_mask[-1] = False
+        if (sec_mask := np.ones_like(sec_compl, bool)).shape[0] > 4:
+            sec_mask[0] = sec_mask[-1] = False
 
-        if verbose and p == 2:
-            print(f"found {sum(pri_compl>0)} & {sum(sec_compl>0)} eclipse(s) with fluxes.")
+        # Refine the reference time. The depths are useful as we only have them for those eclipses
+        # detected by the peak finder, so they indicate those with the most well characterised time.
+        if any(good_mask := pri_mask & ~np.isnan(pri_depths)) and any(pri_compl[good_mask] > 0.5):
+            t0 = pri_times[good_mask][np.argmax(pri_compl[good_mask])]
+        elif any(good_mask := sec_mask & ~np.isnan(sec_depths)) and any(sec_compl[good_mask] > 0.5):
+            t0 = sec_times[good_mask][np.argmax(sec_compl[good_mask])] - time_to_sec
+        elif any(pri_compl[pri_mask] > 0.5):
+            t0 = pri_times[pri_mask][np.argmax(pri_compl[pri_mask])]
+        elif any(sec_compl[sec_mask] > 0.5):
+            t0 = sec_times[sec_mask][np.argmax(sec_compl[sec_mask])] - time_to_sec
 
-        # Refine the reference time (completeness > 0.5 implies enough of a peak to find a time)
-        if len(pri_compl) > 0 and any(pri_compl > 0.5):
-            t0 = pri_times[np.argmax(pri_compl)]
-        elif len(sec_times) > 0 and any(sec_compl > 0.5):
-            t0 = sec_times[np.argmax(sec_compl)] - (period * nominal_value(phis))
-            while t0 < times.min():
-                t0 += period
-        else:
-            t0 = ref_t0
+        while t0 < times.min():
+            t0 += period
+
+    if verbose:
+        print(f"found {sum(pri_compl>0)} & {sum(sec_compl>0)} eclipse(s) with fluxes.")
 
     return (t0, pri_times, pri_depths, pri_compl, sec_times, sec_depths, sec_compl)
 

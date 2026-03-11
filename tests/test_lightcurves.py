@@ -165,10 +165,10 @@ class Testlightcurves(unittest.TestCase):
                 self.assertFalse(any(np.isnan(mags)))
 
     #
-    #   find_eclipses_and_completeness(lc, ref_t0, period, widthP, widthS, depthP, depthS, phis, max_phase_shift)
+    #   find_and_characterise_eclipses(lc, ref_t0, period, widthP, widthS, depthP, depthS, phis, max_phase_shift)
     #
-    def test_find_eclipses_and_completeness_known_targets(self):
-        """ Tests find_eclipses_and_completeness(known target) correctly finds and identifies eclipses """
+    def test_find_and_characterise_eclipses_known_targets(self):
+        """ Tests find_and_characterise_eclipses(known target) correctly finds and identifies eclipses """
         #  in lightcurve_helpers KNOWN_TARGETS & exp_prim, exp_sec are #eclipses >80% complete
         for (target,            sectors,    exp_prim,   exp_sec) in [
             # CW Eri has short period & many good eclipses although S31 ends with an incomplete sec (~70%)
@@ -205,7 +205,7 @@ class Testlightcurves(unittest.TestCase):
             tess_ebs = catalogues.query_tess_ebs_ephemeris(target_cfg["tic"]) or {}
 
             lcs = lightcurve_helpers.load_lightcurves(target, sectors)
-            ret_vals = [lightcurves.find_eclipses_and_completeness(lc,
+            ret_vals = [lightcurves.find_and_characterise_eclipses(lc,
                                                                    target_cfg.get("t0", tess_ebs.get("t0", None)),
                                                                    target_cfg.get("period", tess_ebs.get("period", None)),
                                                                    target_cfg.get("widthP", tess_ebs.get("widthP", None)),
@@ -238,18 +238,19 @@ class Testlightcurves(unittest.TestCase):
 
         def plot_eclipses(ix, ax, _):
             ed = data[ix]
-            ax.text(ed[0], 1.025, r"$t_{\rm 0}$", c="k", size="large", fontweight="bold",
-                    ha="center", zorder=-10, alpha=1, backgroundcolor="w")
+            ax.plot(ed[0], 1.06, "rv", markersize=6, alpha=0.5, zorder=-10)
+            ax.text(ed[0], 1.08, f"{ed[0]:.9f}", c="k", ha="center",
+                    zorder=-20, alpha=1, backgroundcolor="w")
             for times, depths, compl, ls, c, label in [
                 (ed[1], ed[2], ed[3], "-.", "r", "primary"),
                 (ed[4], ed[5], ed[6], "--", "g", "secondary")
             ]:
                 alphas = [0.66 if c > completeness_th else 0.20 for c in compl]
-                ax.vlines(times, 0.4, 1.05, c, ls, label, alpha=alphas, zorder=-20)
+                ax.vlines(times, 0.4, 1.1, c, ls, label, alpha=alphas, zorder=-30)
                 for times, dps, compl, a in zip(times, depths, compl, alphas):
-                    ax.plot(times, 1.0-dps, marker="+", markersize=10, color=c, zorder=-10, alpha=a)
+                    ax.plot(times, 1.0-dps, marker="+", markersize=10, color=c, zorder=-20, alpha=a)
                     ax.text(times, 0.45, f"{compl:.0%}", c=c, rotation=90, size="x-small",
-                            va="center", ha="center", zorder=-10, alpha=a+0.3, backgroundcolor="w")
+                            va="center", ha="center", zorder=-20, alpha=a+0.3, backgroundcolor="w")
 
         plots.plot_lightcurves(lcs, cols=min(len(lcs), 3), ax_func=plot_eclipses)
         plt.show()

@@ -172,7 +172,7 @@ def add_eclipse_meta_to_lightcurves(lcs: LightCurveCollection,
     :verbose: whether or not to send messages to stdout with details of the eclipse search
     """
     for lc in lcs:
-        ecl_data = lightcurves.find_eclipses_and_completeness(lc, ref_t0, period,
+        ecl_data = lightcurves.find_and_characterise_eclipses(lc, ref_t0, period,
                                                               widthp, widths, depthp, depths,
                                                               phis, search_window_phase, verbose)
 
