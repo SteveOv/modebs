@@ -281,7 +281,7 @@ if __name__ == "__main__":
                     "LDA1_fit": 1,              "LDB1_fit": 1,
                     "LDA2_fit": 0,              "LDB2_fit": 0,
                     "reflA_fit": refl_fit,      "reflB_fit": refl_fit,
-                    "sf_fit": 1,
+                    "sf_fit": 0,                # We're fitting scale factor with a poly instruction
                     "period_fit": 1,            "t0_fit": 1,
 
                     **preds_dict,
