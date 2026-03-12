@@ -101,7 +101,9 @@ if __name__ == "__main__":
                     help="json file to write with the details of the targets to ingest")
     ap.add_argument("-fo", "--force-overwrite", dest="force_overwrite", action="store_true",
                     required=False, help="force the overwritting of any existing targets file")
-    ap.set_defaults(force_overwrite=False, max_morph=0.6, min_ecl_depth=0.05)
+    ap.set_defaults(force_overwrite=False,
+                    max_morph=0.6, min_ecl_depth=0.05,
+                    inspect_on_missing_ephemeris=False)
     args = ap.parse_args()
     config_dir = Path.cwd() / "config"
 
@@ -210,6 +212,10 @@ if __name__ == "__main__":
         # For now, we're skipping these targets with insufficient ephemeris data to be fitted
         # ----------------------------------------------------------------------
         if any(config.get(k, None) is None for k in ["phiS", "depthP", "depthS"]):
+            if not args.inspect_on_missing_ephemeris:
+                print("lacking eclipse phase or depth information...omitted.")
+                continue
+
             print("no TESS-ebs eclipse depths, so inspecting LCs", end="...")
             search_term = config.get("search_term", target_id)
             lcs = lightcurves.load_lightcurves(target_id,
