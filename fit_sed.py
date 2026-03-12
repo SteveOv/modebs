@@ -231,8 +231,12 @@ if __name__ == "__main__":
 
 
                 print("\nSetting up the starting position (theta0) for fitting.")
-                theta0 = create_theta(teffs=nominal_value(Teff_sys),
-                                      loggs=nominal_value(logg_sys),
+                init_teff = max(min(model_grid.teff_range),
+                                min(nominal_value(Teff_sys), max(model_grid.teff_range)))
+                init_logg = max(min(model_grid.logg_range),
+                                min(nominal_value(logg_sys), max(model_grid.logg_range)))
+                theta0 = create_theta(teffs=init_teff,
+                                      loggs=init_logg,
                                       radii=1.0,
                                       dist=coords.distance.to(u.pc).value,
                                       av=0,
