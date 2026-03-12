@@ -5,11 +5,15 @@ from pathlib import Path
 import sys
 import json
 import argparse
+from warnings import filterwarnings
 
 import numpy as np
 from mocpy import MOC
+import astropy.units as u
 
-from libs import catalogues
+from libs import catalogues, lightcurves, pipeline
+
+filterwarnings("ignore", "Warning: converting a masked element to nan.", category=UserWarning)
 
 THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 
@@ -97,7 +101,7 @@ if __name__ == "__main__":
                     help="json file to write with the details of the targets to ingest")
     ap.add_argument("-fo", "--force-overwrite", dest="force_overwrite", action="store_true",
                     required=False, help="force the overwritting of any existing targets file")
-    ap.set_defaults(force_overwrite=False)
+    ap.set_defaults(force_overwrite=False, max_morph=0.6, min_ecl_depth=0.05)
     args = ap.parse_args()
     config_dir = Path.cwd() / "config"
 
@@ -114,23 +118,23 @@ if __name__ == "__main__":
     all_tebs_lops.sort("TIC")
 
 
-    # Exclude those targets that are not suited to our needs
+    # Exclude those targets that are not suited to our needs; first explicitly configured exclusions
     include_mask = np.in1d(all_tebs_lops["TIC"], exclude_tics, invert=True)
 
-    # TESS-ebs morphology; we're interested in well-detached so we cut-off Morph at 0.6
-    include_mask &= all_tebs_lops["Morph"] < 0.6
+    # TESS-ebs morphology; we're interested in well-detached so we have a Morph cut-off
+    include_mask &= all_tebs_lops["Morph"] <= args.max_morph
 
     # Eclipse depths: need eclipses sufficiently deep to be able to fit with EBOP MAVEN & JKTEBOP.
     # There are 2 algorithms used to characterise the eclipses; a 2-Gaussian fit & the polyfit algo.
     # Prefer the 2g characterisation, values tend to deeper & wider, but coalesce the pf values if
     # have neither 2g values. Keep those without characterisation (masked) to be inspected later.
-    min_ecl_depth = np.minimum(np.ma.filled(all_tebs_lops["Dp-2g"], -100),
-                               np.ma.filled(all_tebs_lops["Ds-2g"], -100))
-    min_ecl_depth_pf = np.minimum(np.ma.filled(all_tebs_lops["Dp-pf"], -100),
-                                  np.ma.filled(all_tebs_lops["Ds-pf"], -100))
-    missing_2g = min_ecl_depth == -100
-    min_ecl_depth[missing_2g] = min_ecl_depth_pf[missing_2g]
-    include_mask &= (min_ecl_depth >= 0.05) | (min_ecl_depth == -100)
+    min_ecl_depths = np.minimum(np.ma.filled(all_tebs_lops["Dp-2g"], np.nan),
+                                np.ma.filled(all_tebs_lops["Ds-2g"], np.nan))
+    min_ecl_depths_pf = np.minimum(np.ma.filled(all_tebs_lops["Dp-pf"], np.nan),
+                                   np.ma.filled(all_tebs_lops["Ds-pf"], np.nan))
+    missing_2g_mask = np.isnan(min_ecl_depths)
+    min_ecl_depths[missing_2g_mask] = min_ecl_depths_pf[missing_2g_mask]
+    include_mask &= (min_ecl_depths >= args.min_ecl_depth) | np.isnan(min_ecl_depths)
 
     # Any further criteria/evaluation should go here
 
@@ -154,7 +158,7 @@ if __name__ == "__main__":
     for ix, row in enumerate(all_tebs_lops[include_mask], start=0):
         tic = int(row["TIC"])
         target_id = f"TIC {tic:d}"
-        print(f"Target {ix+1}/{num_matching_rows}: {target_id}")
+        print(f"Target {ix+1}/{num_matching_rows}: {target_id}", end="...")
 
         # Start this target's config with some basic info
         # ----------------------------------------------------------------------
@@ -162,7 +166,7 @@ if __name__ == "__main__":
             "details": "",
             "notes": "",
             "why_include": f"morph={row['Morph']:.3f} " +
-                            f"& min(Dp)={min_ecl_depth[include_mask][ix]:.3f}"
+                            f"& ecl_depths>={min_ecl_depths[include_mask][ix]:.3f}"
         }
 
 
@@ -205,8 +209,50 @@ if __name__ == "__main__":
         # Now download & inspect any light-curves to confirm/improve the ephemeris
         # For now, we're skipping these targets with insufficient ephemeris data to be fitted
         # ----------------------------------------------------------------------
-        if any(config.get(k, None) is None for k in ["phiS", "widthP", "widthS"]):
-            continue
+        if any(config.get(k, None) is None for k in ["phiS", "depthP", "depthS"]):
+            print("no TESS-ebs eclipse depths, so inspecting LCs", end="...")
+            search_term = config.get("search_term", target_id)
+            lcs = lightcurves.load_lightcurves(target_id,
+                                               search_term,
+                                               sectors=None,
+                                               mission=["TESS", "HLSP"],
+                                               author=["SPOC", "TESS-SPOC"],
+                                               exptime=[120, 600],
+                                               quality_bitmask="default",
+                                               flux_column="sap_flux",
+                                               force_mast=False,
+                                               cache_dir=Path() / ".cache/.mast/",
+                                               consume_cadence_warnings=True,
+                                               verbose=False)
+
+            quality_masks = targets_config.get("target_config_defaults", {}).get("quality_masks",[])
+            pipeline.mask_lightcurves_unusable_fluxes(lcs, quality_masks, min_section_dur=2 * u.d)
+
+            widthp = config.get("widthP", None) or 0.01
+            widths = config.get("widthS", None) or widthp
+            phis = config.get("phiS", None) or 0.5
+            pipeline.add_eclipse_meta_to_lightcurves(lcs, config["t0"], config["period"],
+                                                     widthp, widths, phis=phis, verbose=False)
+
+            pri_depths = [[d for d in lc.meta["primary_depths"] if not np.isnan(d)] for lc in lcs]
+            pri_depths = [d for dd in pri_depths for d in dd]
+            sec_depths = [[d for d in lc.meta["secondary_depths"] if not np.isnan(d)] for lc in lcs]
+            sec_depths = [d for dd in sec_depths for d in dd]
+
+            avg_pri_depth = np.mean(pri_depths) if len(pri_depths) else 0
+            avg_sec_depth = np.mean(sec_depths) if len(sec_depths) else 0
+            if min(avg_pri_depth, avg_sec_depth) >= args.min_ecl_depth:
+                config["depthP"] = avg_pri_depth
+                config["depthS"] = avg_sec_depth
+                config["phiS"] = phis
+                config["notes"] = "added through LC inspection as no eclipse depths in TESS-ebs"
+                print(f"suitable <pri>={avg_pri_depth:.6f} <sec>={avg_sec_depth:.6f}", end="...")
+            elif any(d > 0 for d in [avg_pri_depth, avg_sec_depth]):
+                print(f"too shallow <pri>={avg_pri_depth:.6f} <sec>={avg_sec_depth:.6f}...omitted.")
+                continue
+            else:
+                print("unable to get sufficient eclipse information from LCs...omitted.")
+                continue
 
 
         # Capture any known values for these targets as labels
@@ -223,6 +269,7 @@ if __name__ == "__main__":
         # If we got here, everything is OK with the target so we add it to the config to be written
         # ----------------------------------------------------------------------
         target_configs[target_id] = config
+        print("added to config.")
 
 
     # Finally, save the dictionary as a formatted JSON file
