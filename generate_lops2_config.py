@@ -37,6 +37,7 @@ exclude_tics = [
     "0300654002",   # too close for JKTEBOP (rA+rB ~ 0.5, morph 0.563)
     "0310308203",   # too close for JKTEBOP (rA+rB ~ 0.5, morph 0.593)
     "0349835367",   # too close for JKTEBOP (rA+rB ~ 0.45, morph 0.544)
+    "0382069435",   # not TESS-ebs depthp, high variability and significant eclipse timing shift in later sectors - too difficult 
     "0393344055",   # too close for JKTEBOP (rA+rB ~ 0.5, morph 0.600)
     "0393491149",   # too close for JKTEBOP (rA+rB ~ 0.5, morph 0.595)
 ]
