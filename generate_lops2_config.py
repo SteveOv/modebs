@@ -53,6 +53,7 @@ include_tics = [
     "0037606218",   # secondary eclipses are very shallow (Ds-2g 0.013) but mitigated by being total
     "0220420534",   # secondary eclipses are "borderline" (Ds-2g 0.05) but we easily get good consistent fits
     "0307488184",   # secondary eclipses are very shallow (Ds-2g 0.017) but mitigated by being total
+    "0349480507",   # TESS-ebs has half the period & no secondary depth, so may not be selected by default
 ]
 
 # These are systems which are known to need hard-coded overrides to some config settings
@@ -90,6 +91,8 @@ known_overrides = {
     "TIC 319863494": { "t0": 2206.68905, "period": 17.644121, "widthP": 0.035, "widthS": 0.031, "depthP": 0.20, "depthS": 0.15, "phiS": 0.290, },
     # highly eccentric and gives nonsense fits without assistance - particularly sensitive to the Poincare elements
     "TIC 350298314": { "jktebop_overrides": { "ecosw": -0.38, "esinw": 0.11, "period_fit": 0 }, },
+    # Need to double the TESS-ebs period, copy the primary meta to secondary and halve the widths
+    "TIC 349480507": { "period": 1355.493939, "period_err": 0.027422, "widthP": 0.067, "widthS": 0.067, "depthS": 0.339 },
     "TIC 355152640": { "flatten": True, },
     "TIC 386166904": { "widthS": 0.050, },
 }
