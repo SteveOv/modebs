@@ -1,8 +1,9 @@
 """ Useful IO helper classes. """
-from typing import Callable as _Callable
+from typing import Callable as _Callable, Union as _Union
 from sys import stdout as _stdout
 from io import TextIOBase as _TextIOBase
 from contextlib import AbstractContextManager as _AbstractContextManager
+from contextlib import contextmanager as _contextmanager
 from threading import RLock as _RLock
 
 class PassthroughTextWriter(_AbstractContextManager):
@@ -109,3 +110,58 @@ class Tee(PassthroughTextWriter):
         Initialize a new instance.
         """
         super().__init__(output1, output2)
+
+
+class LoggingContext(_AbstractContextManager):
+    """
+    A context manager for selective logging, based on the Logging Cookbook recipe at 
+    https://docs.python.org/3/howto/logging-cookbook.html#using-a-context-manager-for-selective-logging
+
+    The log_message_suffix property can be set with text to be appended to any messages logged to
+    include information missing by default (i.e.: lightkurve omits the sector in its warnings!).
+    """
+    # pylint: disable=redefined-builtin
+    from logging import Logger, Handler, Filter, LogRecord # pylint: disable=import-outside-toplevel
+
+    log_message_suffix: str = None
+
+    def __init__(self, logger: Logger, level=None, handler: Handler=None,
+                 filter: _Union[Filter, _Callable[[LogRecord], bool]]=None, close: bool=True):
+        self._logger = logger
+        self._level = level
+        self._handler = handler
+        self._filter = filter
+        self._close = close
+        self._old_level = None
+        super().__init__()
+
+    def __enter__(self):
+        # Apply any logging customizations to apply while within the context
+        if self._level is not None:
+            self._old_level = self._logger.level
+            self._logger.setLevel(self._level)
+        if self._handler:
+            self._logger.addHandler(self._handler)
+        self._logger.filters.insert(0, self._append_msg_suffix_filter)
+        if self._filter:
+            self._logger.addFilter(self._filter)
+        return super().__enter__()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        # Tear down the logging customizations used within the context
+        if self._level is not None:
+            self._logger.setLevel(self._old_level)
+        if self._handler:
+            self._logger.removeHandler(self._handler)
+        if self._handler and self._close and hasattr(self._handler, "close"):
+            self._handler.close()
+        if self._filter:
+            self._logger.removeFilter(self._filter)
+        self._logger.removeFilter(self._append_msg_suffix_filter)
+        return super().__exit__(exc_type, exc_value, traceback)
+
+    def _append_msg_suffix_filter(self, record: LogRecord) -> bool:
+        """ Custom filter which appends any suffix text to the records msg """
+        if self.log_message_suffix is not None:
+            record.msg += self.log_message_suffix
+        return True

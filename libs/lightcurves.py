@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 from sys import stdout
 from datetime import datetime, timezone, timedelta
+from logging import getLogger
 
 import numpy as np
 from scipy.signal import find_peaks
@@ -17,6 +18,8 @@ from astropy.time import Time, TimeDelta
 from astropy.table import Table
 from lightkurve import LightCurve, LightCurveCollection, FoldedLightCurve, SearchResult
 import lightkurve as lk
+
+from libs.iohelpers import LoggingContext
 
 
 def load_lightcurves(target: str,
@@ -30,6 +33,7 @@ def load_lightcurves(target: str,
                      force_mast: bool=False,
                      cache_dir: Path=Path("./.cache"),
                      cache_timeout: timedelta=timedelta(days=28),
+                     consume_cadence_warnings: bool=False,
                      verbose: bool=False) -> LightCurveCollection:
     """
     This is a wrapper for lightkurve's search_lightcurves and SearchResults download_all funcs
@@ -60,6 +64,7 @@ def load_lightcurves(target: str,
     :force_mast: if True will always bypass local files and search/download from MAST
     :cache_dir: the local directory under which the assets are/will be stored
     :cache_timeout: elapsed time after which cached results are expired [28 days]
+    :consume_cadence_warnings: any 'cadences will be ignored due to quality mask' not logged if True
     :verbose: if True will output some diagnostics text to the console
     """
     # pylint: disable=too-many-locals, too-many-arguments, too-many-positional-arguments
@@ -103,9 +108,20 @@ def load_lightcurves(target: str,
     # A hack but ensures that anything sent to print/stdout above is seen before quality warnings
     stdout.flush()
 
-    # Sorted how we want; by sector then exptime fast to slow
-    lcs = result.download_all(quality_bitmask, f"{targ_dir}", flux_column=flux_column, cache=True)
-    return LightCurveCollection(sorted(lcs, key=lambda lc: lc.sector + (1 / lc.meta['FRAMETIM'])))
+    # By default these "cadence" warnings are useless noise as they don't indicate the lightcurve
+    # or sector which caused the warning. This LoggingContext and filter allows us to append
+    # the mission info (Mission + sector) to the message and/or consume (hide) them completely.
+    # pylint: disable=line-too-long
+    with LoggingContext(logger=getLogger("lightkurve.utils"),
+                        filter=lambda rec: not (consume_cadence_warnings and "cadences will be ignored" in rec.getMessage()),
+                        close=False) as logc:
+        # Sorted how we want; by sector then exptime fast to slow
+        lcs = []
+        for r in result:
+            row = r.table[0]
+            logc.log_message_suffix = f" For {target} {r.mission[0]} @ {row['exptime']}; {row['productFilename']}"
+            lcs += [r.download(quality_bitmask, str(targ_dir), flux_column=flux_column, cache=True)]
+        return LightCurveCollection(sorted(lcs, key=lambda lc: lc.sector + (1/lc.meta['FRAMETIM'])))
 
 
 def create_invalid_flux_mask(lc: LightCurve) -> np.ndarray:

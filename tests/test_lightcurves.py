@@ -51,8 +51,10 @@ class Testlightcurves(unittest.TestCase):
                                                    mission=mission,
                                                    author=author,
                                                    exptime=exptime,
+                                                   quality_bitmask="hardest",
                                                    force_mast=True,
                                                    cache_dir=self.cache_dir,
+                                                   consume_cadence_warnings=False,
                                                    verbose=True)
 
                 self.assertEqual(len(exp_sectors), len(lcs))
