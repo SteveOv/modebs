@@ -140,6 +140,18 @@ class Testpipeline(unittest.TestCase):
             with self.subTest(f" {target}; {sectors} grouped as {exp_groups} "):
                 lcs = load_lightcurves(target, sectors)
 
+                # stitch depends on the eclipse metadata added by add_eclipse_meta_to_lightcurves
+                config = KNOWN_TARGETS[target]
+                eph = query_tess_ebs_ephemeris(config["tic"]) or {}
+                add_eclipse_meta_to_lightcurves(lcs,
+                                                ref_t0=eph.get("t0", config.get("t0", None)),
+                                                period=eph.get("period", config.get("period", None)),
+                                                widthp=eph.get("widthP", config.get("widthP", None)),
+                                                widths=eph.get("widthS", config.get("widthS", None)),
+                                                depthp=eph.get("depthP", config.get("depthP", None)),
+                                                depths=eph.get("depthS", config.get("depthS", None)),
+                                                phis=eph.get("phiS", config.get("phiS", None)))
+
                 # Test
                 grp_lcs = stitch_lightcurve_groups(lcs, exp_groups, verbose=True)
                 for ix, exp_group_sectors in enumerate(exp_groups):
@@ -153,6 +165,19 @@ class Testpipeline(unittest.TestCase):
         ]:
             with self.subTest(f" {target}; {sectors} grouped as {sector_groups} "):
                 lcs = load_lightcurves(target, sectors)
+
+                # stitch depends on the eclipse metadata added by add_eclipse_meta_to_lightcurves
+                config = KNOWN_TARGETS[target]
+                eph = query_tess_ebs_ephemeris(config["tic"]) or {}
+                add_eclipse_meta_to_lightcurves(lcs,
+                                                ref_t0=eph.get("t0", config.get("t0", None)),
+                                                period=eph.get("period", config.get("period", None)),
+                                                widthp=eph.get("widthP", config.get("widthP", None)),
+                                                widths=eph.get("widthS", config.get("widthS", None)),
+                                                depthp=eph.get("depthP", config.get("depthP", None)),
+                                                depths=eph.get("depthS", config.get("depthS", None)),
+                                                phis=eph.get("phiS", config.get("phiS", None)))
+
                 with self.assertWarns(UserWarning, msg=warn_msg):
                     grp_lcs = stitch_lightcurve_groups(lcs, sector_groups, verbose=True)
                     for ix, exp_group_sectors in enumerate(exp_sectors):
