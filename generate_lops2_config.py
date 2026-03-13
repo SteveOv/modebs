@@ -7,94 +7,98 @@ import json
 import argparse
 from warnings import filterwarnings
 
+filterwarnings("ignore", "Warning: converting a masked element to nan.", category=UserWarning)
+filterwarnings("ignore", "Using UFloat objects with std_dev==0 may", category=UserWarning)
+filterwarnings("ignore", "Warning: the tpfmodel submodule is not available", category=UserWarning)
+
+# pylint: disable=wrong-import-position
 import numpy as np
 from mocpy import MOC
 import astropy.units as u
 
 from libs import catalogues, lightcurves, pipeline
 
-filterwarnings("ignore", "Warning: converting a masked element to nan.", category=UserWarning)
 
 THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 
 # These are systems which may be included up by selection criteria but are known to not fit
-exclude_tics = [
+exclude_tics = {
     # pylint: disable=line-too-long
-    "0126446153",   # too close for JKTEBOP
-    "0129268651",   # TESS-ebs eclipse depths incorrect - this has very shallow eclipses
-    "0140661916",   # too close for JKTEBOP (rA+rB ~ 0.5, morph 0.592)
-    "0142105299",   # highly eccentric, long period with shallow eclipses (Ds~0.062) - cannot get a durable fit
-    "0150284425",   # cannot get a good fit to "hump" in LC prior to the primary eclipse
-    "0150357064",   # very shallow with variability as deep as eclipses - cannot get a good fit
-    "0165186801",   # too close/tidally distorted for JKTEBOP (rA+rB ~ 0.55)
-    "0167692429",   # eclipses almost non-existent by the latter sectors - needs investigation
-    "0220430912",   # too close for JKTEBOP (rA+rB ~ 0.5)
-    "0257691369",   # too shallow (more than Ds-2g of 0.081 indicates), with long period - cannot get a durable fit
-    "0259543079",   # extremely eccentric and cannot get a reliable fit, even with interventions
-    "0260124760",   # too close for JKTEBOP (rA+rB ~ 0.6, morph 0.590), however the fit is plausible
-    "0278826996",   # highly eccentric and cannot get a reliable fit even with interventions
-    "0299906906",   # low SNR and quite shallow eclipses (although ~0.1) - together make a difficult fit
-    "0300654002",   # too close for JKTEBOP (rA+rB ~ 0.5, morph 0.563)
-    "0310308203",   # too close for JKTEBOP (rA+rB ~ 0.5, morph 0.593)
-    "0349835367",   # too close for JKTEBOP (rA+rB ~ 0.45, morph 0.544)
-    "0382069435",   # not TESS-ebs depthp, high variability and significant eclipse timing shift in later sectors - too difficult 
-    "0393344055",   # too close for JKTEBOP (rA+rB ~ 0.5, morph 0.600)
-    "0393491149",   # too close for JKTEBOP (rA+rB ~ 0.5, morph 0.595)
-]
+    126446153: "too close for JKTEBOP",
+    129268651: "ESS-ebs eclipse depths incorrect - this has very shallow eclipses",
+    140661916: "too close for JKTEBOP (rA+rB ~ 0.5, morph 0.592)",
+    142105299: "highly eccentric, long period with shallow eclipses (Ds~0.062) - cannot get a durable fit",
+    150284425: "cannot get a good fit to 'hump' in LC prior to the primary eclipse",
+    150357064: "very shallow with variability as deep as eclipses - cannot get a good fit",
+    165186801: "too close/tidally distorted for JKTEBOP (rA+rB ~ 0.55)",
+    167692429: "eclipses almost non-existent by the latter sectors - needs investigation",
+    220430912: "too close for JKTEBOP (rA+rB ~ 0.5)",
+    257691369: "oo shallow (more than Ds-2g of 0.081 indicates), with long period - cannot get a durable fit",
+    259543079: "extremely eccentric and cannot get a reliable fit, even with interventions",
+    260124760: "too close for JKTEBOP (rA+rB ~ 0.6, morph 0.590), however the fit is plausible",
+    278826996: "highly eccentric and cannot get a reliable fit even with interventions",
+    299906906: "low SNR and quite shallow eclipses (although ~0.1) - together make a difficult fit",
+    300654002: "too close for JKTEBOP (rA+rB ~ 0.5, morph 0.563)",
+    310308203: "too close for JKTEBOP (rA+rB ~ 0.5, morph 0.593)",
+    349835367: "too close for JKTEBOP (rA+rB ~ 0.45, morph 0.544)",
+    382069435: "not TESS-ebs depthp, high variability and significant eclipse timing shift in later sectors - too difficult", 
+    393344055: "too close for JKTEBOP (rA+rB ~ 0.5, morph 0.600)",
+    393491149: "too close for JKTEBOP (rA+rB ~ 0.5, morph 0.595)",
+}
 
 # Too shallow (review depth criteria)
-exclude_tics += ["0064783257", "0150357064"]
+exclude_tics |= { 4783257: "TBC" }
 
 # These may be excluded by selection criteria but are included as they're known to fit well
-include_tics = [
+include_tics = {
     # pylint: disable=line-too-long
-    "0030034081",   # TESS-ebs misses the secondary, however double the period and it fits well
-    "0031810287",   # secondary eclipses are "borderline" (Ds-2g 0.049) but this fits with flattening
-    "0037606218",   # secondary eclipses are very shallow (Ds-2g 0.013) but mitigated by being total
-    "0220420534",   # secondary eclipses are "borderline" (Ds-2g 0.05) but we easily get good consistent fits
-    "0307488184",   # secondary eclipses are very shallow (Ds-2g 0.017) but mitigated by being total
-    "0349480507",   # TESS-ebs has half the period & no secondary depth, so may not be selected by default
-]
+    30034081: "TESS-ebs misses the secondary, however double the period and it fits well",
+    31810287: "secondary eclipses are 'borderline' (Ds-2g 0.049) but this fits with flattening",
+    37606218: "secondary eclipses are very shallow (Ds-2g 0.013) but mitigated by being total",
+    220420534: "secondary eclipses are 'borderline' (Ds-2g 0.05) but we easily get good consistent fits",
+    307488184: "secondary eclipses are very shallow (Ds-2g 0.017) but mitigated by being total",
+    349480507: "TESS-ebs has half the period & no secondary depth, so may not be selected by default",
+}
 
 # These are systems which are known to need hard-coded overrides to some config settings
 known_overrides = {
     # pylint: disable=line-too-long
     # Highly eccentric and needs assistance to fit
-    "TIC 7695666": { "jktebop_overrides": { "ecosw": -0.56, "esinw": 0.08, "inc": 88.7 }, },
+    7695666: { "jktebop_overrides": { "ecosw": -0.56, "esinw": 0.08, "inc": 88.7 }, },
     # Need to double the TESS-ebs period, copy the primary meta to secondary and halve the widths
-    "TIC 30034081": { "period": 4.6892177144299785, "period_err": 0.0002550268060178, "widthP": 0.068, "widthS": 0.068, "depthP": 0.452, "depthS": 0.452, "phiS": 0.500 },
+    30034081: { "period": 4.6892177144299785, "period_err": 0.0002550268060178, "widthP": 0.068, "widthS": 0.068, "depthP": 0.452, "depthS": 0.452, "phiS": 0.500 },
     # Flattening to combat variability
-    "TIC 31810287": { "flatten": True, },
-    "TIC 53292822": { "t0": 1519.046, "period": 4.93495, "phiS": 0.67 },
+    31810287: { "flatten": True, },
+    53292822: { "t0": 1519.046, "period": 4.93495, "phiS": 0.67 },
     # Gaia DR3 with no parallax; dist from Gaia DR2 ~500 pc so set parallax to 2.0;
-    "TIC 55659311": { "parallax": 2.0, },
-    "TIC 63579446": { "exclude_sectors": [87], },
-    "TIC 80650858": { "Teff_sys": 20000, },
-    "TIC 153742549": { "flatten": True, },
+    55659311: { "parallax": 2.0, },
+    63579446: { "exclude_sectors": [87], },
+    80650858: { "Teff_sys": 20000, },
+    153742549: { "flatten": True, },
     # overriding the TESS-ebs period with value from inspecting S32+33 (left the rest of the ephemeris unchanged)
-    "TIC 167756615": { "exptime": [120, 600], "period": 19.179, },
+    167756615: { "exptime": [120, 600], "period": 19.179, },
     # overriding the TESS-ebs eclipse data which overstates eclipse widths & depths
-    "TIC 173756896": { "widthP": 0.025, "widthS": 0.043, "depthP": 0.100, "depthS": 0.020, },
+    173756896: { "widthP": 0.025, "widthS": 0.043, "depthP": 0.100, "depthS": 0.020, },
     # highly eccentric and gives nonsense fit without assistance (esinw)
-    "TIC 219362976": { "jktebop_overrides": { "esinw": 0.2 }, },
-    "TIC 220397947": { "flatten": True, },
-    "TIC 260504147": { "jktebop_overrides": { "inc": 89.3, "L3": 0.5 }, },
+    219362976: { "jktebop_overrides": { "esinw": 0.2 }, },
+    220397947: { "flatten": True, },
+    260504147: { "jktebop_overrides": { "inc": 89.3, "L3": 0.5 }, },
     # Repeated gaussj warnings on S61+62 and a failure to converge after retries unless we start ecosw/esinw at zero
-    "TIC 278826516": { "jktebop_overrides": { "ecosw": 0, "esinw": 0 }, },
+    278826516: { "jktebop_overrides": { "ecosw": 0, "esinw": 0 }, },
     # highly eccentric and needs help
-    "TIC 279741942": { "jktebop_overrides": { "ecosw": 0.36, "esinw": 0.06 }, },
+    279741942: { "jktebop_overrides": { "ecosw": 0.36, "esinw": 0.06 }, },
     # will not meet 2+1 eclipse criterion, so no fit without the sectors override & fixed period; period override from insepcting S87
-    "TIC 299903137": { "sectors": [[6], [87]], "period": 26.3811, "phiS": 0.365, "jktebop_overrides": { "period_fit": 0 }, },
+    299903137: { "sectors": [[6], [87]], "period": 26.3811, "phiS": 0.365, "jktebop_overrides": { "period_fit": 0 }, },
     # TESS-ebs period and phiS corrected and corresponding reduction in eclipse widths
-    "TIC 319558164": { "period": 16.596535, "widthP": 0.013, "widthS": 0.012, "phiS": 0.540, },
+    319558164: { "period": 16.596535, "widthP": 0.013, "widthS": 0.012, "phiS": 0.540, },
     # TESS-ebs ephemeris values not usable for this target - ephemeris set by inspection;
-    "TIC 319863494": { "t0": 2206.68905, "period": 17.644121, "widthP": 0.035, "widthS": 0.031, "depthP": 0.20, "depthS": 0.15, "phiS": 0.290, },
+    319863494: { "t0": 2206.68905, "period": 17.644121, "widthP": 0.035, "widthS": 0.031, "depthP": 0.20, "depthS": 0.15, "phiS": 0.290, },
     # highly eccentric and gives nonsense fits without assistance - particularly sensitive to the Poincare elements
-    "TIC 350298314": { "jktebop_overrides": { "ecosw": -0.38, "esinw": 0.11, "period_fit": 0 }, },
+    350298314: { "jktebop_overrides": { "ecosw": -0.38, "esinw": 0.11, "period_fit": 0 }, },
     # Need to double the TESS-ebs period, copy the primary meta to secondary and halve the widths
-    "TIC 349480507": { "period": 1355.493939, "period_err": 0.027422, "widthP": 0.067, "widthS": 0.067, "depthS": 0.339 },
-    "TIC 355152640": { "flatten": True, },
-    "TIC 386166904": { "widthS": 0.050, },
+    349480507: { "period": 1355.493939, "period_err": 0.027422, "widthP": 0.067, "widthS": 0.067, "depthS": 0.339, "phiS": 0.500 },
+    355152640: { "flatten": True, },
+    386166904: { "widthS": 0.050, },
 }
 
 
@@ -122,10 +126,11 @@ if __name__ == "__main__":
     lops_moc = MOC.load(path="libs/data/lops2-footprints-moc/PLATOfootprint_hpix9_full_v2.fits")
     all_tebs_lops = lops_moc.query_vizier_table("J/ApJS/258/16")
     all_tebs_lops.sort("TIC")
+    all_tics = [int(t) for t in all_tebs_lops["TIC"]]
 
 
     # Exclude those targets that are not suited to our needs; first explicitly configured exclusions
-    include_mask = np.in1d(all_tebs_lops["TIC"], exclude_tics, invert=True)
+    include_mask = np.in1d(all_tics, list(exclude_tics.keys()), invert=True)
 
     # TESS-ebs morphology; we're interested in well-detached so we have a Morph cut-off
     include_mask &= all_tebs_lops["Morph"] <= args.max_morph
@@ -133,7 +138,7 @@ if __name__ == "__main__":
     # Eclipse depths: need eclipses sufficiently deep to be able to fit with EBOP MAVEN & JKTEBOP.
     # There are 2 algorithms used to characterise the eclipses; a 2-Gaussian fit & the polyfit algo.
     # Prefer the 2g characterisation, values tend to deeper & wider, but coalesce the pf values if
-    # have neither 2g values. Keep those without characterisation (masked) to be inspected later.
+    # we have neither 2g values. Keep those without characterisation (masked) to be inspected later.
     min_ecl_depths = np.minimum(np.ma.filled(all_tebs_lops["Dp-2g"], np.nan),
                                 np.ma.filled(all_tebs_lops["Ds-2g"], np.nan))
     min_ecl_depths_pf = np.minimum(np.ma.filled(all_tebs_lops["Dp-pf"], np.nan),
@@ -145,7 +150,7 @@ if __name__ == "__main__":
     # Any further criteria/evaluation should go here
 
     # The final selections, including any hard-coded inclusion overrides
-    include_mask |= np.in1d(all_tebs_lops["TIC"], include_tics)
+    include_mask |= np.in1d(all_tics, list(include_tics.keys()))
     num_matching_rows = sum(include_mask)
 
 
@@ -171,15 +176,15 @@ if __name__ == "__main__":
         config = {
             "details": "",
             "notes": "",
-            "why_include": f"morph={row['Morph']:.3f} " +
-                            f"& ecl_depths>={min_ecl_depths[include_mask][ix]:.3f}"
+            "why_include": ""
         }
 
 
         # TESS-ebs fields to the ephemeris config item for each target.
         # These first set of fields are easy as there are direct 1-1 mappings.
         # ----------------------------------------------------------------------
-        for kfrom, kto in [("BJD0", "t0"), ("Per", "period"), ("Morph", "morph")]:
+        for kfrom, kto in [("BJD0", "t0"), ("e_BJD0", "t0_err"),
+                           ("Per", "period"), ("e_Per", "period_err"), ("Morph", "morph")]:
             if (val := row.get(kfrom, None)) is not None and not np.isnan(val):
                 config[kto] = round(float(val), 6) if kfrom in ["Morph"] else val
 
@@ -209,8 +214,9 @@ if __name__ == "__main__":
 
         # Apply any overrides now, before we try to fix any data by inspection
         # ----------------------------------------------------------------------
-        config |= known_overrides.get(target_id, { })
-
+        if (config_overrides := known_overrides.get(tic, None)) is not None:
+            config |= config_overrides
+            config["notes"] += "with overrides to " + ", ".join(k for k in config_overrides) + ";"
 
         # Now download & inspect any light-curves to confirm/improve the ephemeris
         # For now, we're skipping these targets with insufficient ephemeris data to be fitted
@@ -255,7 +261,7 @@ if __name__ == "__main__":
                 config["depthP"] = avg_pri_depth
                 config["depthS"] = avg_sec_depth
                 config["phiS"] = phis
-                config["notes"] = "added through LC inspection as no eclipse depths in TESS-ebs"
+                config["notes"] += "with overrides of eclipse depths from inspection of LCs;"
                 print(f"suitable <pri>={avg_pri_depth:.6f} <sec>={avg_sec_depth:.6f}", end="...")
             elif any(d > 0 for d in [avg_pri_depth, avg_sec_depth]):
                 print(f"too shallow <pri>={avg_pri_depth:.6f} <sec>={avg_sec_depth:.6f}...omitted.")
@@ -278,6 +284,11 @@ if __name__ == "__main__":
 
         # If we got here, everything is OK with the target so we add it to the config to be written
         # ----------------------------------------------------------------------
+        if tic in include_tics:
+            config["why_include"] = include_tics.get(tic, "explicitly included")
+        else:
+            config["why_include"] = f"morph={config['morph']:.3f} & " \
+                                    + f"ecl_depths>={min(config['depthP'],config['depthS']):.3f}"
         target_configs[target_id] = config
         print("added to config.")
 
