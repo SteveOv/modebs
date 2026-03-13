@@ -52,12 +52,19 @@ exclude_tics |= { 4783257: "TBC" }
 # These may be excluded by selection criteria but are included as they're known to fit well
 include_tics = {
     # pylint: disable=line-too-long
-    30034081: "TESS-ebs misses the secondary, however double the period and it fits well",
+    30034081: "TESS-ebs has halved the period so include with overriden ephemeris",
+    31054255: "TESS-ebs has halved the period so include with overriden ephemeris",
+    31273263: "TESS-ebs has halved the period so include with overriden ephemeris",
     31810287: "secondary eclipses are 'borderline' (Ds-2g 0.049) but this fits with flattening",
     37606218: "secondary eclipses are very shallow (Ds-2g 0.013) but mitigated by being total",
+    55369219: "TESS-ebs has halved the period so include with overriden ephemeris",
+    147975720: "TESS-ebs has halved the period so include with overriden ephemeris",
+    200440175: "TESS-ebs has halved the period so include with overriden ephemeris. J+A characterisation affected by 1/2 period shift.",
     220420534: "secondary eclipses are 'borderline' (Ds-2g 0.05) but we easily get good consistent fits",
+    260659986: "TESS-ebs has halved the period so include with overriden ephemeris",
     307488184: "secondary eclipses are very shallow (Ds-2g 0.017) but mitigated by being total",
-    349480507: "TESS-ebs has half the period & no secondary depth, so may not be selected by default",
+    349480507: "TESS-ebs has halved the period so include with overriden ephemeris",
+    425064757: "TESS-ebs has no data on the secondary so include with overriden ephemeris"
 }
 
 # These are systems which are known to need hard-coded overrides to some config settings
@@ -65,24 +72,34 @@ known_overrides = {
     # pylint: disable=line-too-long
     # Highly eccentric and needs assistance to fit
     7695666: { "jktebop_overrides": { "ecosw": -0.56, "esinw": 0.08, "inc": 88.7 }, },
-    # Need to double the TESS-ebs period, copy the primary meta to secondary and halve the widths
+    # For the following; double the TESS-ebs period, copy the primary eclipse data to secondary and halve the widths
     30034081: { "period": 4.6892177144299785, "period_err": 0.0002550268060178, "widthP": 0.068, "widthS": 0.068, "depthP": 0.452, "depthS": 0.452, "phiS": 0.500 },
+    31054255: { "period": 1.747743979, "period_err": 0.000000513, "widthP": 0.021, "widthS": 0.021, "depthP": 0.021, "depthS": 0.021, "phiS": 0.500 },
+    31273263: { "period": 45.145916694, "period_err": 0.002004383, "widthP": 0.010, "widthS": 0.010, "depthP": 0.220, "depthS": 0.220, "phiS": 0.500 },
     # Flattening to combat variability
     31810287: { "flatten": True, },
     53292822: { "t0": 1519.046, "period": 4.93495, "phiS": 0.67 },
+    # Switch t0, double the TESS-ebs period, copy the primary eclipse data to secondary and halve the widths
+    55369219: { "t0": 1389.775813611, "t0_err": 0.036166900, "period": 3.959191743, "period_err": 0.000061792, "widthP": 0.045, "widthS": 0.045, "depthP": 0.067, "depthS": 0.067, "phiS": 0.500 },
     # Gaia DR3 with no parallax; dist from Gaia DR2 ~500 pc so set parallax to 2.0;
     55659311: { "parallax": 2.0, },
     63579446: { "exclude_sectors": [87], },
     80650858: { "Teff_sys": 20000, },
+    # Double the TESS-ebs period, copy the primary eclipse data to secondary and halve the widths
+    147975720: { "period": 5.700445194, "period_err": 0.000026526, "widthP": 0.015, "widthS": 0.015, "depthP": 0.264, "depthS": 0.264, "phiS": 0.500 },
     153742549: { "flatten": True, },
     # overriding the TESS-ebs period with value from inspecting S32+33 (left the rest of the ephemeris unchanged)
     167756615: { "exptime": [120, 600], "period": 19.179, },
     # overriding the TESS-ebs eclipse data which overstates eclipse widths & depths
     173756896: { "widthP": 0.025, "widthS": 0.043, "depthP": 0.100, "depthS": 0.020, },
+    # Double the TESS-ebs period, copy the primary eclipse data to secondary and halve the widths. J+A characterisation affected by 1/2 period shift.
+    200440175: { "period": 3.652007766, "period_err": 0.000010387, "widthP": 0.062, "widthS": 0.062, "depthP": 0.433, "depthS": 0.433, "phiS": 0.500 },
     # highly eccentric and gives nonsense fit without assistance (esinw)
     219362976: { "jktebop_overrides": { "esinw": 0.2 }, },
     220397947: { "flatten": True, },
     260504147: { "jktebop_overrides": { "inc": 89.3, "L3": 0.5 }, },
+    # Double the TESS-ebs period, copy the primary eclipse data to secondary and halve the widths. Fits benefit from flattening, but morph ~ 0.4 so may try better detrending instead.
+    260659986: { "period": 7.140179368, "period_err": 0.000016378, "widthP": 0.033, "widthS": 0.033, "depthP": 0.172, "depthS": 0.172, "phiS": 0.500 },
     # Repeated gaussj warnings on S61+62 and a failure to converge after retries unless we start ecosw/esinw at zero
     278826516: { "jktebop_overrides": { "ecosw": 0, "esinw": 0 }, },
     # highly eccentric and needs help
@@ -99,6 +116,8 @@ known_overrides = {
     349480507: { "period": 1355.493939, "period_err": 0.027422, "widthP": 0.067, "widthS": 0.067, "depthS": 0.339, "phiS": 0.500 },
     355152640: { "flatten": True, },
     386166904: { "widthS": 0.050, },
+    # A sub-dwarf period of ~0.25 d. Not included by default as TESS-ebs lack secondary width. Eclipses are shallow but total.
+    425064757: { "widthS": 0.080, "depthP": 0.350, "depthS": 0.050, "phiS": 0.500 },
 }
 
 
