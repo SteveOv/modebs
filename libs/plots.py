@@ -442,15 +442,18 @@ def plot_hr_diagram(teffs: ArrayLike,
     if labels is not None and len(labels) != teffs.shape[0]:
         raise ValueError("labels do not match the teffs or luminosities")
 
+    teff_noms, teff_errs = nominal_values(teffs), std_devs(teffs)
+    lum_noms, lum_errs = nominal_values(luminosities), std_devs(luminosities)
+
     fig, ax = plt.subplots(1, 1, figsize=(6, 4), constrained_layout=True)
     labels = labels or [None] * teffs.shape[0]
-    for ix, (teff_vals, lum_vals, label) in enumerate(zip(teffs, luminosities, labels)):
-        ax.errorbar(x=nominal_values(teff_vals), xerr=std_devs(teff_vals),
-                    y=nominal_values(lum_vals), yerr=std_devs(lum_vals),
+    for ix, (teffn, teffe, lumn, lume, label) in enumerate(zip(teff_noms, teff_errs,
+                                                               lum_noms, lum_errs, labels)):
+        ax.errorbar(x=teffn, xerr=teffe, y=lumn, yerr=lume,
                     fmt="o", ms=4, markeredgewidth=1, fillstyle="full", zorder=-ix, label=label)
 
-    xlim = (min(3000, max(ax.get_xlim()[0]*0.9, 1e-3)), max(20000, ax.get_xlim()[1]*1.1))
-    ylim = (min(0.1, max(ax.get_ylim()[0]*0.9, 1e-3)), max(20, ax.get_ylim()[1]*1.1))
+    xlim = (min(3000, max(np.min(teff_noms)*0.66, 1e-3)), max(20000, np.max(teff_noms)*2.0))
+    ylim = (min(0.001, max(np.min(lum_noms)*0.66, 1e-3)), max(5000, np.max(lum_noms)*2.0))
     ax.set(xlabel=r"$\log{(T_{\rm eff}\,/\,{\rm K})}$", xscale="log", xlim=xlim,
            ylabel=r"$\log{(L\,/\,{\rm L_{\odot}})}$", yscale="log", ylim=ylim)
 
