@@ -95,8 +95,8 @@ known_overrides = {
     173756896: { "widthP": 0.025, "widthS": 0.043, "depthP": 0.100, "depthS": 0.020, },
     # Double the TESS-ebs period, copy the primary eclipse data to secondary and halve the widths. J+A characterisation affected by 1/2 period shift.
     200440175: { "period": 3.652007766, "period_err": 0.000010387, "widthP": 0.062, "widthS": 0.062, "depthP": 0.433, "depthS": 0.433, "phiS": 0.500 },
-    # highly eccentric and gives nonsense fit without assistance (esinw)
-    219362976: { "jktebop_overrides": { "esinw": 0.2 }, },
+    # highly eccentric and gives nonsense fit without assistance; force the grouping for better coverage and esinw input value
+    219362976: { "sectors":[[4, 5, 6], [31, 32]], "jktebop_overrides": { "esinw": 0.25 }, },
     220397947: { "flatten": True, },
     260504147: { "jktebop_overrides": { "inc": 89.3, "L3": 0.5 }, },
     # Double the TESS-ebs period, copy the primary eclipse data to secondary and halve the widths. Fits benefit from flattening, but morph ~ 0.4 so may try better detrending instead.

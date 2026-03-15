@@ -555,7 +555,8 @@
         },
         "TIC 219362976": {
             "details": "5 short cadence sectors (4-6 & 31-32); tess-ebs morph 0.020 & period ~15.954 d; Gaia DR3 ruwe 1.221; high snr; eclipses of ~0.25 & ~0.07 mag; slow variability; highly eccentric with secondary at phase ~ 0.25;",
-            "notes": "highly eccentric and gives nonsense fits without assistance (esinw);",
+            "notes": "highly eccentric and gives nonsense fits without assistance, so we override grouping to combine S4 with 5&6 for beeter coverage, Teff_sys for better LD params, and override esinw;",
+            "sectors": [[4, 5, 6], [31, 32]],
             "t0": 1415.8603508604456,
             "t0_err": 0.0004368432018964,
             "period": 15.954389632941265,
@@ -566,7 +567,7 @@
             "depthP": 0.213,
             "depthS": 0.055,
             "phiS": 0.255,
-            "jktebop_overrides": { "esinw": 0.2 }
+            "jktebop_overrides": { "esinw": 0.25 }
         },
         "TIC 219421171": {
             "details": "3 short cadence sectors (4-5 & 67); tess-ebs morph 0.165 & period ~8.303 d; Gaia DR3 ruwe 0.812; high snr; eclipses of ~0.20 & ~0.07 mag; slight eccentricity; discontinuity in S4 near 1412.5; potential nearby sources of L3;",
