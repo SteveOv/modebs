@@ -175,6 +175,7 @@ if __name__ == "__main__":
 
 
                 print(f"\nFinal fitted parameters for {target_id} ([known value])")
+                high_uncert_params = []
                 write_params = { "M_sys": M_sys, "a": a }
                 for (k, unit), val in zip(theta_params_and_units, theta_fit):
                     label = ""
@@ -183,11 +184,13 @@ if __name__ == "__main__":
                         label = f"({lval:.3f} {unit:unicode})"
                     print(f"{k:>12s} = {val:.3f} {unit:unicode} \t", label)
 
-                    if std_dev(val) > nominal_value(val) * 0.20:
-                        warn_msgs += [f"{k} uncertainty>20%"]
-
                     # *** also updates the target data ***
                     write_params[k] = val
+                    if std_dev(val) > nominal_value(val) * 0.20:
+                        high_uncert_params += [k]
+
+                if len(high_uncert_params) > 0:
+                    warn_msgs += [f"uncertainty of {','.join(k for k in high_uncert_params)}>0%"]
 
 
                 # Finally, store the params and the flag that indicates fitting has completed

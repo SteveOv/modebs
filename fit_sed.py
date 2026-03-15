@@ -291,6 +291,7 @@ if __name__ == "__main__":
 
                 print(f"\nFinal fitted parameters for {target_id} ([known value])")
                 write_params = {}
+                high_uncert_params = []
                 for (k, unit), val, mask in zip(theta_params_and_units, theta_fit, fit_mask):
                     label = ""
                     if k == "dist":
@@ -303,8 +304,11 @@ if __name__ == "__main__":
                     # *** also updates the target data ***
                     if mask:
                         write_params[k] = val
-                        if std_dev(val) > nominal_value(val) / 10:
-                            warn_msgs += [f"{k} uncertainty>10%"]
+                        if std_dev(val) > nominal_value(val) * 0.20:
+                            high_uncert_params += [k]
+
+                if len(high_uncert_params) > 0:
+                    warn_msgs += [f"uncertainty of {','.join(k for k in high_uncert_params)}>20%"]
 
 
                 # Finally, store the params and the flag that indicates SED fitting has completed
