@@ -63,6 +63,7 @@ include_tics = {
     220420534: "secondary eclipses are 'borderline' (Ds-2g 0.05) but we easily get good consistent fits",
     260659986: "TESS-ebs has halved the period so include with overriden ephemeris",
     307488184: "secondary eclipses are very shallow (Ds-2g 0.017) but mitigated by being total",
+    319863494: "a difficult LC fit as the inclination changes over time - will need update to pipeline to at least allow inc to be overriden by sector",
     349480507: "TESS-ebs has halved the period so include with overriden ephemeris",
     425064757: "TESS-ebs has no data on the secondary so include with overriden ephemeris"
 }
@@ -108,7 +109,7 @@ known_overrides = {
     299903137: { "sectors": [[6], [87]], "period": 26.3811, "phiS": 0.365, "jktebop_overrides": { "period_fit": 0 }, },
     # TESS-ebs period and phiS corrected and corresponding reduction in eclipse widths
     319558164: { "period": 16.596535, "widthP": 0.013, "widthS": 0.012, "phiS": 0.540, },
-    # TESS-ebs ephemeris values not usable for this target - ephemeris set by inspection;
+    # TESS-ebs ephemeris values not usable for this target - ephemeris set by inspection; also inc changes over time so may need to set by sector
     319863494: { "t0": 2206.68905, "period": 17.644121, "widthP": 0.035, "widthS": 0.031, "depthP": 0.20, "depthS": 0.15, "phiS": 0.290, },
     # highly eccentric and gives nonsense fits without assistance - particularly sensitive to the Poincare elements
     350298314: { "jktebop_overrides": { "ecosw": -0.38, "esinw": 0.11, "period_fit": 0 }, },
