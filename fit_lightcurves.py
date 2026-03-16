@@ -266,13 +266,14 @@ if __name__ == "__main__":
                 # Build the values and flags for the JKTEBOP in files
                 # The refl flags can be 0 (fixed), 1 (fitted) or -1 (calculated from sys geometry)
                 refl_fit = -1 if (morph <= FLATTEN_TH) else 1
-                in_params = {
+                in_params = [{
                     # Mass ratio (qphot), can be -1 (force spherical) or a specified ratio value
                     "qphot": -1 if (morph <= FLATTEN_TH) else preds_dict["k"]**1.4,
                     "gravA": 0.,                "gravB": 0.,
-                    # The pipeline code sets initial L3 from each LC's CROWDSAP (or in overrides)
+                    "L3": max(0, 1-lc.meta.get("CROWDSAP", 1)),
                     "reflA": 0.,                "reflB": 0.,
 
+                    "t0": nominal_value(lc.meta.get("t0", t0)),
                     "period": nominal_value(period),
 
                     "qphot_fit": 0,
@@ -288,7 +289,7 @@ if __name__ == "__main__":
                     **preds_dict,
                     **ld_params,
                     **fit_overrides,
-                }
+                } for lc in lcs]
 
                 # Set of the potentially fitted parameters to be read from par file after fitting
                 read_keys = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc", "qphot", "L3",
@@ -298,11 +299,9 @@ if __name__ == "__main__":
                 # will occur after each attempt is complete, but overall elapsed time is reduced.
                 # If set to 1, tasks are serialized but more frequent progress updates will occur.
                 print(f"\nFitting {len(lcs)} lightcurves with JKTEBOP task 3")
-                t0s = [nominal_value(lc.meta.get("t0", t0)) for lc in lcs]
                 fitted_param_dicts = pipeline.fit_target_lightcurves(lcs,
                                                                      input_params=in_params,
                                                                      read_keys=read_keys,
-                                                                     t0=t0s,
                                                                      task=3,
                                                                      max_workers=8,
                                                                      max_attempts=3,

@@ -524,9 +524,8 @@ def median_params(input_params: ArrayLike,
 
 
 def fit_target_lightcurves(lcs: LightCurveCollection,
-                           input_params: dict[str],
+                           input_params: Union[dict[str], List[dict[str]]],
                            read_keys: List[str],
-                           t0: Union[float, UFloat, np.ndarray]=None,
                            task: int=3,
                            iterations: int=10,
                            max_workers: int=1,
@@ -539,15 +538,19 @@ def fit_target_lightcurves(lcs: LightCurveCollection,
     a "## Warning: a good fit was not found after ..." warning message. Timeouts are supported, with
     the timeout arg indicating the maximum number of seconds to allow for a fit (None == forever).
 
-    Each lightcurve will be fitted from mostly the same input settings with the exception of;
-        - t0, which may be varied by lightcurve (see t0 parameter)
-        - poly fit instructions, which are calculated for the timings of each lightcurve
+    The input_params may either be a single dict of values, shared by all LighCurves, or
+    a list of dicts, one for each LightCurve. In either case, the following additional fitting
+    instructions are set to values specific to each lightcurve;
+    - poly fit instructions, which are calculated for the time range of each lightcurve
+
+    If not already present within the input_params the following values, which are likely to change
+    with each LightCurve, are set based on values read from each LightCurve's metadata;
+    - t0 / primary_epoch time is read from the the t0 meta value
+    - L3, which is calculated as 1 - TESS CROWDSAP meta value
 
     :lcs: the source lightcurves, which must have the time, delta_mag and delta_mag_err columns
-    :input_params: the set initial input params to the fitting process shared by each lightcurve
+    :input_params: the set initial input params to the fitting process for each lightcurve
     :read_keys: the set of fitted output params to read and return for each fit
-    :t0: either a single value for all lcs, individual values for each lc or None when
-    values will be taken from each lightcurve's meta dictionary under the t0 key
     :task: the jktebop task to be executed
     :iterations: the number of iterations to run if task == 3, otherwise ignored
     :max_workers: the maximum number of concurrent fits to run
@@ -556,20 +559,26 @@ def fit_target_lightcurves(lcs: LightCurveCollection,
     :returns: a list of dictionaries containing the fitted parameters matching read_keys and the
     paths to the various jktebop files associated with the fitting
     """
-    if t0 is None:
-        t0 = [lc.meta.get("t0", lc.meta.get("primary_epoch", None)) for lc in lcs]
-    elif isinstance(t0, float|UFloat):
-        t0 = [t0] * len(lcs)
+    if isinstance(input_params, dict):
+        input_params = [input_params.copy()] * len(lcs)
+    elif len(lcs) != len(input_params):
+        raise ValueError("Expected either one shared set of input params, or one set per LC. " +
+                         f"Got {len(lcs)} LightCurve(s) and {len(input_params)} set(s) of params.")
+
+    # These params are known to vary by LC and have values stored in LC meta dicts,
+    # so we can set them if they have no already be set in client code.
+    for in_params, lc in zip(input_params, lcs):
+        t0 = lc.meta.get("t0", lc.meta.get("primary_epoch", in_params.get("t0", None)))
+        in_params.setdefault("t0", t0)
+        in_params.setdefault("primary_epoch", t0)
+        in_params.setdefault("L3", max(0, 1-lc.meta.get("CROWDSAP", 1)))
+
+    all_fit_stems = [file_prefix + "-" + lc.meta["LABEL"].replace(" ", "-").lower() for lc in lcs]
 
     task_params = { "task": task, "simulations": iterations if task == 8 else "" }
     if task != 3:
         max_attempts = 1
     max_workers = min(len(lcs), max_workers or 1)
-
-    # Set up the sets of fit_target_lightcurve args may differ by lc/sector
-    all_in_params = [input_params.copy() | task_params | \
-                { "t0": t, "L3": max(0, 1-lc.meta.get("CROWDSAP", 1)) } for t, lc in zip(t0, lcs)]
-    all_fit_stems = [file_prefix + "-" + lc.meta["LABEL"].replace(" ", "-").lower() for lc in lcs]
 
     # If we're to run in parallel this indicates to _fit_target to write JKTEBOP console output to
     # stdout less frequently, so it is less likely that the fitting narrative will be interleaved.
@@ -580,15 +589,15 @@ def fit_target_lightcurves(lcs: LightCurveCollection,
     iter_params = ((lc["time"].unmasked.value,
                     lc["delta_mag"].unmasked.value,
                     lc["delta_mag_err"].unmasked.value,
-                    in_params,
+                    in_params | task_params,
                     read_keys,
                     fit_stem,
                     lc.meta.get("clip_mask", None),
-                    _create_lc_std_further_process_cmds(lc, input_params["period"]),
+                    _create_lc_std_further_process_cmds(lc, in_params["period"]),
                     max_attempts,
                     timeout,
                     hold_stdout) \
-                    for lc, in_params, fit_stem in zip(lcs, all_in_params, all_fit_stems))
+                    for lc, in_params, fit_stem in zip(lcs, input_params, all_fit_stems))
 
     if max_workers <= 1:
         # Could use a pool of 1, but it's useful to keep execution on the interactive proc for debug

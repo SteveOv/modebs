@@ -237,19 +237,20 @@ class Testpipeline(unittest.TestCase):
                 lc[s]["delta_mag"] -= fit_polynomial(lc.time[s], lc[s]["delta_mag"], 1, 3)
             lc.meta["clip_mask"] = np.ones((len(lc)), dtype=bool)
 
-        in_params = {
+        in_params = [{
             "task": 3,
             "rA_plus_rB": 0.3,      "k": 0.7,
             "inc": 86.4,            "qphot": 0.836,
             "ecosw": 0.005,         "esinw": -0.010,
             "gravA": 0,             "gravB": 0,
-            "J": 0.9,               "L3": 0,
+            "J": 0.9,               "L3": max(0, 1-lc.meta.get("CROWDSAP", 1)),
             "LDA": "pow2",          "LDB": "pow2",
             "LDA1": 0.64,           "LDB1": 0.65,
             "LDA2": 0.47,           "LDB2": 0.50,
             "reflA": 0,             "reflB": 0,
 
-            # primary_epoch is passed in separately as it may vary by sector
+            # Ephemeris
+            "t0": config["t0"].value,
             "period": config["period"].to(u.d).value,
 
                                     "qphot_fit": 0,
@@ -262,11 +263,10 @@ class Testpipeline(unittest.TestCase):
                                     "sf_fit": 1,
             "period_fit": 1,        "t0_fit": 1,
 
-        }
+        } for lc in lcs]
 
         read_keys = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc", "L3"]
-        pe = config["t0"].value
-        out_params = fit_target_lightcurves(lcs, in_params, read_keys, pe,
+        out_params = fit_target_lightcurves(lcs, in_params, read_keys,
                                             task=3, max_workers=4, file_prefix="test-pipeline")
 
         for op_dict in out_params:
