@@ -515,8 +515,11 @@ def median_params(input_params: ArrayLike,
             whisker_len = 1.5 * (q3 - q1)
             noms = noms[(q1 - whisker_len <= noms) & (noms <= q3 + whisker_len)]
 
-        lo, med, hi = np.quantile(noms, q=quantiles)
-        agg_params[k][0] = ufloat(med, max(np.mean([med-lo, hi-med]), med * min_uncertainty_pc))
+        if noms is None or len(noms) == 0:
+            agg_params[k][0] = None
+        else:
+            lo, med, hi = np.quantile(noms, q=quantiles)
+            agg_params[k][0] = ufloat(med, max(np.mean([med-lo, hi-med]), med * min_uncertainty_pc))
     return agg_params[0]
 
 
