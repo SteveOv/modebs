@@ -52,7 +52,7 @@ exclude_tics = {
 # Too shallow (review depth criteria)
 exclude_tics |= { 4783257: "TBC" }
 
-# These may be excluded by selection criteria but are included as they're known to fit well
+# These may be excluded by selection criteria but are included as they're known to fit
 include_tics = {
     # pylint: disable=line-too-long
     30034081: "TESS-ebs has halved the period (corroborated with J+A) so include with overriden ephemeris",
@@ -66,7 +66,7 @@ include_tics = {
     220420534: "secondary eclipses are 'borderline' (Ds-2g 0.05) but we easily get good consistent fits",
     260659986: "TESS-ebs has halved the period (corroborated with J+A) so include with overriden ephemeris",
     307488184: "secondary eclipses are very shallow (Ds-2g 0.017) but mitigated by being total",
-    319863494: "a difficult LC fit as the inclination changes over time - will need update to pipeline to at least allow inc to be overriden by sector",
+    319863494: "a difficult LC fit as the inclination changes over time - requires inc to be overriden by sector",
     349059354: "TESS-ebs has halved the period (corroborated with GCVS, AAVSO VSX, ShiQian) so include and override ephemeris",
     349480507: "TESS-ebs has halved the period (corroborated with J+A & TBOSB2) so include with overriden ephemeris",
     425064757: "TESS-ebs has no data on the secondary so include with overriden ephemeris"
@@ -115,8 +115,9 @@ known_overrides = {
     299903137: { "sectors": [[6], [87]], "period": 26.3811, "phiS": 0.365, "jktebop_overrides": { "period_fit": 0 }, },
     # TESS-ebs period (not corroborated) and phiS corrected and corresponding reduction in eclipse widths
     319558164: { "period": 16.596535, "widthP": 0.013, "widthS": 0.012, "phiS": 0.540, },
-    # TESS-ebs ephemeris values not usable for this target - ephemeris set by inspection; also inc changes over time so may need to set by sector
-    319863494: { "t0": 2206.68905, "period": 17.644121, "widthP": 0.035, "widthS": 0.031, "depthP": 0.20, "depthS": 0.15, "phiS": 0.290, },
+    # TESS-ebs ephemeris values not usable for this target - ephemeris set by inspection; also inc changes over time so must override by sector group
+    319863494: { "t0": 2206.68905, "period": 17.644121, "widthP": 0.035, "widthS": 0.031, "depthP": 0.20, "depthS": 0.15, "phiS": 0.290,
+                "sectors": [[33, 34], [61], [87, 88]], "jktebop_overrides": [{"inc": 88.8}, {"inc": 89.6}, {"inc": 90.0}], },
     # Double the TESS-ebs period (corroborated with GCVS, AAVSO VSX, ShiQian), copy the primary eclipse data to secondary and halve the widths. In AAVSO B/vsx/vsx with per of ~3.3 d
     349059354: { "period": 3.329326238, "period_err": 0.000009050, "widthP": 0.058, "widthS": 0.058, "depthP": 0.174, "depthS": 0.174, "phiS": 0.500 },
     # Need to double the TESS-ebs period (corroborated with J+A & TBOSB2), copy the primary meta to secondary and halve the widths

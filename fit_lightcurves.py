@@ -247,6 +247,8 @@ if __name__ == "__main__":
                 # Extract any fitting overrides from the target config.
                 # May contain LD params which are handled below.
                 fit_overrides = copy.deepcopy(config.get("jktebop_overrides", {}))
+                if isinstance(fit_overrides, dict):
+                    fit_overrides = [fit_overrides] * len(lcs)
 
                 Teff_sys, logg_sys, st = wset.read_values(target_id, "Teff_sys", "logg_sys", "spt")
                 Teff_sys = Teff_sys or lcs[0].meta["TEFF"] or pipeline.get_teff_from_spt(st) or 5650
@@ -258,10 +260,10 @@ if __name__ == "__main__":
                       f"logg_sys={logg_sys:.3f}, subject to overrides from config.")
                 TeffR = nominal_value(preds_dict["J"]**0.25)
                 ld_Teffs = (Teff_sys, Teff_sys*TeffR) if TeffR < 1 else (Teff_sys/TeffR, Teff_sys)
-                ld_params = pipeline.pop_and_complete_ld_config(fit_overrides,
+                ld_params = [pipeline.pop_and_complete_ld_config(fo,
                                                             *nominal_values(ld_Teffs),
                                                             *nominal_values((logg_sys, logg_sys)),
-                                                            "pow2", verbose=True)
+                                                            "pow2") for fo in fit_overrides]
 
                 # Build the values and flags for the JKTEBOP in files
                 # The refl flags can be 0 (fixed), 1 (fitted) or -1 (calculated from sys geometry)
@@ -287,9 +289,9 @@ if __name__ == "__main__":
                     "period_fit": 1,            "t0_fit": 1,
 
                     **preds_dict,
-                    **ld_params,
-                    **fit_overrides,
-                } for lc in lcs]
+                    **ld,
+                    **fo,
+                } for lc, ld, fo in zip(lcs, ld_params, fit_overrides, strict=True)]
 
                 # Set of the potentially fitted parameters to be read from par file after fitting
                 read_keys = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc", "qphot", "L3",
