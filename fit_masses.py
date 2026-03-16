@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """ Pipeline Stage 4 - MCMC fitting of target masses from MIST models """
 # pylint: disable=no-member, invalid-name
 from inspect import getsourcefile

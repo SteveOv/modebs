@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """ Pipeline Stage 5 - plots of fitted targets """
 # pylint: disable=no-member, no-name-in-module, singleton-comparison
 from inspect import getsourcefile
@@ -7,14 +8,12 @@ from datetime import datetime
 from contextlib import redirect_stdout
 import numpy as np
 import matplotlib.pyplot as plt
-from uncertainties.unumpy import nominal_values
 
 from astropy.constants import sigma_sb
 from astropy.constants.iau2015 import L_sun, R_sun
 
 from libs import plots
 from libs.iohelpers import Tee
-from libs.targets import Targets
 from libs.pipeline_dal import QTableFileDal
 
 THIS_STEM = Path(getsourcefile(lambda: 0)).stem

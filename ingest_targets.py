@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """ Pipeline Stage 1 - ingesting targets """
 # pylint: disable=no-member
 from inspect import getsourcefile

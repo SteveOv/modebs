@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """ Pipeline Stage 2 - fitting target lightcurves """
 # pylint: disable=no-member, invalid-name
 from inspect import getsourcefile

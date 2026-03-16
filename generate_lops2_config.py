@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """ Pipeline Stage 0 - generating config for suitable LOPS2 targets """
 # pylint: disable=no-member
 from inspect import getsourcefile

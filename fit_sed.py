@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """ Pipeline Stage 3 - MCMC fitting of target SEDs """
 # pylint: disable=no-member, invalid-name
 from inspect import getsourcefile
