@@ -25,6 +25,7 @@ THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 # These are systems which may be included up by selection criteria but are known to not fit
 exclude_tics = {
     # pylint: disable=line-too-long
+    13062255: "too close for JKTEBOP (rA+rB ~ 0.5)",
     126446153: "too close for JKTEBOP",
     129268651: "ESS-ebs eclipse depths incorrect - this has very shallow eclipses",
     140661916: "too close for JKTEBOP (rA+rB ~ 0.5, morph 0.592)",
