@@ -368,7 +368,7 @@ def append_mags_to_lightcurves_and_detrend(lcs: LightCurveCollection,
 
             if verbose:
                 num_ecl = len(np.ma.clump_masked(np.ma.masked_where(mask, mask)))
-                print(f"Flattening the {label} LC outside of {num_ecl} masked eclipse(s).")
+                print(f"Flattening the {label} LC fluxes outside of {num_ecl} masked eclipse(s).")
             lcs[ix] = lcs[ix].flatten(mask=mask)
 
         # Create detrended & rectified delta_mag and delta_mag err columns
@@ -378,6 +378,8 @@ def append_mags_to_lightcurves_and_detrend(lcs: LightCurveCollection,
                                                                   lcs[ix][s]["delta_mag"],
                                                                   detrend_poly_degree,
                                                                   detrend_iterations)
+    if verbose:
+        print(f"Added detrended & rectified delta_mag/delta_mag_err columns to {len(lcs)} LC(s).")
 
 
 def calculate_orbital_inclination(sum_r: ArrayLike,

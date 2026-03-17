@@ -187,8 +187,12 @@ if __name__ == "__main__":
                 # Flatten (optional depending on morph), append delta_mag & delta_mag_err columns
                 # and then detrend & rectify the mags to zero by subtracting a low order polynomial
                 do_flatten = config.flatten or (config.flatten is None and morph <= FLATTEN_TH)
-                print("\nAppending detrended delta_mags & delta_mags_err columns (rectified to 0).",
-                    (f"Fluxes will be flattened first (morph={morph:.3f}.)" if do_flatten else ""))
+                if do_flatten:
+                    print(f"\nFluxes for {target_id} (with morph={morph:.3f}) will be flattened,",
+                          "prior to detrending, as it has a",
+                          "config override set." if config.flatten else f"morph <= {FLATTEN_TH}.")
+                else:
+                    print()
                 pipeline.append_mags_to_lightcurves_and_detrend(lcs,
                                                                 config.detrend_gap_threshold,
                                                                 config.detrend_poly_degree,
