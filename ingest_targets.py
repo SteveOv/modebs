@@ -86,8 +86,8 @@ if __name__ == "__main__":
                 ids = np.array(id_patt.findall(srow["ids"]), [("type", "O"), ("id", "O")])
                 params = {
                     "tics": "|".join(f"{i}" for i in ids[ids["type"]=="TIC"]["id"]),
-                    ** { col: srow[scol] for (col, scol) in [("ra", "ra"),
-                                                            ("dec", "dec"),
+                    ** { col: srow[scol] for (col, scol) in [("ra_coord", "ra"),
+                                                            ("dec_coord", "dec"),
                                                             ("parallax", "plx_value"),
                                                             ("parallax_bibcode", "plx_bibcode"),
                                                             ("spt", "sp_type")]
@@ -112,8 +112,8 @@ if __name__ == "__main__":
                     params = { "ruwe": srow["ruwe"]}
                     if all((srow[k] or 0) != 0 for k in ["ra", "dec", "parallax"]):
                         params |= {
-                            "ra": srow["ra"],
-                            "dec": srow["dec"],
+                            "ra_coord": srow["ra"],
+                            "dec_coord": srow["dec"],
                             "parallax": srow["parallax"],
                             "parallax_err": srow["parallax_error"],
                             "parallax_bibcode": "2022yCat.1355....0G", # GaiaDR3 Part 1. Main source
@@ -124,7 +124,7 @@ if __name__ == "__main__":
         # Highlight missing coords as this will inhibit accounting for extinction when fitting SED
         print()
         for target_id, ra, dec, par, warn_msgs in \
-                dal.yield_values(dal.key_name, "ra", "dec", "parallax", "warnings"):
+                dal.yield_values(dal.key_name, "ra_coord", "dec_coord", "parallax", "warnings"):
             if any(v is None for v in [ra, dec, par]) or nominal_value(par) == 0:
                 warn_msgs = (warn_msgs or "").split(";") + ["coords incomplete"]
                 dal.write_values(target_id,

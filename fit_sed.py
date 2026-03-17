@@ -127,7 +127,7 @@ if __name__ == "__main__":
 
                 search_term, k, TeffR, Teff_sys, logg_sys = wset.read_values(target_id,
                                                 "search_term", "k", "TeffR", "Teff_sys", "logg_sys")
-                ra, dec, parallax = wset.read_values(target_id, "ra", "dec", "parallax")
+                ra, dec, parallax = wset.read_values(target_id, "ra_coord", "dec_coord", "parallax")
                 coords = SkyCoord(ra=nominal_value(ra) * u.deg, dec=nominal_value(dec) * u.deg,
                                   distance=(1000 / nominal_value(parallax)) * u.pc, frame="icrs")
 
