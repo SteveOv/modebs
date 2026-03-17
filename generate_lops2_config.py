@@ -26,6 +26,7 @@ THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 exclude_tics = {
     # pylint: disable=line-too-long
     13062255: "too close for JKTEBOP (rA+rB ~ 0.5)",
+    64783257: "low SNR and shallow eclipses make impossible to get a durable fit, with or without flattening",
     126446153: "too close for JKTEBOP",
     129268651: "ESS-ebs eclipse depths incorrect - this has very shallow eclipses",
     140661916: "too close for JKTEBOP (rA+rB ~ 0.5, morph 0.592)",
@@ -35,7 +36,7 @@ exclude_tics = {
     165186801: "too close/tidally distorted for JKTEBOP (rA+rB ~ 0.55)",
     167692429: "eclipses almost non-existent by the latter sectors - needs investigation",
     220430912: "too close for JKTEBOP (rA+rB ~ 0.5)",
-    257691369: "oo shallow (more than Ds-2g of 0.081 indicates), with long period - cannot get a durable fit",
+    257691369: "too shallow (more than Ds-2g of 0.081 indicates), with long period - cannot get a durable fit",
     259543079: "extremely eccentric and cannot get a reliable fit, even with interventions",
     260124760: "too close for JKTEBOP (rA+rB ~ 0.6, morph 0.590), however the fit is plausible",
     278826996: "highly eccentric and cannot get a reliable fit even with interventions",
