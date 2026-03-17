@@ -94,6 +94,8 @@ known_overrides = {
     # Gaia DR3 with no parallax; dist from Gaia DR2 ~500 pc so set parallax to 2.0;
     55659311: { "parallax": 2.0, },
     63579446: { "exclude_sectors": [87], },
+    # Some noise and variability which struggles to converge even with retries. With a fairly low morph of 0.224 flattening helps with fit.
+    66509654: { "flatten": True, },
     80650858: { "Teff_sys": 20000, },
     # Double the TESS-ebs period (not corroborated), copy the primary eclipse data to secondary and halve the widths
     147975720: { "period": 5.700445194, "period_err": 0.000026526, "widthP": 0.015, "widthS": 0.015, "depthP": 0.264, "depthS": 0.264, "phiS": 0.500 },
