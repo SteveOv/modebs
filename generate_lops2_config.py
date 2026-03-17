@@ -85,6 +85,8 @@ known_overrides = {
     31273263: { "period": 45.145916694, "period_err": 0.002004383, "widthP": 0.010, "widthS": 0.010, "depthP": 0.220, "depthS": 0.220, "phiS": 0.500 },
     # Flattening to combat variability
     31810287: { "flatten": True, },
+    # Difficult to fit as there is significan variability and flares. More likely to get to the system params with flattening.
+    32702481: { "flatten": True, },
     53292822: { "t0": 1519.046, "period": 4.93495, "phiS": 0.67 },
     # Switch t0, double the TESS-ebs period (corroborated with TBOSB), copy the primary eclipse data to secondary and halve the widths
     55369219: { "t0": 1389.775813611, "t0_err": 0.036166900, "period": 3.959191743, "period_err": 0.000061792, "widthP": 0.045, "widthS": 0.045, "depthP": 0.067, "depthS": 0.067, "phiS": 0.500 },
