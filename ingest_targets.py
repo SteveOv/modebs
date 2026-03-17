@@ -89,7 +89,7 @@ if __name__ == "__main__":
                     ** { col: srow[scol] for (col, scol) in [("ra", "ra"),
                                                             ("dec", "dec"),
                                                             ("parallax", "plx_value"),
-                                                            ("coords_source", "plx_bibcode"),
+                                                            ("parallax_bibcode", "plx_bibcode"),
                                                             ("spt", "sp_type")]
                                                         if scol in srow.colnames }
                 }
@@ -116,7 +116,7 @@ if __name__ == "__main__":
                             "dec": srow["dec"],
                             "parallax": srow["parallax"],
                             "parallax_err": srow["parallax_error"],
-                            "coords_source": "2022yCat.1355....0G", # GaiaDR3 Part 1. Main source
+                            "parallax_bibcode": "2022yCat.1355....0G", # GaiaDR3 Part 1. Main source
                         }
                     dal.write_values(target_id, **params)
 

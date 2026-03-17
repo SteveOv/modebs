@@ -97,15 +97,15 @@ class QTableDal(Dal):
         ("tics", "<U40"),
         ("gaia_dr3_id", int),
         ("spt", "<U20"),
-        # Gaia DR3 (coords falling back on SIMBAD)
+        # Gaia DR3 (coords in ICRS, falling back on SIMBAD)
         ("ra", float),
         ("ra_err", float),
         ("dec", float),
         ("dec_err", float),
         ("parallax", float),
         ("parallax_err", float),
+        ("parallax_bibcode", "<U20"),
         ("ruwe", float),
-        ("coords_source", "<U20"),
         # TESS-ebs
         ("t0", float),
         ("t0_err", float),
