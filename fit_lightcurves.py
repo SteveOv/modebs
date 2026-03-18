@@ -105,6 +105,17 @@ if __name__ == "__main__":
                     figs_dir = drop_dir / "figs" / pipeline.to_file_safe_str(target_id)
                     figs_dir.mkdir(parents=True, exist_ok=True)
 
+                # Get basic ephemeris information
+                t0, period, widthP, widthS, depthP, depthS, phiS, morph = wset.read_values(
+                    target_id, "t0","period","widthP","widthS","depthP","depthS","phiS","morph")
+
+                # The quality bitmask excludes fluxes by their quality flag. If unset, choose on the
+                # period. For shorter periods we're more discriminating as orbital coverage is good.
+                quality_bitmask = config.quality_bitmastk
+                if quality_bitmask is None:
+                    per = nominal_value(period)
+                    quality_bitmask = "default" if per > 10 else "hard" if per > 5 else "hardest"
+                    print(f"Set quality_bitmask={quality_bitmask} from the period of {period:.6f}")
 
                 # It's quicker to get LCs once and cache the results than to continue to bother MAST
                 search_term, tics = wset.read_values(target_id, "search_term", "tics")
@@ -114,7 +125,7 @@ if __name__ == "__main__":
                                                    mission=config.mission,
                                                    author=config.author,
                                                    exptime=config.exptime,
-                                                   quality_bitmask=config.quality_bitmask,
+                                                   quality_bitmask=quality_bitmask,
                                                    flux_column=config.flux_column,
                                                    force_mast=False,
                                                    cache_dir=Path() / ".cache/.mast/",
@@ -150,8 +161,6 @@ if __name__ == "__main__":
 
 
                 print("\nInspecting the lightcurves to find and characterise their eclipses")
-                t0, period, widthP, widthS, depthP, depthS, phiS, morph = wset.read_values(
-                    target_id, "t0","period","widthP","widthS","depthP","depthS","phiS","morph")
                 pipeline.add_eclipse_meta_to_lightcurves(lcs, t0, period, widthP, widthS,
                                                          depthP, depthS, phiS, verbose=True)
 

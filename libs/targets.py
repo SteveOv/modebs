@@ -11,7 +11,7 @@ _default_target_config_defaults = {
     "author": ["SPOC", "TESS-SPOC"],
     "mission": ["TESS", "HLSP"],
     "flux_column": "sap_flux",
-    "quality_bitmask": "default",
+    "quality_bitmask": None,
     "sectors": None,
     "exclude_sectors": None,
     "quality_masks": [],
