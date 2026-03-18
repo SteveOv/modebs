@@ -1,7 +1,13 @@
 {
     "explicit": true,
+    "eclipse_complete_threshold": 0.9,
+    "flatten_morph_threshold": 0.2,
     "target_config_defaults": {
-        "quality_bitmask": "hardest"
+        "quality_bitmask": null,
+        "quality_masks": [[1420.0, 1424.0 ], [1534.0, 1544.0]],
+        "detrend_gap_threshold": 0.5,
+        "detrend_poly_degree": 3,
+        "detrend_iterations": 3
     },
     "target_configs": {
         "V539 Ara": {
