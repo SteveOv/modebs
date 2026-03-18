@@ -35,7 +35,9 @@ exclude_tics = {
     150357064: "very shallow with variability as deep as eclipses - cannot get a good fit",
     165186801: "too close/tidally distorted for JKTEBOP (rA+rB ~ 0.55)",
     167692429: "eclipses almost non-existent by the latter sectors - needs investigation",
+    200297691: "too distorted to get a fit with JKTEBOP",
     220430912: "too close for JKTEBOP (rA+rB ~ 0.5)",
+    231809798: "variability in sectors leads to very high scatter in fitted params, better with flatten but morph of 0.408 says not",
     257691369: "too shallow (more than Ds-2g of 0.081 indicates), with long period - cannot get a durable fit",
     259543079: "extremely eccentric and cannot get a reliable fit, even with interventions",
     260124760: "too close for JKTEBOP (rA+rB ~ 0.6, morph 0.590), however the fit is plausible",
@@ -99,6 +101,8 @@ known_overrides = {
     153742549: { "flatten": True, },
     # overriding the TESS-ebs period with value from inspecting S32+33 (left the rest of the ephemeris unchanged)
     167756615: { "exptime": [120, 600], "period": 19.179, },
+    # Wide variance in CROWDSAP/L3 between sectors leading to varying eclipse depths, so it's best to fit singularly
+    167795859: { "do_not_stitch": True, },
     # overriding the TESS-ebs eclipse data which overstates eclipse widths & depths
     173756896: { "widthP": 0.025, "widthS": 0.043, "depthP": 0.100, "depthS": 0.020, },
     # Double the TESS-ebs period, copy the primary eclipse data to secondary and halve the widths. J+A characterisation affected by 1/2 period shift.
@@ -107,6 +111,9 @@ known_overrides = {
     219362976: { "sectors":[[4, 5, 6], [31, 32]], "jktebop_overrides": { "esinw": 0.25 }, },
     # Flatten helps with fit (morph=0.328)
     220397947: { "flatten": True, },
+    # Handily removes distorted regions in LCs seen when quality_bitmask is left at default.
+    238896417: { "quality_bitmask": "hard" },
+    # Helps achieve a better LC fit.
     260504147: { "jktebop_overrides": { "inc": 89.3, "L3": 0.5 }, },
     # Double the TESS-ebs period (corroborated with J+A), copy the primary eclipse data to secondary and halve the widths. Fits benefit from flattening, but morph ~ 0.4 so may try better detrending instead.
     260659986: { "period": 7.140179368, "period_err": 0.000016378, "widthP": 0.033, "widthS": 0.033, "depthP": 0.172, "depthS": 0.172, "phiS": 0.500 },
