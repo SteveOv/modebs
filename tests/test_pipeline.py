@@ -92,15 +92,18 @@ class Testpipeline(unittest.TestCase):
     #
     def test_choose_lightcurve_groups_for_fitting_known_targets(self):
         """ Test choose_lightcurve_groups_for_fitting() assert it produces expected arrangement """
-        for target,             sectors,                exp_groups in[
+        for target,             sectors,                max_group_size, exp_groups in[
             # Sectors not contiguous (so no join) but are fine to use individually do 7+ of each ecl per sector
-            ("CW Eri",          [4, 31],                [[4], [31]]),
+            ("CW Eri",          [4, 31],                None,           [[4], [31]]),
+            ("CW Eri",          [4, 31],                1,              [[4], [31]]),
             # Sector are contiguous, but joining not necessary as there are many of each eclipse per sectors
-            ("CM Dra",          [24, 25, 26],           [[24], [25], [26]]),
+            ("CM Dra",          [24, 25, 26],           None,           [[24], [25], [26]]),
             # The only usable combo is 52+53 as eclipses too infrequent to fit any sector individually
-            ("AN Cam",          [53, 59, 52],           [[52, 53]]),
+            ("AN Cam",          [53, 59, 52],           None,           [[52, 53]]),
+            ("AN Cam",          [53, 59, 52],           1,              []),
+
         ]:
-            with self.subTest(f" {target}; {sectors} -> {exp_groups} "):
+            with self.subTest(f" {target}; {sectors}, max_group_size={max_group_size} -> {exp_groups} "):
                 config = KNOWN_TARGETS[target]
 
                 # Read the ephemeris. We need this to find eclipses and set completeness metrics
@@ -119,7 +122,10 @@ class Testpipeline(unittest.TestCase):
                 add_eclipse_meta_to_lightcurves(lcs, t0, period, widthp, widths, depthp, depths, phis)
 
                 # Test
-                sector_groups = choose_lightcurve_groups_for_fitting(lcs, completeness_th=0.8)
+                sector_groups = choose_lightcurve_groups_for_fitting(lcs,
+                                                                     completeness_th=0.8,
+                                                                     max_group_size=max_group_size,
+                                                                     verbose=True)
                 self.assertListEqual(exp_groups, sector_groups)
 
     #

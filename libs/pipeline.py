@@ -184,6 +184,7 @@ def add_eclipse_meta_to_lightcurves(lcs: LightCurveCollection,
 
 def choose_lightcurve_groups_for_fitting(lcs: LightCurveCollection,
                                          completeness_th: float=0.8,
+                                         max_group_size: int=None,
                                          verbose: bool=False) -> List[List[int]]:
     """
     Will work out the most effective arrangement of LightCurves to support JKTEBOP fitting. This
@@ -193,10 +194,14 @@ def choose_lightcurve_groups_for_fitting(lcs: LightCurveCollection,
 
     :lcs: the LightCurveCollection containing our potential fitting targets
     :completness_th: threshold percentage of an eclipse we require to consider it complete/usable
+    :max_group_size: the maximum number of sectors to combine for a group, or no max if None
     :verbose: whether or not to send messages to stdout with details of the group decisions made
     :returns: the groups to fit, as a list of lists of sector numbers. i.e.: [[13, 14], [15, 16]]
     indicates the LightCurves for sectors 13 & 14 should be grouped for fitting, as should 15 & 16.
     """
+    if max_group_size is None:
+        max_group_size = len(lcs)
+
     def is_usable_group(seg_ecl_counts) -> bool:
         """ On the eclipse counts, is the corresponding grp of LCs/sectors suitable for fitting? """
         ecl_sums = np.sum(seg_ecl_counts, axis=0)
@@ -239,9 +244,12 @@ def choose_lightcurve_groups_for_fitting(lcs: LightCurveCollection,
                 grp_start = 0
                 while grp_start < blk_size:
                     next_start_inc = 1
+                    created_group = False
 
-                    # Grow group until it has sufficient coverage or we run out of sectors
-                    for grp_stop in range(grp_start + min_grp_size, blk_size + 1):
+                    # Grow group until it has sufficient coverage, we run out of sectors
+                    # or we reach the maximum group size allowed.
+                    for grp_stop in range(grp_start + min_grp_size,
+                                          min(grp_start + max_group_size, blk_size + 1)):
                         grp_slice = slice(grp_start, grp_stop)
                         if is_usable_group(blk_ecl_counts[grp_slice]):
                             # Special case. If we cannot to get another group from the remainder
@@ -250,16 +258,23 @@ def choose_lightcurve_groups_for_fitting(lcs: LightCurveCollection,
                                     and not is_usable_group(blk_ecl_counts[grp_stop:]):
                                 grp_slice = slice(grp_start, grp_stop := blk_size)
 
+                            # We have a usable group. Save its membership details then break out so
+                            # we start building the the next group with the next sector or block.
                             sector_groups.append(blk_sectors[grp_slice])
+                            created_group = True
                             next_start_inc = grp_stop - grp_start
                             if verbose:
                                 print(f"Created a group of sector(s) {blk_sectors[grp_slice]}.")
                             break
 
+                    if not created_group and verbose:
+                        print(f"Dropped sector {blk_sectors[grp_start]} as it has insufficient",
+                              "orbital coverage, even when grouped with any following sectors.")
+
                     grp_start += next_start_inc
         elif verbose:
-            print(f"Dropped the block of sectors {blk_sectors} as they have insufficient",
-                  "orbital coverage, either singularly or when combined.")
+            print(f"Dropped the whole block of contiguous sectors {blk_sectors} as they have",
+                  "insufficient orbital coverage, either singularly or when combined.")
 
     return sector_groups
 
