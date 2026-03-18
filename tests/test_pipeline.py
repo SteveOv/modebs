@@ -98,6 +98,7 @@ class Testpipeline(unittest.TestCase):
             ("CW Eri",          [4, 31],                1,              [[4], [31]]),
             # Sector are contiguous, but joining not necessary as there are many of each eclipse per sectors
             ("CM Dra",          [24, 25, 26],           None,           [[24], [25], [26]]),
+            ("CM Dra",          [24, 25, 26],           1,              [[24], [25], [26]]),
             # The only usable combo is 52+53 as eclipses too infrequent to fit any sector individually
             ("AN Cam",          [53, 59, 52],           None,           [[52, 53]]),
             ("AN Cam",          [53, 59, 52],           1,              []),

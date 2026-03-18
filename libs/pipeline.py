@@ -249,7 +249,7 @@ def choose_lightcurve_groups_for_fitting(lcs: LightCurveCollection,
                     # Grow group until it has sufficient coverage, we run out of sectors
                     # or we reach the maximum group size allowed.
                     for grp_stop in range(grp_start + min_grp_size,
-                                          min(grp_start + max_group_size, blk_size + 1)):
+                                          min(grp_start + max_group_size, blk_size) + 1):
                         grp_slice = slice(grp_start, grp_stop)
                         if is_usable_group(blk_ecl_counts[grp_slice]):
                             # Special case. If we cannot to get another group from the remainder
