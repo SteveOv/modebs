@@ -210,8 +210,8 @@ if __name__ == "__main__":
                                                                 config.detrend_poly_degree,
                                                                 config.detrend_iterations,
                                                                 do_flatten,
-                                                                durp=widthP * period,
-                                                                durs=widthS * period,
+                                                                durp=nominal_value(widthP * period),
+                                                                durs=nominal_value(widthS * period),
                                                                 verbose=True)
 
 

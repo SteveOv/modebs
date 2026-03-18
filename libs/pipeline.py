@@ -374,27 +374,38 @@ def append_mags_to_lightcurves_and_detrend(lcs: LightCurveCollection,
     for ix in range(len(lcs)):
         label = lcs[ix].meta["LABEL"]
 
+        pri_times = lcs[ix].meta.get("primary_times", [])
+        sec_times = lcs[ix].meta.get("secondary_times", [])
+        eclipse_mask = lcs[ix].meta["flat_mask"] = lightcurves.create_eclipse_mask(lcs[ix],
+                                                                                   pri_times,
+                                                                                   sec_times,
+                                                                                   durp,
+                                                                                   durs)
+
         if flatten:
-            pri_times = lcs[ix].meta.get("primary_times", [])
-            sec_times = lcs[ix].meta.get("secondary_times", [])
-            mask = lcs[ix].meta["flat_mask"] = lightcurves.create_eclipse_mask(lcs[ix],
-                                                                               pri_times, sec_times,
-                                                                               durp, durs)
-
             if verbose:
-                num_ecl = len(np.ma.clump_masked(np.ma.masked_where(mask, mask)))
+                num_ecl = len(np.ma.clump_masked(np.ma.masked_where(eclipse_mask, eclipse_mask)))
                 print(f"Flattening the {label} LC fluxes outside of {num_ecl} masked eclipse(s).")
-            lcs[ix] = lcs[ix].flatten(mask=mask)
+            lcs[ix] = lcs[ix].flatten(mask=eclipse_mask)
 
-        # Create detrended & rectified delta_mag and delta_mag err columns
+        # Create detrended & rectified delta_mag and delta_mag err columns,
+        # by fitting and subtracting a polynomial to the delta_mags outside the eclipses.
         lightcurves.append_magnitude_columns(lcs[ix], "delta_mag", "delta_mag_err")
         for s in lightcurves.find_lightcurve_segments(lcs[ix], threshold=detrend_gap_th):
-            lcs[ix][s]["delta_mag"] -= lightcurves.fit_polynomial(lcs[ix].time[s],
-                                                                  lcs[ix][s]["delta_mag"],
+            if lcs[ix].has_masked_values:
+                times = lcs[ix].time[s].unmasked
+                ydata = lcs[ix][s]["delta_mag"].unmasked
+            else:
+                times = lcs[ix].time[s]
+                ydata = lcs[ix][s]["delta_mag"]
+            lcs[ix][s]["delta_mag"] -= lightcurves.fit_polynomial(times, ydata,
                                                                   detrend_poly_degree,
-                                                                  detrend_iterations)
+                                                                  detrend_iterations,
+                                                                  fit_mask=~eclipse_mask[s])
     if verbose:
-        print(f"Added detrended & rectified delta_mag/delta_mag_err columns to {len(lcs)} LC(s).")
+        print(f"Added delta_mag & delta_mag_err columns to {len(lcs)} LC(s),",
+               "then detrended & rectified the mags to zero by subtracting polynomials",
+              f"(order={detrend_poly_degree}) fitted outside the eclipes.")
 
 
 def calculate_orbital_inclination(sum_r: ArrayLike,

@@ -211,6 +211,7 @@ def fit_polynomial(times: Time,
                    res_sigma_clip: float = 1.,
                    reset_const_coeff: bool = False,
                    include_coeffs: bool = False,
+                   fit_mask: np.ndarray = None,
                    verbose: bool = False) \
                     -> Union[u.Quantity, Tuple[u.Quantity, List]]:
     """
@@ -228,14 +229,16 @@ def fit_polynomial(times: Time,
     the clipping threshold for each new iteration.
     :reset_const_coeff: set True to reset the const coeff to 0 before final fit
     :include_coeffs: set True to return the coefficients with the fitted ydata
+    :fit_mask: the initial mask over ydata to fit to, or defaults all ydata if None
     :returns: fitted y data and optionally the coefficients used to generate it.
     """
     # pylint: disable=too-many-arguments, too-many-locals
     pivot_ix = int(np.floor(len(times) / 2))
     pivot_jd = times[pivot_ix].jd
     time_values = times.jd - pivot_jd
+    if fit_mask is None:
+        fit_mask = np.array([True] * len(ydata), bool)
 
-    fit_mask = [True] * len(ydata)
     for remaining_iterations in np.arange(iterations, 0, -1):
         # Fit a polynomial to the masked data so that we find its coefficients.
         # For the first iteration this will be all the data.
