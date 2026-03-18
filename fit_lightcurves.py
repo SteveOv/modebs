@@ -177,20 +177,23 @@ if __name__ == "__main__":
 
                 # Group lightcurves to ensure sufficient coverage for fitting. This will also
                 # drop lightcurves with insufficient coverage and which cannot be combined
-                print("\nGrouping lightcurves for orbital coverage required for fitting.")
+                print("\nSelecting lightcurves for orbital coverage required for fitting.")
                 if config.sectors is not None:
                     print("Using groups defined in config.")
                     sector_groups = config.sectors
                 else:
                     # Otherwise we use the pipeline logic to choose the best combination of sectors
-                    print("Groups will chosen by analysis of eclipses, with those having",
+                    print("Sectors will chosen by analysis of eclipses, with those having",
                         f">{eclipse_complete_th:.0%} fluxes are considered complete.")
+                    if max_group_size := 1 if config.do_not_stitch else None:
+                        print("Stitching of adjascent sectors is disabled by target config setting")
                     sector_groups = pipeline.choose_lightcurve_groups_for_fitting(lcs,
                                                                                 eclipse_complete_th,
+                                                                                max_group_size,
                                                                                 verbose=True)
                 lcs = pipeline.stitch_lightcurve_groups(lcs, sector_groups, verbose=True)
                 if len(lcs) == 0:
-                    raise PipelineError(target_id, "No lightcurves retained after grouping")
+                    raise PipelineError(target_id, "No lightcurves retained after selection")
 
 
                 # Flatten (optional depending on morph), append delta_mag & delta_mag_err columns
