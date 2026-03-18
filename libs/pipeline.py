@@ -353,6 +353,8 @@ def append_mags_to_lightcurves_and_detrend(lcs: LightCurveCollection,
     Optionally the fluxes may be flattened outside of any previously detected eclipses,
     prior to calculating the magnitude columns.
 
+    LightCurves that have been flattened will have a flat_mask array added to their meta dict.
+
     :lcs: the LightCurveCollection containing our potential fitting targets
     :detrend_gap_th: the threshold gap time beyond which a detrending section break is triggered
     :detrend_poly_degree: the degree of the detrending polynomial to fit
@@ -376,17 +378,14 @@ def append_mags_to_lightcurves_and_detrend(lcs: LightCurveCollection,
 
         pri_times = lcs[ix].meta.get("primary_times", [])
         sec_times = lcs[ix].meta.get("secondary_times", [])
-        eclipse_mask = lcs[ix].meta["flat_mask"] = lightcurves.create_eclipse_mask(lcs[ix],
-                                                                                   pri_times,
-                                                                                   sec_times,
-                                                                                   durp,
-                                                                                   durs)
+        eclipse_mask = lightcurves.create_eclipse_mask(lcs[ix], pri_times, sec_times, durp, durs)
 
         if flatten:
             if verbose:
                 num_ecl = len(np.ma.clump_masked(np.ma.masked_where(eclipse_mask, eclipse_mask)))
                 print(f"Flattening the {label} LC fluxes outside of {num_ecl} masked eclipse(s).")
             lcs[ix] = lcs[ix].flatten(mask=eclipse_mask)
+            lcs[ix].meta["flat_mask"] = eclipse_mask
 
         # Create detrended & rectified delta_mag and delta_mag err columns,
         # by fitting and subtracting a polynomial to the delta_mags outside the eclipses.
