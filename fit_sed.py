@@ -119,7 +119,7 @@ if __name__ == "__main__":
                 print("\n\n------------------------------------------------------------")
                 print(f"Processing target {fit_counter} of {to_fit_count}: {target_id}")
                 print("------------------------------------------------------------")
-                config = targets_config.get(target_id)
+                config = targets_config.get_target_config(target_id)
                 warn_msgs = (wset.read_values(target_id, "warnings") or "").split(";")
                 if args.plot_figs:
                     figs_dir = drop_dir / "figs" / pipeline.to_file_safe_str(target_id)

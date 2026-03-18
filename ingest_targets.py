@@ -138,7 +138,7 @@ if __name__ == "__main__":
             warn_msgs = (dal.read_values(target_id, "warnings") or "").split(";")
             params = {}
 
-            config = targets_config.get(target_id)
+            config = targets_config.get_target_config(target_id)
             if len(ephem_config_keys := [k for k in ephem_keys if config.has_value(k)]) > 0:
                 print(f"{target_id}: copying ephemeris values for {ephem_config_keys} from config")
                 for k in ephem_config_keys:

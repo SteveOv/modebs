@@ -84,9 +84,7 @@ known_overrides = {
     31054255: { "period": 1.747743979, "period_err": 0.000000513, "widthP": 0.021, "widthS": 0.021, "depthP": 0.021, "depthS": 0.021, "phiS": 0.500 },
     # Double the TESS-ebs period (not corroborated), copy the primary eclipse data to secondary and halve the widths
     31273263: { "period": 45.145916694, "period_err": 0.002004383, "widthP": 0.010, "widthS": 0.010, "depthP": 0.220, "depthS": 0.220, "phiS": 0.500 },
-    # Flattening to combat variability
-    31810287: { "flatten": True, },
-    # Difficult to fit as there is significan variability and flares. More likely to get to the system params with flattening.
+    # Difficult to fit as there is significant variability and flares. More likely to get to the system params with flattening (morph 0.339).
     32702481: { "flatten": True, },
     53292822: { "t0": 1519.046, "period": 4.93495, "phiS": 0.67 },
     # Switch t0, double the TESS-ebs period (corroborated with TBOSB), copy the primary eclipse data to secondary and halve the widths
@@ -94,11 +92,10 @@ known_overrides = {
     # Gaia DR3 with no parallax; dist from Gaia DR2 ~500 pc so set parallax to 2.0;
     55659311: { "parallax": 2.0, },
     63579446: { "exclude_sectors": [87], },
-    # Some noise and variability which struggles to converge even with retries. With a fairly low morph of 0.224 flattening helps with fit.
-    66509654: { "flatten": True, },
     80650858: { "Teff_sys": 20000, },
     # Double the TESS-ebs period (not corroborated), copy the primary eclipse data to secondary and halve the widths
     147975720: { "period": 5.700445194, "period_err": 0.000026526, "widthP": 0.015, "widthS": 0.015, "depthP": 0.264, "depthS": 0.264, "phiS": 0.500 },
+    # Flattening helps with fit (morph = 0.309)
     153742549: { "flatten": True, },
     # overriding the TESS-ebs period with value from inspecting S32+33 (left the rest of the ephemeris unchanged)
     167756615: { "exptime": [120, 600], "period": 19.179, },
@@ -108,6 +105,7 @@ known_overrides = {
     200440175: { "period": 3.652007766, "period_err": 0.000010387, "widthP": 0.062, "widthS": 0.062, "depthP": 0.433, "depthS": 0.433, "phiS": 0.500 },
     # highly eccentric and gives nonsense fit without assistance; force the grouping for better coverage and esinw input value
     219362976: { "sectors":[[4, 5, 6], [31, 32]], "jktebop_overrides": { "esinw": 0.25 }, },
+    # Flatten helps with fit (morph=0.328)
     220397947: { "flatten": True, },
     260504147: { "jktebop_overrides": { "inc": 89.3, "L3": 0.5 }, },
     # Double the TESS-ebs period (corroborated with J+A), copy the primary eclipse data to secondary and halve the widths. Fits benefit from flattening, but morph ~ 0.4 so may try better detrending instead.
@@ -131,7 +129,6 @@ known_overrides = {
     349643889: { "period": 53.358925782, "period_err": 0.002282463, "widthP": 0.005, "widthS": 0.005, "depthP": 0.165, "depthS": 0.165, "phiS": 0.500 },
     # highly eccentric and gives nonsense fits without assistance - particularly sensitive to the Poincare elements
     350298314: { "jktebop_overrides": { "ecosw": -0.38, "esinw": 0.11, "period_fit": 0 }, },
-    355152640: { "flatten": True, },
     386166904: { "widthS": 0.050, },
     # A sub-dwarf period of ~0.25 d. Not included by default as TESS-ebs lack secondary width. Eclipses are shallow but total.
     425064757: { "widthS": 0.080, "depthP": 0.350, "depthS": 0.050, "phiS": 0.500 },
@@ -192,9 +189,11 @@ if __name__ == "__main__":
 
     # Now build up a dictionary from which we'll generate the target config json
     targets_config = {
-        "excplicit": True,   # We are explicitly specifying the target systems
+        "excplicit": True,                  # We are explicitly specifying the target systems
+        "eclipse_complete_threshold": 0.9,  # Eclipses with completeness > this considered complete
+        "flatten_morph_threshold": 0.25,    # Targets with morph <= this will have LCs flattened
         "target_config_defaults": {
-            "quality_bitmask": None,    # leave choice to fit_lightcurves
+            "quality_bitmask": None,        # leave choice to fit_lightcurves
             "quality_masks": [[1420.0, 1424.0], [1534.0, 1544.0]],
         },
         "target_configs": {}

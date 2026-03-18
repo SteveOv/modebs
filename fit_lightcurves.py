@@ -31,23 +31,19 @@ from libs.pipeline_dal import QTableFileDal
 
 THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 
-# The eclipse completeness ratio above which eclipses are considered complete
-ECLIPSE_COMPLETE_TH = 0.9
-
-# The morph value for systems considered very well detached & from which we invoke flattening & clip
-FLATTEN_TH = 0.2
 
 # Use a non-interactive matplotlib backend to avoid threading errors (issue #36).
 mpl_use("agg")
 
 # Plotting ax_func callback functions
+eclipse_complete_th = 0.9
 def indicate_eclipses(_, ax, lc): # pylint: disable=redefined-outer-name
     """ Draw lines for each identified pri/sec eclipse time & depth and highlight the t0 time """
     for ecl_type, ls, c in [
         ("secondary", "--", "g"),
         ("primary", "-.", "r")
     ]:
-        alphas = [0.33 if cf else 0.1 for cf in lc.meta[f"{ecl_type}_completeness"] >= ECLIPSE_COMPLETE_TH]
+        alphas = [0.33 if cf else 0.1 for cf in lc.meta[f"{ecl_type}_completeness"] > eclipse_complete_th]
         if len(times := lc.meta[f"{ecl_type}_times"]) > 0:
             ax.vlines(times, 0.5, 1.1, c, ls, label=ecl_type, alpha=alphas, zorder=-20)
             ax.plot(times, 1.0-lc.meta[f"{ecl_type}_depths"], f"{c}+", markersize=10, alpha=0.33, zorder=-20)
@@ -84,8 +80,12 @@ if __name__ == "__main__":
         print(f"Directory for data, logs & plots: {drop_dir}")
 
         targets_config = Targets(args.targets_file)
-        print(f"Read in the configuration from '{args.targets_file.name}'",
+        print(f"\nRead in the configuration from '{args.targets_file.name}'",
               f"which contains {targets_config.count()} target(s) that have not been exluded.")
+        eclipse_complete_th = targets_config.get("eclipse_complete_threshold", 0.9)
+        flatten_morph_th = targets_config.get("flatten_morph_threshold", 0)
+        print(f"Read from config: eclipse_complete_threshold = {eclipse_complete_th:.2f},",
+              f"flatten_morph_threshold = {flatten_morph_th:.2f}\n")
 
         # Open the targets table and the configs
         wset = QTableFileDal(args.working_set_file)
@@ -99,7 +99,7 @@ if __name__ == "__main__":
                 print("\n\n------------------------------------------------------------")
                 print(f"Processing target {fit_counter} of {to_fit_count}: {target_id}")
                 print("------------------------------------------------------------")
-                config = targets_config.get(target_id)
+                config = targets_config.get_target_config(target_id)
                 warn_msgs = (wset.read_values(target_id, "warnings") or "").split(";")
                 if args.plot_figs:
                     figs_dir = drop_dir / "figs" / pipeline.to_file_safe_str(target_id)
@@ -111,11 +111,11 @@ if __name__ == "__main__":
 
                 # The quality bitmask excludes fluxes by their quality flag. If unset, choose on the
                 # period. For shorter periods we're more discriminating as orbital coverage is good.
-                quality_bitmask = config.quality_bitmastk
+                quality_bitmask = config.quality_bitmask
                 if quality_bitmask is None:
                     per = nominal_value(period)
                     quality_bitmask = "default" if per > 10 else "hard" if per > 5 else "hardest"
-                    print(f"Set quality_bitmask={quality_bitmask} from the period of {period:.6f}")
+                    print(f"Set quality_bitmask to {quality_bitmask} as the period is {period:.6f}")
 
                 # It's quicker to get LCs once and cache the results than to continue to bother MAST
                 search_term, tics = wset.read_values(target_id, "search_term", "tics")
@@ -184,9 +184,9 @@ if __name__ == "__main__":
                 else:
                     # Otherwise we use the pipeline logic to choose the best combination of sectors
                     print("Groups will chosen by analysis of eclipses, with those having",
-                        f">{ECLIPSE_COMPLETE_TH:.0%} fluxes are considered complete.")
+                        f">{eclipse_complete_th:.0%} fluxes are considered complete.")
                     sector_groups = pipeline.choose_lightcurve_groups_for_fitting(lcs,
-                                                                                ECLIPSE_COMPLETE_TH,
+                                                                                eclipse_complete_th,
                                                                                 verbose=True)
                 lcs = pipeline.stitch_lightcurve_groups(lcs, sector_groups, verbose=True)
                 if len(lcs) == 0:
@@ -195,11 +195,11 @@ if __name__ == "__main__":
 
                 # Flatten (optional depending on morph), append delta_mag & delta_mag_err columns
                 # and then detrend & rectify the mags to zero by subtracting a low order polynomial
-                do_flatten = config.flatten or (config.flatten is None and morph <= FLATTEN_TH)
+                do_flatten = config.flatten or (config.flatten is None and morph<=flatten_morph_th)
                 if do_flatten:
                     print(f"\nFluxes for {target_id} (with morph={morph:.3f}) will be flattened,",
-                          "prior to detrending, as it has a",
-                          "config override set." if config.flatten else f"morph <= {FLATTEN_TH}.")
+                        "prior to detrending, as it has a", 
+                        "config override set." if config.flatten else f"morph<={flatten_morph_th}.")
                 else:
                     print()
                 pipeline.append_mags_to_lightcurves_and_detrend(lcs,
@@ -280,10 +280,10 @@ if __name__ == "__main__":
 
                 # Build the values and flags for the JKTEBOP in files
                 # The refl flags can be 0 (fixed), 1 (fitted) or -1 (calculated from sys geometry)
-                refl_fit = -1 if (morph <= FLATTEN_TH) else 1
+                refl_fit = -1 if do_flatten else 1
                 in_params = [{
                     # Mass ratio (qphot), can be -1 (force spherical) or a specified ratio value
-                    "qphot": -1 if (morph <= FLATTEN_TH) else preds_dict["k"]**1.4,
+                    "qphot": -1 if do_flatten else preds_dict["k"]**1.4,
                     "gravA": 0.,                "gravB": 0.,
                     "L3": max(0, 1-lc.meta.get("CROWDSAP", 1)),
                     "reflA": 0.,                "reflB": 0.,

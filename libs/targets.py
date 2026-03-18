@@ -25,7 +25,17 @@ _default_target_config_defaults = {
 }
 
 class TargetConfig():
-    """ Wrapper class for the configuration of a target system """
+    """
+    Wrapper class for the configuration of a target system. This also acts like a Namespace,
+    so well known settings can be called directly. For example:
+    ```python
+    sectors = config.sectors
+    ```
+    is supported, in addition to:
+    ```python
+    sectors = config["sectors"]
+    ```
+    """
     def __init__(self,
                  target_id: any,
                  config: Dict[str, any],
@@ -85,19 +95,21 @@ class TargetConfig():
         raise AttributeError
 
 class Targets():
-    """ Helper for interacting with targets json """
+    """
+    Helper for interacting with targets json. Handles publishing general settings across all targets
+    and those specific to each target (falling back on configured default values where not set).
+    """
     def __init__(self,
                  target_file: _Path):
         """
-        TODO
+        Initializes a Targets instance which published settings from the chosen targets json file.
         """
         with open(target_file, mode="r", encoding="utf8") as cf:
-            targets_config = _json.load(cf)
+            self._targets_config = _json.load(cf)
 
-        self._target_configs = targets_config.get("target_configs", {})
         self._target_config_defaults = {
             **_default_target_config_defaults,
-            **targets_config.get("target_config_defaults", {})
+            **self._targets_config.get("target_config_defaults", {})
         }
 
     def count(self, omit_excluded: bool=True) -> int:
@@ -106,12 +118,7 @@ class Targets():
         
         :omit_excluded: if true, will omit targets with the excluded flag set to True
         """
-        count = 0
-        exclude_default = self._target_config_defaults["exclude"]
-        for target_config in self._target_configs.values():
-            if not omit_excluded or not target_config.get("exclude", exclude_default):
-                count += 1
-        return count
+        return len(self.get_known_target_ids(omit_excluded))
 
     def iterate_known_targets(self, omit_excluded: bool=True) -> Generator[TargetConfig, any, any]:
         """
@@ -120,8 +127,8 @@ class Targets():
         :omit_excluded: if true, will omit targets with the excluded flag set to True
         """
         exclude_default = self._target_config_defaults["exclude"]
-        for target_id, target_config in self._target_configs.items():
-            if not omit_excluded or not target_config.get("exclude", exclude_default):
+        for target_id, target_config in self._targets_config.get("target_configs", {}).items():
+            if not (omit_excluded and target_config.get("exclude", exclude_default)):
                 yield TargetConfig(target_id,
                                    target_config,
                                    self._target_config_defaults)
@@ -132,9 +139,11 @@ class Targets():
 
         :omit_excluded: if true, will omit targets with the excluded flag set to True
         """
-        return [cfg.target_id for cfg in self.iterate_known_targets(omit_excluded)]
+        exclude_default = self._target_config_defaults["exclude"]
+        return [i for i, c in self._targets_config.get("target_configs", {}).items()
+                                    if not (omit_excluded and c.get("exclude", exclude_default))]
 
-    def get(self, target_id, fallback_to_default: bool=False) -> TargetConfig:
+    def get_target_config(self, target_id, fallback_to_default: bool=False) -> TargetConfig:
         """
         Get the target_config for a specific target
         
@@ -142,10 +151,17 @@ class Targets():
         :fallback_to_default: return a default config if no config exists for target_id
         :return: the requested TargetConfig
         """
-        if target_id in self._target_configs:
-            return TargetConfig(target_id,
-                                self._target_configs[target_id],
-                                self._target_config_defaults)
+        target_config = self._targets_config.get("target_configs", {}).get(target_id, None)
+        if target_config is not None:
+            return TargetConfig(target_id, target_config, self._target_config_defaults)
         if fallback_to_default:
             return TargetConfig(target_id, {}, self._target_config_defaults)
         raise KeyError(f"target {target_id} is unknown")
+
+    def get(self, key, default: None=None):
+        """ Return the value if the key is in this config, else return the default"""
+        return self._targets_config.get(key, default)
+
+    def has_value(self, key) -> bool:
+        """ Returns whether or not a value (and not None) is held for this key """
+        return self._targets_config.get(key, None) is not None
