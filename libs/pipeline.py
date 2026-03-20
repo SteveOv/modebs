@@ -117,7 +117,7 @@ def mask_lightcurves_unusable_fluxes(lcs: LightCurveCollection,
     :min_section_gap_bins: the minimum gap size in time bins, when finding sections of observations
     :min_section_dur: the minimum duration of isolated LightCurve sections to retain
     """
-    # pylint: disable=consider-using-enumerate (cannot enumerate lcs as we're changing its content)
+    # cannot enumerate lcs as we're changing its content, pylint: disable=consider-using-enumerate
     for ix in range(len(lcs)):
         _mask = lightcurves.create_invalid_flux_mask(lcs[ix])
 
@@ -387,17 +387,17 @@ def append_mags_to_lightcurves_and_detrend(lcs: LightCurveCollection,
             lcs[ix] = lcs[ix].flatten(mask=eclipse_mask)
             lcs[ix].meta["flat_mask"] = eclipse_mask
 
-        # Create detrended & rectified delta_mag and delta_mag err columns,
-        # by fitting and subtracting a polynomial to the delta_mags outside the eclipses.
+        # Create detrended & rectified delta_mag/delta_mag_err columns, by fitting & subtracting a
+        # polynomial to delta_mags outside the eclipses. Have to jump through hoops in case LC has
+        # MaskedQuantities. Shockingly, hasattr is the most reliable way I've found for detection.
         lightcurves.append_magnitude_columns(lcs[ix], "delta_mag", "delta_mag_err")
+        if hasattr(times := lcs[ix].time, "unmasked"):
+            times = times.unmasked
+        if hasattr(delta_mags := lcs[ix]["delta_mag"], "unmasked"):
+            delta_mags = delta_mags.unmasked
         for s in lightcurves.find_lightcurve_segments(lcs[ix], threshold=detrend_gap_th):
-            if lcs[ix].has_masked_values:
-                times = lcs[ix].time[s].unmasked
-                ydata = lcs[ix][s]["delta_mag"].unmasked
-            else:
-                times = lcs[ix].time[s]
-                ydata = lcs[ix][s]["delta_mag"]
-            lcs[ix][s]["delta_mag"] -= lightcurves.fit_polynomial(times, ydata,
+            lcs[ix][s]["delta_mag"] -= lightcurves.fit_polynomial(times[s],
+                                                                  delta_mags[s],
                                                                   detrend_poly_degree,
                                                                   detrend_iterations,
                                                                   fit_mask=~eclipse_mask[s])
