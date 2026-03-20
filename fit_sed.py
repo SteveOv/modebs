@@ -305,11 +305,11 @@ if __name__ == "__main__":
                     # *** also updates the target data ***
                     if mask:
                         write_params[k] = val
-                        if std_dev(val) > nominal_value(val) * 0.20:
+                        if std_dev(val) > abs(nominal_value(val) * 0.20):
                             high_uncert_params += [k]
 
                 if len(high_uncert_params) > 0:
-                    warn_msgs += [f"uncertainty of {','.join(k for k in high_uncert_params)}>20%"]
+                    warn_msgs += [f"uncert {','.join(k for k in high_uncert_params)}>20%"]
 
 
                 # Finally, store the params and the flag that indicates SED fitting has completed

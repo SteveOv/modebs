@@ -71,6 +71,13 @@ if __name__ == "__main__":
     # EBOP MAVEN estimator for JKTEBOP input params; rA+rB, k, J, ecosw, esinw and bP/inc
     estimator = Estimator()
 
+    # The parameters to read from par file after fitting, to be written to working set and to
+    # potentially give warnings for. Excludes TeffR as this is calculated from the fitted params.
+    read_keys = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc", "qphot", "L3",
+                                                "period", "ecc", "bP", "LR", "reflA", "reflB"]
+    write_keys = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "bP", "inc", "qphot", "L3", "LR"]
+    warn_keys = ["k", "J", "LR"]
+
     with open(drop_dir/f"{THIS_STEM}.log", "a", encoding="utf8") as lf, \
                                                                     redirect_stdout(Tee(lf)) as log:
         print("\n\n============================================================")
@@ -242,7 +249,7 @@ if __name__ == "__main__":
                       f"from {len(lcs)} LC group(s), including the value calculated for inc.")
                 print("\n".join(f"{p:>14s}: {preds_dict[p]:12.6f}" for p in preds_dict))
                 if nominal_value(preds_dict["rA_plus_rB"]) > 0.4:
-                    warn_msgs += ["MAVEN rA+rB>0.4"]
+                    warn_msgs += ["MAVEN rA_plus_rB>0.4"]
 
 
                 # Clip masks retain only obs within 2.5 d of an eclipse for fitting. Can optimise
@@ -309,9 +316,6 @@ if __name__ == "__main__":
                     **fo,
                 } for lc, ld, fo in zip(lcs, ld_params, fit_overrides, strict=True)]
 
-                # Set of the potentially fitted parameters to be read from par file after fitting
-                read_keys = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "inc", "qphot", "L3",
-                                    "period", "ecc", "bP", "LR", "reflA", "reflB"]
 
                 # Now we fit the lightcurves with JKTEBOP. If max_workers >1 progress updates
                 # will occur after each attempt is complete, but overall elapsed time is reduced.
@@ -359,20 +363,19 @@ if __name__ == "__main__":
                 # the scatter for the uncertainty (the sample is relatively small).
                 print()
                 if fitted_params.size > 1:
-                    summary_params = pipeline.median_params(fitted_params, 0.9545, True)
+                    final_params = pipeline.median_params(fitted_params, 0.9545, True)
                     print(f"Using median & 2-sigma uncertainties from {len(lcs)} fitted groups.")
                 else:
-                    summary_params = fitted_params[0]
+                    final_params = fitted_params[0]
                     print("Using fitted values and formal error bars from 1 fitted lightcurve.")
 
 
-                write_keys = ["rA_plus_rB","k","J","ecosw","esinw","bP","inc","qphot","L3","LR"]
                 if args.plot_figs and fitted_params.size > 1:
                     print("\nCreating plot of the scatter in the fitted params, by lightcurve.")
                     xlim = (lcs.sector.min() - 2, lcs.sector.max() + 2)
                     def median_and_uncertainty(key, ax):
                         # pylint: disable=cell-var-from-loop, missing-function-docstring
-                        v = summary_params[key]
+                        v = final_params[key]
                         ax.hlines([v.n], *xlim, "k", "-", lw=1.0, label="median")
                         ax.axhspan(v.n-v.s, v.n+v.s,color="silver",zorder=-50,label=r"$\pm2\sigma$")
 
@@ -389,32 +392,41 @@ if __name__ == "__main__":
                     min_err_pc = 0.02
                     print(f"\nApplying a minimum of {min_err_pc:.0%} to the uncertainties.",end=" ")
                     kup = []
-                    for k in summary_params.dtype.names:
-                        nom, err = nominal_value(summary_params[k]), std_dev(summary_params[k])
+                    for k in final_params.dtype.names:
+                        nom, err = nominal_value(final_params[k]), std_dev(final_params[k])
                         if err < (new_err:= abs(nom * min_err_pc)):
                             kup += [k]
-                            summary_params[k] = ufloat(nom, new_err)
+                            final_params[k] = ufloat(nom, new_err)
                     print(f"Revised {', '.join(k for k in kup)}." if len(kup)>0 else "No changes.")
 
+
+                # Report on the final, fitted params & uncertainties.
                 print(f"\nFinal parameters and uncertainties for {target_id}",
                       f"from {len(lcs)} fitted lightcurve ([known value])")
-                for k in [rk for rk in read_keys if summary_params[rk] is not None]:
-                    print(f"{k:>14s}: {summary_params[k]:12.6f}", end="")
+                for k in [rk for rk in read_keys if final_params[rk] is not None]:
+                    print(f"{k:>14s}: {final_params[k]:12.6f}", end="")
                     if (lval := config.get("labels", {}).get(k, None)) is not None:
                         if (lerr := config.get("labels", {}).get(k + "_err")) is not None:
                             lval = ufloat(lval, lerr)
                         print(f"\t({lval})")
                     else:
                         print()
-                TeffR = (summary_params["LR"] / summary_params["k"]**2)**0.25
+                TeffR = (final_params["LR"] / final_params["k"]**2)**0.25
                 print(f"         TeffR: {TeffR:12.6f} (calculated from LR & k)")
-                warn_msgs += [f"fitted {k}<0" for k in ["k", "J"]
-                                                            if nominal_value(summary_params[k]) < 0]
+
+
+                # Raise warnings about anomolous parameter values
+                if len(warn_params:=[k for k in warn_keys if nominal_value(final_params[k])<0]) > 0:
+                    warn_msgs += [f"fitted {','.join(warn_params)}<0"]
+                if len(warn_params:=[k for k, v in [(r, final_params[r]) for r in warn_keys]
+                                                if std_dev(v) > abs(nominal_value(v)*0.20)]) > 0:
+                    warn_msgs += [f"uncert {','.join(warn_params)}>20%"]
+
 
                 # Finally, store the params and the flag that indicates LC fitting has completed
                 print(f"\nWriting final values for {', '.join(k for k in write_keys)},",
                       "TeffR, Teff_sys & logg_sys to working-set.")
-                params = { k: summary_params[k] for k in write_keys }
+                params = { k: final_params[k] for k in write_keys }
                 params["TeffR"] = TeffR
                 params["Teff_sys"] = Teff_sys   # These have come from TIC
                 params["logg_sys"] = logg_sys   # and will be used later in SED fitting
