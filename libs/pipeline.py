@@ -346,6 +346,7 @@ def append_mags_to_lightcurves_and_detrend(lcs: LightCurveCollection,
                                            flatten: bool=False,
                                            durp: Union[float, UFloat]=None,
                                            durs: Union[float, UFloat]=None,
+                                           override_poly_on_flatten: bool=True,
                                            verbose: bool=False):
     """
     Append delta_mag and delta_mag_err columns calculated from normalized fluxes to each
@@ -355,6 +356,9 @@ def append_mags_to_lightcurves_and_detrend(lcs: LightCurveCollection,
 
     LightCurves that have been flattened will have a flat_mask array added to their meta dict.
 
+    The detrending poly will be overriden to zero if flattening is requested, unless the
+    override_poly_on_flatten argument is set to False.
+
     :lcs: the LightCurveCollection containing our potential fitting targets
     :detrend_gap_th: the threshold gap time beyond which a detrending section break is triggered
     :detrend_poly_degree: the degree of the detrending polynomial to fit
@@ -362,6 +366,7 @@ def append_mags_to_lightcurves_and_detrend(lcs: LightCurveCollection,
     :flatten: whether or not to flatten the LightCurve fluxes prior to calculating the magnitudes
     :durp: the duration of the primary eclipses required for flattening
     :durs: the duration of the secondary eclipses required for flattening
+    :override_poly_on_flatten: whether to override the poly params if flatten == True
     :verbose: whether or not to send messages to stdout with details of the actions taken
     """
     if flatten and (durp is None or durs is None):
@@ -371,6 +376,13 @@ def append_mags_to_lightcurves_and_detrend(lcs: LightCurveCollection,
         durs = nominal_value(durs) * 1.1
     if not isinstance(detrend_gap_th, u.Quantity):
         detrend_gap_th = detrend_gap_th * u.d
+
+    if flatten and override_poly_on_flatten:
+        # Flattening will address the data trends so don't need the full detrend poly.
+        # We'll just fit and subtract a flat line to rectify the delta_mags to zero.
+        detrend_poly_degree = 0
+        if verbose:
+            print(f"Flattening requested so setting detrend_poly_degree to {detrend_poly_degree}.")
 
     # Cannot enumerate lcs as we're changing its content. pylint: disable=consider-using-enumerate
     for ix in range(len(lcs)):

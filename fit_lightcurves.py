@@ -219,6 +219,7 @@ if __name__ == "__main__":
                                                                 do_flatten,
                                                                 durp=nominal_value(widthP * period),
                                                                 durs=nominal_value(widthS * period),
+                                                                override_poly_on_flatten=True,
                                                                 verbose=True)
 
 
