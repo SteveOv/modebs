@@ -203,8 +203,8 @@ if __name__ == "__main__":
             "quality_bitmask": None,        # leave choice to fit_lightcurves
             "quality_masks": [[1420.0, 1424.0], [1534.0, 1544.0]],
             "detrend_gap_threshold": 0.5,
-            "detrend_poly_degree": 3,
-            "detrend_iterations": 4
+            "detrend_poly_degree": 2,
+            "detrend_iterations": 3
         },
         "target_configs": {}
     }
