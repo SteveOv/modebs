@@ -90,13 +90,22 @@ def plot_parameter_scatter(params: ArrayLike,
         legend_loc = format_kwargs.pop("legend_loc")
         legend_ncol = format_kwargs.pop("legend_ncol", 1)
 
+    # Calculate xticks (sector values) and a reasonable xlim range
+    xmin, xmax = int(round(min(xdata), -1)), int(round(max(xdata), -1))
+    xmax += 10 if xmin == xmax else 0
+    xstep = 1 if xmax-xmin < 15 else 5 if xmax-xmin <= 40 else 10
+    xticks = list(range(xmin, xmax+1, xstep))
+    format_kwargs.setdefault("xlim", (xmin, xmax))
+
     for ix, (ax, key) in enumerate(zip_longest(axes.flat, keys)):
         if ix < len(keys):
             ax.errorbar(xdata, nominal_values(params[key]), yerr=std_devs(params[key]),
                         fmt="o", c="tab:blue", capsize=None, fillstyle="none")
 
-            ax.set_xticks(xdata, labels=xdata, minor=False)
             ax.set_ylabel(all_param_captions.get(key, key))
+            ax.set_xticks(xticks, labels=xticks, minor=False)
+            if ix >= len(keys) - cols:
+                ax.set_xlabel("sector")
 
             if ax_func is not None:
                 ax_func(key, ax)
