@@ -4,8 +4,9 @@ A tool for characterising even mo'dEBs.
 
 ## Setup of runtime environment
 This code base was developed within the context of a Python3 virtual environment which
-supports Python 3.9-3.12, Scikit-Learn, TensorFlow, Keras, numpy, matplotlib, astropy,
-lightkurve, emcee, and the custom [ebopmaven](https://github.com/SteveOv/ebop_maven),
+supports Python 3.9-3.12, numpy, scipy, uncertainties, matplotlib,
+astropy, lightkurve, dust_extinction, mocpy, emcee, corner and the custom
+[ebopmaven](https://github.com/SteveOv/ebop_maven),
 [sed fit](https://github.com/SteveOv/sed_fit) &
 [deblib](https://github.com/SteveOv/deblib) packages upon which the code is dependent.
 The dependencies are documented in the [requirements.txt](../main/requirements.txt)
@@ -43,7 +44,7 @@ The instructions on downloading these data are documented in the
 [readme.txt](../main/libs/data/mist/MIST_v1.2_vvcrit0.4_basic_isos/readme.txt) file.
 
 #### Alternative, conda virtual environment
-To set up an `platodebcat` conda environment, from the root of the local repo run the
+To set up an `modebs` conda environment, from the root of the local repo run the
 following command;
 ```sh
 $ conda env create -f environment.yaml
