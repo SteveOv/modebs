@@ -376,8 +376,8 @@ def plot_mass_radius_diagram(masses: ArrayLike,
     Plots a log(R) vs log(M) diagram with an optional ZAMS line.
     Returns the figure of the plot for the calling code to show or save.
 
-    :masses: the mass values to plot on the x-axis in shape (#sets, #masses) or (#masses) for 1 set
-    :radii: the radius values to plot on the y-axis in shape (#sets, #radii) or (#radii) for 1 set
+    :masses: mass values to plot on the x-axis in shape (#sets, #masses) or (#masses) for 1 set
+    :radii: radius values to plot on the y-axis in shape (#sets, #radii) or (#radii) for 1 set
     :labels: optional labels text for each set (if multiple sets) or item (if a single set)
     :plot_zams: whether or not to include a zero age main-sequence line on the figure
     :format_kwargs: kwargs to be passed on to format_axes()
@@ -389,12 +389,16 @@ def plot_mass_radius_diagram(masses: ArrayLike,
     if labels is not None and len(labels) != masses.shape[0]:
         raise ValueError("labels do not match the masses or radii")
 
+    # Smaller markers the more items there are to be plotted
+    ms = max(1, 5 - np.log10(masses.shape[-1]))
+
     fig, ax = plt.subplots(1, 1, figsize=(6, 4), constrained_layout=True)
     labels = labels or [None] * masses.shape[0]
     for ix, (mass_vals, rad_vals, label) in enumerate(zip(masses, radii, labels)):
         ax.errorbar(x=nominal_values(mass_vals), xerr=std_devs(mass_vals),
                     y=nominal_values(rad_vals), yerr=std_devs(rad_vals),
-                    fmt="o", ms=4, markeredgewidth=1, fillstyle="full", zorder=-ix, label=label)
+                    fmt="o", ms=ms, lw=0.5, markeredgewidth=0.5,
+                    fillstyle="full", zorder=-ix, label=label)
 
     xlim = (min(0.1, max(ax.get_xlim()[0]*0.9, 1e-3)), max(20, ax.get_xlim()[1]*1.1))
     ylim = (min(0.1, max(ax.get_ylim()[0]*0.9, 1e-3)), max(20, ax.get_ylim()[1]*1.1))
@@ -429,8 +433,8 @@ def plot_hr_diagram(teffs: ArrayLike,
     Plots a log(L) vs log(T_eff) Hertzsprung-Russell diagram with an optional ZAMS line.
     Returns the figure of the plot for the calling code to show or save.
 
-    :teffs: the mass values to plot on the x-axis in shape (#sets, #teffs) or (#teffs) for 1 set
-    :luminosities: the radius values to plot on the y-axis in shape (#sets, #lums) or (#lums) for 1 set
+    :teffs: mass values to plot on the x-axis in shape (#sets, #teffs) or (#teffs) for 1 set
+    :luminosities: radius values to plot on the y-axis in shape (#sets, #lums) or (#lums) for 1 set
     :labels: optional labels text for each set (if multiple sets) or item (if a single set)
     :plot_zams: whether or not to include a zero age main-sequence line on the figure
     :format_kwargs: kwargs to be passed on to format_axes()
@@ -442,6 +446,9 @@ def plot_hr_diagram(teffs: ArrayLike,
     if labels is not None and len(labels) != teffs.shape[0]:
         raise ValueError("labels do not match the teffs or luminosities")
 
+    # Smaller markers the more items there are to be plotted
+    ms = max(1, 5 - np.log10(teffs.shape[-1]))
+
     teff_noms, teff_errs = nominal_values(teffs), std_devs(teffs)
     lum_noms, lum_errs = nominal_values(luminosities), std_devs(luminosities)
 
@@ -450,7 +457,8 @@ def plot_hr_diagram(teffs: ArrayLike,
     for ix, (teffn, teffe, lumn, lume, label) in enumerate(zip(teff_noms, teff_errs,
                                                                lum_noms, lum_errs, labels)):
         ax.errorbar(x=teffn, xerr=teffe, y=lumn, yerr=lume,
-                    fmt="o", ms=4, markeredgewidth=1, fillstyle="full", zorder=-ix, label=label)
+                    fmt="o", ms=ms, lw=0.5, markeredgewidth=0.5,
+                    fillstyle="full", zorder=-ix, label=label)
 
     xlim = (min(3000, max(np.min(teff_noms)*0.66, 1e-3)), max(20000, np.max(teff_noms)*2.0))
     ylim = (min(0.001, max(np.min(lum_noms)*0.66, 1e-3)), max(5000, np.max(lum_noms)*2.0))
