@@ -47,6 +47,7 @@ def indicate_eclipses(_, ax, lc): # pylint: disable=redefined-outer-name
         if len(times := lc.meta[f"{ecl_type}_times"]) > 0:
             ax.vlines(times, 0.5, 1.1, c, ls, label=ecl_type, alpha=alphas, zorder=-20)
             ax.plot(times, 1.0-lc.meta[f"{ecl_type}_depths"], f"{c}+", markersize=10, alpha=0.33, zorder=-20)
+    # Also highlight the t0/primary epoch time
     ax.plot(lc.meta["t0"], 1.08, "rv", markersize=6, alpha=0.5, zorder=-20)
 
 def highlight_mask(_, ax, lc): # pylint: disable=redefined-outer-name
@@ -55,7 +56,9 @@ def highlight_mask(_, ax, lc): # pylint: disable=redefined-outer-name
         for sl in np.ma.clump_masked(np.ma.masked_where(_mask, lc.time.value)):
             ax.axvspan(lc.time[sl.start].value, lc.time[sl.stop-1].value,
                        color="lightgray", zorder=-50, transform=ax.get_xaxis_transform())
-
+    # Also highlight the t0/primary epoch time
+    t0_y = max(-0.1, -0.066 * max(ax.get_ylim()))
+    ax.plot(lc.meta["t0"], t0_y, "rv", markersize=6, alpha=0.5, zorder=-20)
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Pipeline stage 2: fitting target lightcurves.")
