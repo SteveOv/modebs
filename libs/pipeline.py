@@ -315,7 +315,8 @@ def stitch_lightcurve_groups(lcs: LightCurveCollection,
             grp_lcs += [lcs[mask].stitch(lambda lc: lc.normalize())]
 
             # Update/combine metadata where appropriate. From fits tends to be UCASE, ours are lcase
-            grp_lcs[-1].meta["LABEL"] = f"{target} S{'+'.join(f'{s:02d}' for s in sector_group)}"
+            sec_list = [f"{s:02d}" if isinstance(s, int) else f"{s:02.1f}" for s in sector_group]
+            grp_lcs[-1].meta["LABEL"] = f"{target} S" + "+".join(sec_list)
             grp_lcs[-1].meta["sectors"] = lcs[mask].sector
             if sum(mask) > 1:
                 # lightkurve's stitch appears smart enough to concat ndarray & list meta values.
