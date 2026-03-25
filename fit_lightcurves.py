@@ -163,6 +163,13 @@ if __name__ == "__main__":
                 for lc in lcs: # Used downstream in naming LC groups and jktebop fitting files
                     lc.meta["target"] = target_id
 
+                # High variance in CROWDSAP indicates wide differences in L3 across sectors. This
+                # may give differing in eclipse depths, leading to difficulties fitting & stitching.
+                var_crowdsap = np.var([lc.meta.get('CROWDSAP', 1) for lc in lcs])
+                if len(lcs) > 1:
+                    print(f"Variance in CROWDSAP over {len(lcs)} LCs: {var_crowdsap:.6f}")
+                    if var_crowdsap > 1e-3:
+                        warn_msgs += ["var(CROWDSAP)>1e-3"]
 
                 print("\nClipping the lightcurves' invalid fluxes, known distorted sections",
                     "& any isolated sections < 2 d in length.")
