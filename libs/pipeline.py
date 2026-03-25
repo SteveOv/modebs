@@ -407,16 +407,11 @@ def append_mags_to_lightcurves_and_detrend(lcs: LightCurveCollection,
             lcs[ix].meta["flat_mask"] = eclipse_mask
 
         # Create detrended & rectified delta_mag/delta_mag_err columns, by fitting & subtracting a
-        # polynomial to delta_mags outside the eclipses. Have to jump through hoops in case LC has
-        # MaskedQuantities. Shockingly, hasattr is the most reliable way I've found for detection.
+        # polynomial to delta_mags outside the eclipses.
         lightcurves.append_magnitude_columns(lcs[ix], "delta_mag", "delta_mag_err")
-        if hasattr(times := lcs[ix].time, "unmasked"):
-            times = times.unmasked
-        if hasattr(delta_mags := lcs[ix]["delta_mag"], "unmasked"):
-            delta_mags = delta_mags.unmasked
         for s in lightcurves.find_lightcurve_segments(lcs[ix], threshold=detrend_gap_th):
-            lcs[ix][s]["delta_mag"] -= lightcurves.fit_polynomial(times[s],
-                                                                  delta_mags[s],
+            lcs[ix][s]["delta_mag"] -= lightcurves.fit_polynomial(lcs[ix].time[s],
+                                                                  lcs[ix]["delta_mag"][s],
                                                                   detrend_poly_degree,
                                                                   detrend_iterations,
                                                                   fit_mask=~eclipse_mask[s])

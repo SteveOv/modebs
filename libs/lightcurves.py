@@ -236,8 +236,18 @@ def fit_polynomial(times: Time,
     pivot_ix = int(np.floor(len(times) / 2))
     pivot_jd = times[pivot_ix].jd
     time_values = times.jd - pivot_jd
+
+    # We have to jump through hoops in case the source data is as MaskedQuantities. If this is
+    # the case, the resids mask derived from these is likely to be Masked which may cause an error
+    # when we conflate it with the existing mask (TypeError: cannot write to unmasked output).
+    # Shockingly, hasattr is the most reliable way I've found for detection of masked data.
+    if hasattr(time_values, "unmasked"):
+        time_values = time_values.unmasked
+    if hasattr(ydata, "unmasked"):
+        ydata = ydata.unmasked
+
     if fit_mask is None:
-        fit_mask = np.array([True] * len(ydata), bool)
+        fit_mask = np.ones(shape=(len(ydata)), dtype=bool)
 
     for remaining_iterations in np.arange(iterations, 0, -1):
         # Fit a polynomial to the masked data so that we find its coefficients.
