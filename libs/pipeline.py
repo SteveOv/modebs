@@ -240,23 +240,24 @@ def choose_lightcurve_groups_for_fitting(lcs: LightCurveCollection,
                     print(f"Dropped the solitary sector {blk_sectors[0]}",
                           "as it has insufficient orbital coverage.")
             else:
-                # Multiple sectors/LCs within this block so build combinations.
+                # Multiple sectors/LCs within this block so build groups from combinations.
                 grp_start = 0
                 while grp_start < blk_size:
                     next_start_inc = 1
                     created_group = False
 
-                    # Grow group until it has sufficient coverage, we run out of sectors
-                    # or we reach the maximum group size allowed.
-                    for grp_stop in range(grp_start + min_grp_size,
-                                          min(grp_start + max_group_size, blk_size) + 1):
+                    # Grow group within this block until it has sufficient coverage,
+                    # we run out of sectors or we reach the maximum group size allowed.
+                    max_grp_stop = min(grp_start + max_group_size, blk_size)
+                    for grp_stop in range(grp_start + min_grp_size, max_grp_stop + 1):
                         grp_slice = slice(grp_start, grp_stop)
                         if is_usable_group(blk_ecl_counts[grp_slice]):
-                            # Special case. If we cannot to get another group from the remainder
-                            # of the block, we may as well expand this group to make use of it.
-                            if grp_stop < blk_size <= grp_stop + min_grp_size \
-                                    and not is_usable_group(blk_ecl_counts[grp_stop:]):
-                                grp_slice = slice(grp_start, grp_stop := blk_size)
+                            # Special case: if group is not of max size & the remainder of the block
+                            # isn't usable to form another group, extend this group to max possible.
+                            if grp_stop < max_grp_stop \
+                                    and (blk_size - grp_stop < min_grp_size \
+                                        or not is_usable_group(blk_ecl_counts[grp_stop:])):
+                                grp_slice = slice(grp_start, grp_stop := max_grp_stop)
 
                             # We have a usable group. Save its membership details then break out so
                             # we start building the the next group with the next sector or block.
