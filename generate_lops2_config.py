@@ -26,7 +26,11 @@ THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 exclude_tics = {
     # pylint: disable=line-too-long
     13062255: "too close for JKTEBOP (rA+rB ~ 0.5)",
+    38586438: "too much variability in LCs leads to highly uncertain fit",
+    53292822: "too much variability in LCs leads to highly uncertain fit -> SED fit also poor",
     64783257: "low SNR and shallow eclipses make impossible to get a durable fit, with or without flattening",
+    77703308: "too close/distorted for JKTEBOP (rA+rB > 0.4)",
+    80659292: "AW Vel; too close for JKTEBOP (rA+rB ~ 0.53 on fitting), pulsations and vast difference in luminosity",
     126446153: "too close for JKTEBOP",
     129268651: "ESS-ebs eclipse depths incorrect - this has very shallow eclipses",
     140661916: "too close for JKTEBOP (rA+rB ~ 0.5, morph 0.592)",
@@ -82,19 +86,23 @@ known_overrides = {
     7695666: { "jktebop_overrides": { "ecosw": -0.56, "esinw": 0.08, "inc": 88.7 }, },
     # Double the TESS-ebs period (corroborated with J+A), copy the primary eclipse data to secondary and halve the widths
     30034081: { "period": 4.6892177144299785, "period_err": 0.0002550268060178, "widthP": 0.068, "widthS": 0.068, "depthP": 0.452, "depthS": 0.452, "phiS": 0.500 },
+    # Double the TESS-ebs period (not corroborated), copy the primary eclipse data to secondary and halve the widths. Higher order detrend to deal with S5 & S32 distortions.
+    31054255: { "period": 1.747743979, "period_err": 0.000000513, "widthP": 0.021, "widthS": 0.021, "depthP": 0.021, "depthS": 0.021, "phiS": 0.500, "detrend_poly_degree": 3 },
+    # Variance in CROWDSAP/L3 in later sectors so we cannot let them be grouped.
     # Double the TESS-ebs period (not corroborated), copy the primary eclipse data to secondary and halve the widths
-    31054255: { "period": 1.747743979, "period_err": 0.000000513, "widthP": 0.021, "widthS": 0.021, "depthP": 0.021, "depthS": 0.021, "phiS": 0.500 },
-    # Double the TESS-ebs period (not corroborated), copy the primary eclipse data to secondary and halve the widths
-    31273263: { "period": 45.145916694, "period_err": 0.002004383, "widthP": 0.010, "widthS": 0.010, "depthP": 0.220, "depthS": 0.220, "phiS": 0.500 },
-    # Difficult to fit as there is significant variability and flares. More likely to get to the system params with flattening (morph 0.339).
-    32702481: { "flatten": True, },
-    53292822: { "t0": 1519.046, "period": 4.93495, "phiS": 0.67 },
+    31273263: { "exclude_sectors": [96], "period": 45.145916694, "period_err": 0.002004383, "widthP": 0.010, "widthS": 0.010, "depthP": 0.220, "depthS": 0.220, "phiS": 0.500 },
+    # Very short period, phiS=0.5 and LC fit made more durable/reliable by fixing eccentricity at zero
+    52280468: { "jktebop_overrides": { "ecosw": 0, "esinw": 0, "ecosw_fit": 0, "esinw_fit": 0 }, },
     # Switch t0, double the TESS-ebs period (corroborated with TBOSB), copy the primary eclipse data to secondary and halve the widths
     55369219: { "t0": 1389.775813611, "t0_err": 0.036166900, "period": 3.959191743, "period_err": 0.000061792, "widthP": 0.045, "widthS": 0.045, "depthP": 0.067, "depthS": 0.067, "phiS": 0.500 },
+    # (AL Dor) Fixing LD params prevents poor LC fit around eclipses in some sectors
+    55497281: { "jktebop_overrides": { "LDA1_fit": 0, "LDB1_fit": 0, }, },
     # Gaia DR3 with no parallax; dist from Gaia DR2 ~500 pc so set parallax to 2.0;
     55659311: { "parallax": 2.0, },
     63579446: { "exclude_sectors": [87], },
     80650858: { "Teff_sys": 20000, },
+    # MAVEN predicts inc ~ 78 which leads to many failed fits. Override uses value from J+A as initial value.
+    141622065: { "jktebop_overrides": { "inc": 83.7 }, },
     # Double the TESS-ebs period (not corroborated), copy the primary eclipse data to secondary and halve the widths
     147975720: { "period": 5.700445194, "period_err": 0.000026526, "widthP": 0.015, "widthS": 0.015, "depthP": 0.264, "depthS": 0.264, "phiS": 0.500 },
     # Flattening helps with fit (morph = 0.309)
