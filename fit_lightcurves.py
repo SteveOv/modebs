@@ -393,7 +393,7 @@ if __name__ == "__main__":
                     min_err_pc = 0.02
                     print(f"\nApplying a minimum of {min_err_pc:.0%} to the uncertainties.",end=" ")
                     kup = []
-                    for k in final_params.dtype.names:
+                    for k in (n for n in final_params.dtype.names if final_params[n] is not None):
                         nom, err = nominal_value(final_params[k]), std_dev(final_params[k])
                         if err < (new_err:= abs(nom * min_err_pc)):
                             kup += [k]
@@ -404,7 +404,7 @@ if __name__ == "__main__":
                 # Report on the final, fitted params & uncertainties.
                 print(f"\nFinal parameters and uncertainties for {target_id}",
                       f"from {len(lcs)} fitted lightcurve ([known value])")
-                for k in [rk for rk in read_keys if final_params[rk] is not None]:
+                for k in (n for n in read_keys if final_params[n] is not None):
                     print(f"{k:>14s}: {final_params[k]:12.6f}", end="")
                     if (lval := config.get("labels", {}).get(k, None)) is not None:
                         if (lerr := config.get("labels", {}).get(k + "_err")) is not None:
