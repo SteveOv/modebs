@@ -307,35 +307,41 @@ def stitch_lightcurve_groups(lcs: LightCurveCollection,
                 msg = f"The LC(s) {missing} not found for the grouped sector(s) {sector_group}"
                 warnings.warn(msg)
 
-            target = lcs[mask][0].meta.get("target", lcs[mask][0].meta["OBJECT"])
+            src_lcs = lcs[mask]
+            target = src_lcs[0].meta.get("target", src_lcs[0].meta["OBJECT"])
             if verbose and sum(mask) > 1:
-                print(f"The {target} LCs for grouped sectors {lcs[mask].sector} will be stitched.")
+                print(f"The {target} LCs for grouped sectors {src_lcs.sector} will be stitched.")
 
             # Normalize + combine the sectors in the grouping (also if there's only 1)
-            grp_lcs += [lcs[mask].stitch(lambda lc: lc.normalize())]
+            grp_lcs += [src_lcs.stitch(lambda lc: lc.normalize())]
+            new_grp_lc = grp_lcs[-1]
 
             # Update/combine metadata where appropriate. From fits tends to be UCASE, ours are lcase
-            sec_list = [f"{s:02d}" if isinstance(s, int) else f"{s:02.1f}" for s in sector_group]
-            grp_lcs[-1].meta["LABEL"] = f"{target} S" + "+".join(sec_list)
-            grp_lcs[-1].meta["sectors"] = lcs[mask].sector
+            sec_list = [f"{s:02d}" if int(s) == s else f"{s:02.1f}" for s in src_lcs.sector]
+            new_grp_lc.meta["LABEL"] = f"{target} S" + "+".join(sec_list)
+            new_grp_lc.meta["sectors"] = src_lcs.sector
             if sum(mask) > 1:
                 # lightkurve's stitch appears smart enough to concat ndarray & list meta values.
                 # However, some of the singular values seem to be from the last sector, when it is
                 # useful if it were from the first sector (i.e.: t0, TSTART). Fix where necessary.
                 for k in ["t0", "TSTART", "DATE-OBS", "SECTOR"]:
-                    if k in lcs[mask][0].meta:
-                        grp_lcs[-1].meta[k] = lcs[mask][0].meta[k]
+                    if k in src_lcs[0].meta:
+                        new_grp_lc.meta[k] = src_lcs[0].meta[k]
 
                 for k in ["LIVETIME", "TELAPSE"]:
-                    if all(k in lc.meta for lc in lcs[mask]):
-                        grp_lcs[-1].meta[k] = np.sum([lc.meta[k] for lc in lcs[mask]])
+                    if all(k in lc.meta for lc in src_lcs):
+                        new_grp_lc.meta[k] = np.sum([lc.meta[k] for lc in src_lcs])
 
                 for (k, d) in [("CROWDSAP", 1)]:
-                    grp_lcs[-1].meta[k] = np.mean([lc.meta.get(k, d) for lc in lcs[mask]])
+                    new_grp_lc.meta[k] = np.mean([lc.meta.get(k, d) for lc in src_lcs])
 
-                # Revise the t0 time to that of the most complete primary eclipse in the combined LC
-                if len(pri_compl := grp_lcs[-1].meta["primary_completeness"]) > 0:
-                    grp_lcs[-1].meta["t0"] = grp_lcs[-1].meta["primary_times"][np.argmax(pri_compl)]
+                # Revise the t0 time to that of the best/most complete in the combined LC
+                t0_mask = np.in1d(new_grp_lc.meta["primary_times"], [l.meta["t0"] for l in src_lcs])
+                if any(t0_mask):
+                    best_t0_ix = np.argmax(new_grp_lc.meta["primary_completeness"][t0_mask])
+                    new_grp_lc.meta["t0"] = new_grp_lc.meta["primary_times"][t0_mask][best_t0_ix]
+                else:
+                    new_grp_lc.meta["t0"] = src_lcs[0].meta["t0"]
 
     return LightCurveCollection(grp_lcs)
 
