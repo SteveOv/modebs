@@ -278,11 +278,11 @@ if __name__ == "__main__":
                                                                         widthP * period.n * 5,
                                                                         widthS * period.n * 5)
 
-                # Extract any fitting overrides from the target config.
-                # May contain LD params which are handled below.
+                # Extract any fitting overrides from the target config. May contain LD params which
+                # are popped from the dicts, so each dict must be independent with the copy calls.
                 fit_overrides = copy.deepcopy(config.get("jktebop_overrides", {}))
                 if isinstance(fit_overrides, dict):
-                    fit_overrides = [fit_overrides] * len(lcs)
+                    fit_overrides = [fit_overrides.copy() for _ in range(len(lcs))]
 
                 Teff_sys, logg_sys, st = wset.read_values(target_id, "Teff_sys", "logg_sys", "spt")
                 Teff_sys = Teff_sys or lcs[0].meta["TEFF"] or pipeline.get_teff_from_spt(st) or 5650
