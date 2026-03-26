@@ -260,14 +260,15 @@ class Testpipeline(unittest.TestCase):
             "t0": config["t0"].value,
             "period": config["period"].to(u.d).value,
 
-                                    "qphot_fit": 0,
+            "rA_plus_rB_fit": 1,    "k_fit": 1,
+            "inc_fit": 1,           "qphot_fit": 0,
             "ecosw_fit": 1,         "esinw_fit": 1,
             "gravA_fit": 0,         "gravB_fit": 0,
-                                    "L3_fit": 1,
+            "J_fit": 1,             "L3_fit": 1,
             "LDA1_fit": 1,          "LDB1_fit": 1,
             "LDA2_fit": 0,          "LDB2_fit": 0,
             "reflA_fit": 0,         "reflB_fit": 0,
-                                    "sf_fit": 1,
+                                    "sf_fit": 0,
             "period_fit": 1,        "t0_fit": 1,
 
         } for lc in lcs]

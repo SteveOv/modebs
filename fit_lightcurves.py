@@ -312,14 +312,15 @@ if __name__ == "__main__":
                     "t0": nominal_value(lc.meta.get("t0", t0)),
                     "period": nominal_value(period),
 
-                    "qphot_fit": 0,
+                    "rA_plus_rB_fit": 1,        "k_fit": 1,
+                    "inc_fit": 1,               "qphot_fit": 0,
                     "ecosw_fit": 1,             "esinw_fit": 1,
                     "gravA_fit": 0,             "gravB_fit": 0,
-                    "L3_fit": 1,
+                    "J_fit": 1,                 "L3_fit": 1,
                     "LDA1_fit": 1,              "LDB1_fit": 1,
                     "LDA2_fit": 0,              "LDB2_fit": 0,
                     "reflA_fit": refl_fit,      "reflB_fit": refl_fit,
-                    "sf_fit": 0,                # We're fitting scale factor with a poly instruction
+                                                "sf_fit": 0, # fitting sf with a poly instruction
                     "period_fit": 1,            "t0_fit": 1,
 
                     **preds_dict,
