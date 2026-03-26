@@ -35,10 +35,13 @@ exclude_tics = {
     129268651: "ESS-ebs eclipse depths incorrect - this has very shallow eclipses",
     140661916: "too close for JKTEBOP (rA+rB ~ 0.5, morph 0.592)",
     142105299: "highly eccentric, long period with shallow eclipses (Ds~0.062) - cannot get a durable fit",
+    149319411: "unable to get a consistent fit across sectors; hot stars with lots of variability",
     150284425: "cannot get a good fit to 'hump' in LC prior to the primary eclipse",
     150357064: "very shallow with variability as deep as eclipses - cannot get a good fit",
     165186801: "too close/tidally distorted for JKTEBOP (rA+rB ~ 0.55)",
+    167673218: "too distorted to be likely to fit with JKTEBOP",
     167692429: "eclipses almost non-existent by the latter sectors - needs investigation",
+    173756896: "low SNR and shallow secondary eclipses make impossible to get a durable fit, with or without flattening",
     200297691: "too distorted to get a fit with JKTEBOP",
     220430912: "too close for JKTEBOP (rA+rB ~ 0.5)",
     231809798: "variability in sectors leads to very high scatter in fitted params, better with flatten but morph of 0.408 says not",
@@ -107,12 +110,12 @@ known_overrides = {
     147975720: { "period": 5.700445194, "period_err": 0.000026526, "widthP": 0.015, "widthS": 0.015, "depthP": 0.264, "depthS": 0.264, "phiS": 0.500 },
     # Flattening helps with fit (morph = 0.309)
     153742549: { "flatten": True, },
+    # Flattening to deal with large range of variability (morph=0.311)
+    161638713: { "flatten": True, },
     # overriding the TESS-ebs period with value from inspecting S32+33 (left the rest of the ephemeris unchanged)
     167756615: { "exptime": [120, 600], "period": 19.179, },
     # Wide variance in CROWDSAP/L3 between sectors leading to varying eclipse depths, so it's best to fit singularly
     167795859: { "do_not_stitch": True, },
-    # overriding the TESS-ebs eclipse data which overstates eclipse widths & depths
-    173756896: { "widthP": 0.025, "widthS": 0.043, "depthP": 0.100, "depthS": 0.020, },
     # Double the TESS-ebs period, copy the primary eclipse data to secondary and halve the widths. J+A characterisation affected by 1/2 period shift.
     200440175: { "period": 3.652007766, "period_err": 0.000010387, "widthP": 0.062, "widthS": 0.062, "depthP": 0.433, "depthS": 0.433, "phiS": 0.500 },
     # highly eccentric and gives nonsense fit without assistance; force the grouping for better coverage and esinw input value
@@ -149,6 +152,14 @@ known_overrides = {
     425064757: { "widthS": 0.080, "depthP": 0.350, "depthS": 0.050, "phiS": 0.500 },
 }
 
+# Systems likely with evolved components so overrides for mass ratio (defaults to M-S approximation)
+known_overrides |= {
+    # pylint: disable=line-too-long
+    # Improved resids with overrides to qphot and LD params - larger secondary corroborated by J+A characterisation
+    150443185: { "jktebop_overrides": { "qphot": 0.5, "LDA": "pow2", "LDA1": 0.53, "LDA2": 0.43, "LDB": "pow2", "LDB1": 0.67, "LDB2": 0.69, }, },
+    # Improved resids with overrides to qphot and LD params - implies larger/less massive secondary - fixed inc as ~90 and will not converge otherwise
+    219173590: { "jktebop_overrides": { "qphot": 0.25, "inc": 89.9, "inc_fit": 0, "LDA": "pow2", "LDA1": 0.60, "LDA2": 0.63, "LDB": "pow2", "LDB1": 0.70, "LDB2": 0.76 }, },
+}
 
 
 if __name__ == "__main__":
