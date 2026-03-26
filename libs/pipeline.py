@@ -715,6 +715,16 @@ def _fit_target(time: ArrayLike,
     for file in fit_dir.glob(file_stem + ".*"):
         file.unlink()
 
+    # Ensure filenames are not going to be > 50 chars or JKTEBOP will truncate them when writing
+    # its output, which causes subsequent errors when expected files are not found.
+    # Allow a file stem up to 42 chars to leave space for attempt suffixes and file extensions.
+    max_stem_len = 42
+    if len(file_stem) > max_stem_len:
+        # Try truncating after last possible +, leaving the + trailing so it's clear we've truncated
+        if (pix := file_stem.rfind("+", 0, max_stem_len-1)) > -1:
+            file_stem = file_stem[:pix+1]
+        file_stem = file_stem[:max_stem_len] # Fallback/catch-all
+
     # The contents of the lightcurve data file are fixed across fitting attempts.
     # jktebop.write_light_curve_to_dat_file(lc, dat_fname)
     dat_fname = fit_dir / (file_stem + ".dat")
