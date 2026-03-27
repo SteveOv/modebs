@@ -318,10 +318,12 @@ def stitch_lightcurve_groups(lcs: LightCurveCollection,
             new_grp_lc = grp_lcs[-1]
 
             # Update/combine metadata where appropriate. From fits tends to be UCASE, ours are lcase
-            sec_list = [f"{s:02d}" if int(s) == s else f"{s:02.1f}" for s in src_lcs.sector]
-            new_grp_lc.meta["LABEL"] = f"{target} S" + "+".join(sec_list)
             new_grp_lc.meta["sectors"] = src_lcs.sector
+            sec_list = [f"{s:02d}" if int(s) == s else f"{s:02.1f}" for s in src_lcs.sector]
+            new_grp_lc.meta["LABEL"] = f"{target} S{sec_list[0]}"
             if sum(mask) > 1:
+                new_grp_lc.meta["LABEL"] += (" to" if sum(mask)>2 else " and") + f" S{sec_list[-1]}"
+
                 # lightkurve's stitch appears smart enough to concat ndarray & list meta values.
                 # However, some of the singular values seem to be from the last sector, when it is
                 # useful if it were from the first sector (i.e.: t0, TSTART). Fix where necessary.
