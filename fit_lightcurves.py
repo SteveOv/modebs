@@ -345,18 +345,19 @@ if __name__ == "__main__":
                 # by redirect_stdout/Tee. A copy is in the params dicts, so log it manually to file.
                 lf.writelines(d.pop("log", []) for d in fitted_param_dicts)
 
-                # Review fitting metadata to check whether any of the fits are suspect.
-                wixs = [i for i, fd in enumerate(fitted_param_dicts) if not fd.get("converged")]
-                if len(wixs) > 0:
-                    warn_msgs += [f"{len(wixs)}/{len(lcs)} LC fits incomplete"]
-                    print(f"\nWarning: {len(wixs)} of {len(lcs)} LC fit(s) did not converge.",
-                          "Those for", ", ".join(lcs[ix].meta["LABEL"] for ix in wixs))
+                # Review fitting metadata to find and warn if any of the fits are suspect.
+                conv_mask = np.array([fd.get("converged") for fd in fitted_param_dicts], bool)
+                if (fail_count := sum(~conv_mask)) > 0:
+                    warn_msgs += [f"{fail_count}/{len(lcs)} LC fits incomplete"]
+                    print(f"\nWarning: {fail_count} of {len(lcs)} LC fit(s) did not converge:",
+                          ", ".join(lc.meta["LABEL"] for lc in lcs[~conv_mask]))
 
 
                 if args.plot_figs:
                     print("\nCreating a plot of the fit and residual of each lightcurve.")
+                    print("An axes title with a * suffix indicates that the fit did not converge.")
                     out_files = [fitted_param_dicts[ix]["out_fname"] for ix in range(len(lcs))]
-                    ax_titles = [lcs[ix].meta["LABEL"] for ix in range(len(lcs))]
+                    ax_titles = [l.meta["LABEL"]+("" if c else "*") for l, c in zip(lcs, conv_mask)]
                     fig = plots.plot_lightcurve_fits_and_residuals(out_files, wrap_phase,
                                                                    ax_titles, lc_plot_cols)
                     fig.savefig(figs_dir / f"lcs-fit-residual.{args.figs_type}", dpi=args.figs_dpi)
@@ -370,15 +371,21 @@ if __name__ == "__main__":
                     for k in read_keys:
                         fitted_params[ix][k] = fitted_param_dicts[ix][k]
 
-                # Summarize the params into single set of values: if there's only 1 LC group use
-                # the predictions directly, otherwise use the predictions' median & 2-sigma of
-                # the scatter for the uncertainty (the sample is relatively small).
+
+                # Summarize the fits' params into single set of values. If possible, omit those
+                # which failed to converge. If there's 1 usable fit use the fitted vals directly,
+                # otherwise use the fits' median +/- 2-sigma of the scatter (the sample is small).
                 print()
-                if fitted_params.size > 1:
-                    final_params = pipeline.median_params(fitted_params, 0.9545, True)
-                    print(f"Using median & 2-sigma uncertainties from {len(lcs)} fitted groups.")
+                use_mask = np.ones_like(conv_mask, bool)
+                if 0 < (conv_count := sum(conv_mask)) < len(lcs):
+                    print(f"Excluding the {len(lcs)-conv_count} of {len(lcs)} LC(s) where the fit",
+                          "did not converge from the calculations for the final set of parameters.")
+                    use_mask &= conv_mask
+                if sum(use_mask) > 1:
+                    final_params = pipeline.median_params(fitted_params[use_mask], 0.9545, True)
+                    print(f"Using the fits' median & 2-sigma scatter from {sum(use_mask)} LCs.")
                 else:
-                    final_params = fitted_params[0]
+                    final_params = fitted_params[use_mask]
                     print("Using fitted values and formal error bars from 1 fitted lightcurve.")
 
 
@@ -391,10 +398,11 @@ if __name__ == "__main__":
                         ax.hlines([v.n], *xlim, "k", "-", lw=1.0, label="median")
                         ax.axhspan(v.n-v.s, v.n+v.s,color="silver",zorder=-50,label=r"$\pm2\sigma$")
 
-                    fig = plots.plot_parameter_scatter(fitted_params, lcs.sector, write_keys,
-                                                    suptitle=f"Fitted params from {len(lcs)} LC(s)",
-                                                    ax_func=median_and_uncertainty, xlim=xlim,
-                                                    legend_loc="upper right", legend_ncol=2)
+                    fig = plots.plot_parameter_scatter(fitted_params[use_mask],
+                                                       lcs.sector[use_mask], write_keys,
+                                                       suptitle="Scatter in fitted params",
+                                                       ax_func=median_and_uncertainty, xlim=xlim,
+                                                       legend_loc="upper right", legend_ncol=2)
                     fig.savefig(figs_dir / f"lcs-fit-scatter.{args.figs_type}", dpi=args.figs_dpi)
                     plt.close(fig)
 
@@ -413,8 +421,7 @@ if __name__ == "__main__":
 
 
                 # Report on the final, fitted params & uncertainties.
-                print(f"\nFinal parameters and uncertainties for {target_id}",
-                      f"from {len(lcs)} fitted lightcurve ([known value])")
+                print(f"\nFinal parameters and uncertainties for {target_id} ([known value])")
                 for k in (n for n in read_keys if final_params[n] is not None):
                     print(f"{k:>14s}: {final_params[k]:12.6f}", end="")
                     if (lval := config.get("labels", {}).get(k, None)) is not None:
