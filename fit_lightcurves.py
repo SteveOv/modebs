@@ -355,7 +355,8 @@ if __name__ == "__main__":
 
                 if args.plot_figs:
                     print("\nCreating a plot of the fit and residual of each lightcurve.")
-                    print("An axes title with a * suffix indicates that the fit did not converge.")
+                    if fail_count > 0:
+                        print("Axes titles with a * suffix indicate fits that did not converge.")
                     out_files = [fitted_param_dicts[ix]["out_fname"] for ix in range(len(lcs))]
                     ax_titles = [l.meta["LABEL"]+("" if c else "*") for l, c in zip(lcs, conv_mask)]
                     fig = plots.plot_lightcurve_fits_and_residuals(out_files, wrap_phase,
