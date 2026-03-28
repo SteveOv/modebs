@@ -385,7 +385,7 @@ if __name__ == "__main__":
                     final_params = pipeline.median_params(fitted_params[use_mask], 0.9545, True)
                     print(f"Using the fits' median & 2-sigma scatter from {sum(use_mask)} LCs.")
                 else:
-                    final_params = fitted_params[use_mask]
+                    final_params = fitted_params[use_mask][0]
                     print("Using fitted values and formal error bars from 1 fitted lightcurve.")
 
 
