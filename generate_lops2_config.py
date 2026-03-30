@@ -155,10 +155,10 @@ known_overrides = {
 # Systems likely with evolved components so overrides for mass ratio (defaults to M-S approximation)
 known_overrides |= {
     # pylint: disable=line-too-long
-    # Improved resids with overrides to qphot and LD params - larger secondary corroborated by J+A characterisation
-    150443185: { "jktebop_overrides": { "qphot": 0.5, "LDA": "pow2", "LDA1": 0.53, "LDA2": 0.43, "LDB": "pow2", "LDB1": 0.67, "LDB2": 0.69, }, },
-    # Improved resids with overrides to qphot and LD params - implies larger/less massive secondary - fixed inc as ~90 and will not converge otherwise
-    219173590: { "jktebop_overrides": { "qphot": 0.25, "inc": 89.9, "inc_fit": 0, "LDA": "pow2", "LDA1": 0.60, "LDA2": 0.63, "LDB": "pow2", "LDB1": 0.70, "LDB2": 0.76 }, },
+    # Improved resids with overrides to LD params - larger secondary corroborated by J+A characterisation
+    150443185: { "jktebop_overrides": { "LDA": "pow2", "LDA1": 0.53, "LDA2": 0.43, "LDB": "pow2", "LDB1": 0.67, "LDB2": 0.69, }, },
+    # Improved resids with overrides to LD params (based on larger cooler secondary) - fixed inc as ~90 deg and will not converge otherwise
+    219173590: { "jktebop_overrides": { "inc": 89.9, "inc_fit": 0, "LDA": "pow2", "LDA1": 0.60, "LDA2": 0.63, "LDB": "pow2", "LDB1": 0.70, "LDB2": 0.76 }, },
 }
 
 
