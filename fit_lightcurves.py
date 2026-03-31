@@ -363,7 +363,7 @@ if __name__ == "__main__":
                 conv_mask = np.array([fd.get("converged") for fd in fitted_param_dicts], bool)
                 if (fail_count := sum(~conv_mask)) > 0:
                     warn_msgs += [f"{fail_count}/{len(lcs)} LC fits incomplete"]
-                    print(f"\nWarning: {fail_count} of {len(lcs)} LC fit(s) did not converge:",
+                    print(f"\n## Warning: {fail_count} of {len(lcs)} LC fit(s) did not converge:",
                           ", ".join(lc.meta["LABEL"] for lc in lcs[~conv_mask]))
 
 

@@ -770,6 +770,9 @@ def _fit_target(time: ArrayLike,
             att_out_params = jktebop.read_fitted_params_from_par_lines(plines, all_keys, True)
             converged = not stdout_inspect.inspect_flag
 
+            att_out_params["warn_msgs"] = jktebop.read_warnings_from_par_file(par_fname)
+            stdout_inspect.write_lines(att_out_params["warn_msgs"])
+
             if attempt == 1:
                 # The fallback position being the outputs from the 1st attempt regardless of success
                 best_attempt = 1
@@ -798,8 +801,7 @@ def _fit_target(time: ArrayLike,
                     best_file_params = att_file_params
 
             if msg is not None:
-                if stdout_to:
-                    stdout_inspect.write("** " + msg + "\n")
+                stdout_inspect.write("** " + msg + "\n")
                 msgs += [msg]
 
             if converged:

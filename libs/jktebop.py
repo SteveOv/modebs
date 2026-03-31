@@ -410,6 +410,24 @@ def read_fitted_params_from_par_lines(par_lines: Iterable[str],
     return results
 
 
+def read_warnings_from_par_file(par_filename: Path) -> List[str]:
+    """
+    Parses the indicated JKTEBOP parameter output file (.par) returning a list of any warning lines.
+
+    :par_filename: path of the file to read
+    :returns: a List[str] of warning message lines with newlines appended
+    """
+    # Warnings start with '## Warning:'. The text of each warning can continue onto the next line
+    # (again prefixed ##). We'll just treat them all as text & capture each line with the ## prefix.
+    warn_re = re.compile(r"^\#\#\s*(.+)", re.MULTILINE)
+    with open(par_filename, mode="r", encoding="utf8") as par:
+        warn_lines = []
+        for par_line in par.readlines():
+            if match := warn_re.match(par_line):
+                warn_lines += [match.group(0) + "\n"]
+        return warn_lines
+
+
 #
 # Private helper functions
 # pylint: disable=too-many-arguments
