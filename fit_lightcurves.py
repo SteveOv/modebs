@@ -293,14 +293,16 @@ if __name__ == "__main__":
 
                 # LD params based on the system temperature & log(g) (deferring to any overrides)
                 # Substiturte LR ~= J*k^2 giving TeffR ~= ((J*k^2)/k^2)^1/4 ~= J^1/4
-                print(f"\nSetting up LD params based on Teff_sys={Teff_sys:.0f} K &",
-                      f"logg_sys={logg_sys:.3f}, subject to overrides from config.")
+                def_ld_algo = config.get("default_ld_algo", "pow2")
+                print(f"\nSetting up LD params based on Teff_sys={Teff_sys:.0f} K, ",
+                      f"logg_sys={logg_sys:.3f}, subject to any overrides from config.",
+                      f"The default algorithm in {def_ld_algo}.")
                 TeffR = nominal_value(preds_dict["J"]**0.25)
                 ld_Teffs = (Teff_sys, Teff_sys*TeffR) if TeffR < 1 else (Teff_sys/TeffR, Teff_sys)
                 ld_params = [pipeline.pop_and_complete_ld_config(fo,
                                                             *nominal_values(ld_Teffs),
                                                             *nominal_values((logg_sys, logg_sys)),
-                                                            "pow2") for fo in fit_overrides]
+                                                            def_ld_algo) for fo in fit_overrides]
 
                 # Build the values and flags for the JKTEBOP in files
                 # The refl flags can be 0 (fixed), 1 (fitted) or -1 (calculated from sys geometry)
