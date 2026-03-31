@@ -36,14 +36,14 @@ THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 mpl_use("agg")
 
 # Plotting ax_func callback functions
-eclipse_complete_th = 0.9
+ecl_complete_th = 0.9
 def indicate_eclipses(_, ax, lc): # pylint: disable=redefined-outer-name
     """ Draw lines for each identified pri/sec eclipse time & depth and highlight the t0 time """
     for ecl_type, ls, c in [
         ("secondary", "--", "g"),
         ("primary", "-.", "r")
     ]:
-        alphas = [0.33 if cf else 0.1 for cf in lc.meta[f"{ecl_type}_completeness"] > eclipse_complete_th]
+        alphas = [0.33 if cf else 0.1 for cf in lc.meta[f"{ecl_type}_completeness"] > ecl_complete_th]
         if len(times := lc.meta[f"{ecl_type}_times"]) > 0:
             ax.vlines(times, 0.5, 1.1, c, ls, label=ecl_type, alpha=alphas, zorder=-20)
             ax.plot(times, 1.0-lc.meta[f"{ecl_type}_depths"], f"{c}+", markersize=10, alpha=0.33, zorder=-20)
@@ -92,10 +92,6 @@ if __name__ == "__main__":
         targets_config = Targets(args.targets_file)
         print(f"\nRead in the configuration from '{args.targets_file.name}'",
               f"which contains {targets_config.count()} target(s) that have not been exluded.")
-        eclipse_complete_th = targets_config.get("eclipse_complete_threshold", 0.9)
-        flatten_morph_th = targets_config.get("flatten_morph_threshold", 0)
-        print(f"Read from config: eclipse_complete_threshold = {eclipse_complete_th:.2f},",
-              f"flatten_morph_threshold = {flatten_morph_th:.2f}\n")
 
         # Open the targets table and the configs
         wset = QTableFileDal(args.working_set_file)
@@ -123,8 +119,12 @@ if __name__ == "__main__":
                 # period. For shorter periods we're more discriminating as orbital coverage is good.
                 quality_bitmask = config.quality_bitmask
                 if quality_bitmask is None:
+                    quality_bitmask = "default"
                     per = nominal_value(period)
-                    quality_bitmask = "default" if per > 10 else "hard" if per > 5 else "hardest"
+                    if per < config.get("quality_bitmask_to_hardest_threshold", 5):
+                        quality_bitmask = "hardest"
+                    elif per < config.get("quality_bitmask_to_hard_threshold", 10):
+                        quality_bitmask = "hard"
                     print(f"Set quality_bitmask to {quality_bitmask} as the period is {period:.6f}")
 
                 # It's quicker to get LCs once and cache the results than to continue to bother MAST
@@ -171,10 +171,11 @@ if __name__ == "__main__":
                     if var_crowdsap > 1e-3:
                         warn_msgs += ["var(CROWDSAP)>1e-3"]
 
+                min_section_dur = config.get("min_lc_section_days", 2) * u.d
                 print("\nClipping the lightcurves' invalid fluxes, known distorted sections",
-                    "& any isolated sections < 2 d in length.")
+                    f"& any isolated sections < {min_section_dur} in length.")
                 pipeline.mask_lightcurves_unusable_fluxes(lcs, config.quality_masks or [],
-                                                          min_section_dur=2 * u.d)
+                                                          min_section_dur=min_section_dur)
 
 
                 print("\nInspecting the lightcurves to find and characterise their eclipses")
@@ -200,14 +201,15 @@ if __name__ == "__main__":
                     sector_groups = config.sectors
                 else:
                     # Otherwise we use the pipeline logic to choose the best combination of sectors
+                    ecl_complete_th = config.get("eclipse_complete_threshold", 0.9)
                     print("Sectors will chosen by analysis of eclipses, with those having",
-                        f">{eclipse_complete_th:.0%} fluxes are considered complete.")
+                          f">{ecl_complete_th:.0%} fluxes are considered complete.")
                     if max_group_size := 1 if config.do_not_stitch else None:
                         print("Stitching of adjascent sectors is disabled by target config setting")
                     sector_groups = pipeline.choose_lightcurve_groups_for_fitting(lcs,
-                                                                                eclipse_complete_th,
-                                                                                max_group_size,
-                                                                                verbose=True)
+                                                                                  ecl_complete_th,
+                                                                                  max_group_size,
+                                                                                  verbose=True)
                 lcs = pipeline.stitch_lightcurve_groups(lcs, sector_groups, verbose=True)
                 if len(lcs) == 0:
                     raise PipelineError(target_id, "No lightcurves retained after selection")
@@ -215,6 +217,7 @@ if __name__ == "__main__":
 
                 # Flatten (optional depending on morph), append delta_mag & delta_mag_err columns
                 # and then detrend & rectify the mags to zero by subtracting a low order polynomial
+                flatten_morph_th = config.get("flatten_morph_threshold", 0)
                 do_flatten = config.flatten or (config.flatten is None and morph<=flatten_morph_th)
                 if do_flatten:
                     print(f"\nFluxes for {target_id} (with morph={morph:.3f}) will be flattened,",
@@ -347,13 +350,10 @@ if __name__ == "__main__":
                 # will occur after each attempt is complete, but overall elapsed time is reduced.
                 # If set to 1, tasks are serialized but more frequent progress updates will occur.
                 print(f"\nFitting {len(lcs)} lightcurves with JKTEBOP task 3")
-                fitted_param_dicts = pipeline.fit_target_lightcurves(lcs,
-                                                                     input_params=in_params,
-                                                                     read_keys=read_keys,
-                                                                     task=3,
-                                                                     max_workers=8,
-                                                                     max_attempts=3,
-                                                                     timeout=900)
+                fitted_param_dicts = pipeline.fit_target_lightcurves(lcs, in_params, read_keys, 3,
+                                                max_workers=config.get("lc_fit_max_workers", 8),
+                                                max_attempts=1 + config.get("lc_fit_retries", 2),
+                                                timeout=config.get("lc_fit_timeout", 900))
 
                 # If >1 worker then jktebop stdout was written in another process and is not seen
                 # by redirect_stdout/Tee. A copy is in the params dicts, so log it manually to file.

@@ -215,15 +215,19 @@ if __name__ == "__main__":
 
     # Now build up a dictionary from which we'll generate the target config json
     targets_config = {
-        "excplicit": True,                  # We are explicitly specifying the target systems
-        "eclipse_complete_threshold": 0.9,  # Eclipses with completeness > this considered complete
-        "flatten_morph_threshold": 0.25,    # Targets with morph <= this will have LCs flattened
+        "explicit": True,                       # We are explicitly specifying the target systems
         "target_config_defaults": {
-            "quality_bitmask": None,        # leave choice to fit_lightcurves
+            # Cut well-known sections of LC which are commonly distorted.
             "quality_masks": [[1420.0, 1424.0], [1534.0, 1544.0]],
+            "quality_bitmask": None,            # Leave choice of this to fit_lightcurves
+            "eclipse_complete_threshold": 0.9,  # Eclipses > this completeness considered complete
+            "flatten_morph_threshold": 0.25,    # Targets <= this morph will have LCs flattened
             "detrend_gap_threshold": 0.1,
             "detrend_poly_degree": 2,
-            "detrend_iterations": 3
+            "detrend_iterations": 3,
+            "lc_fit_max_workers": 8,
+            "lc_fit_retries": 2,
+            "lc_fit_timeout": 900,
         },
         "target_configs": {}
     }
