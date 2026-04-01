@@ -92,8 +92,8 @@ class Testlightcurves(unittest.TestCase):
     #
     def test_find_lightcurve_sections_happy(self):
         """ Simple happy path test of find_lightcurve_sections() known LC """
-        # CW Eri S4 has 3 "contiguous" segments separated by gaps of 2.7 and 1.97 days (middle seg is only ~1.25 d long)
-        #   and S31 has 2 "contiguous" segments separated by a gap of 2.2 days
+        # CW Eri S4 has 3 "contiguous" sections separated by gaps of 2.7 and 1.97 days
+        # (middle one is only ~1.25 d long) and S31 has 2 sections separated by a gap of 2.2 days
         print()
         for target,     sector, min_gap_dur,    yield_times,exp_segs in [
             ("CW Eri",  4,    TimeDelta(2*u.d), False,      [slice(0, 5291, 1), slice(5291, 14824, 1)]),
@@ -107,6 +107,7 @@ class Testlightcurves(unittest.TestCase):
             ("CW Eri",  4,      1 * u.d,        False,      [slice(0, 5291, 1), slice(5291, 6274, 1), slice(6274, 14824, 1)]),
             ("CW Eri",  4,      1 * u.d,        True,       [(1410.907, 1418.492), (1421.219, 1422.587), (1424.560, 1436.517)]),
 
+            ("CW Eri",  4,      3 * u.d,        False,      [slice(0, 14824, 1)]),
             ("CW Eri",  4,      3 * u.d,        True,       [(1410.907, 1436.517)]),
         ]:
             msg = f"{target}-S{sector:02d}, threshold={min_gap_dur}, yield_times={yield_times}"
@@ -130,7 +131,6 @@ class Testlightcurves(unittest.TestCase):
                             if isinstance(item, Time|u.Quantity):
                                 item = item.btjd
                             self.assertAlmostEqual(exp_seg[ix], item, 3, f"Seg[{seg_ix}][{ix}]")
-
 
 
     #

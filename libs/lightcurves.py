@@ -186,15 +186,20 @@ def find_lightcurve_sections(lc: LightCurve,
     if isinstance(min_gap_duration, TimeDelta|u.Quantity):
         min_gap_duration = min_gap_duration.to(u.d).value
 
-    # Find the time gaps between each obs, which gives an array 1 shorter than times.
-    # The gap indices can then be used to directly read the preceeding time.
-    seg_first_ix = 0
-    for seg_last_ix in np.append(np.where(np.diff(times) >= min_gap_duration), [len(times)-1]):
-        if yield_times:
-            yield (lc.time[seg_first_ix], lc.time[seg_last_ix])
+    # Heirarchically split the LC on the largest gap, until none are left >= min_gap_duration
+    gap_durs = np.diff(times)
+    def yield_sections(sec_first_ix=0, sec_last_ix=len(gap_durs)):
+        longest_gap_ix = sec_first_ix + np.argmax(gap_durs[sec_first_ix:sec_last_ix])
+        if gap_durs[longest_gap_ix] >= min_gap_duration:
+            # The gap ix can handily be used as the ix of the last time in the new 1st section
+            for ixs in [(sec_first_ix, longest_gap_ix), (longest_gap_ix+1, sec_last_ix)]:
+                yield from yield_sections(*ixs)
+        elif yield_times:
+            yield lc.time[sec_first_ix], lc.time[sec_last_ix]
         else:
-            yield slice(seg_first_ix, seg_last_ix + 1, 1)
-        seg_first_ix = seg_last_ix + 1
+            yield slice(sec_first_ix, sec_last_ix+1, 1)
+
+    return yield_sections()
 
 
 def fit_polynomial(times: Time,
