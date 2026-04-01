@@ -8,7 +8,7 @@ from io import StringIO
 # pylint: disable=no-member, wrong-import-position, line-too-long
 import numpy as np
 import astropy.units as u
-from astropy.time import Time
+from astropy.time import Time, TimeDelta
 import matplotlib.pyplot as plt
 
 from tests.helpers import lightcurve_helpers
@@ -95,17 +95,18 @@ class Testlightcurves(unittest.TestCase):
         # CW Eri S4 has 3 "contiguous" segments separated by gaps of 2.7 and 1.97 days (middle seg is only ~1.25 d long)
         #   and S31 has 2 "contiguous" segments separated by a gap of 2.2 days
         print()
-        for target,     sector, threshold,  yield_times,    exp_segs in [
-            ("CW Eri",  4,      2 * u.d,    False,          [slice(0, 5291, 1), slice(5291, 14824, 1)]),
-            ("CW Eri",  4,      48 * u.h,   False,          [slice(0, 5291, 1), slice(5291, 14824, 1)]),
-            ("CW Eri",  4,      2,          False,          [slice(0, 5291, 1), slice(5291, 14824, 1)]),
+        for target,     sector, threshold,      yield_times,exp_segs in [
+            ("CW Eri",  4,    TimeDelta(2*u.d), False,      [slice(0, 5291, 1), slice(5291, 14824, 1)]),
+            ("CW Eri",  4,      2 * u.d,        False,      [slice(0, 5291, 1), slice(5291, 14824, 1)]),
+            ("CW Eri",  4,      48 * u.h,       False,      [slice(0, 5291, 1), slice(5291, 14824, 1)]),
+            ("CW Eri",  4,      2,              False,      [slice(0, 5291, 1), slice(5291, 14824, 1)]),
 
-            ("CW Eri",  4,      2 * u.d,    True,           [(1410.907, 1418.492), (1421.219, 1436.517)]),
-            ("CW Eri",  31,     2 * u.d,    True,           [(2144.520, 2156.667), (2158.867, 2169.949)]),
+            ("CW Eri",  4,      2 * u.d,        True,       [(1410.907, 1418.492), (1421.219, 1436.517)]),
+            ("CW Eri",  31,     2 * u.d,        True,       [(2144.520, 2156.667), (2158.867, 2169.949)]),
 
-            ("CW Eri",  4,      1 * u.d,    True,           [(1410.907, 1418.492), (1421.219, 1422.587), (1424.560, 1436.517)]),
+            ("CW Eri",  4,      1 * u.d,        True,       [(1410.907, 1418.492), (1421.219, 1422.587), (1424.560, 1436.517)]),
 
-            ("CW Eri",  4,      3 * u.d,    True,           [(1410.907, 1436.517)]),
+            ("CW Eri",  4,      3 * u.d,        True,       [(1410.907, 1436.517)]),
         ]:
             msg = f"{target}-S{sector:02d}, threshold={threshold}, yield_times={yield_times}"
             with self.subTest(msg):
