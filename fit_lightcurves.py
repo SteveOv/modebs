@@ -361,13 +361,20 @@ if __name__ == "__main__":
                 # by redirect_stdout/Tee. A copy is in the params dicts, so log it manually to file.
                 lf.writelines(d.pop("log", []) for d in fitted_param_dicts)
 
-                # Review fitting metadata to find and warn if any of the fits are suspect.
+                # Review fitting metadata to find and warn if any of the fits did not converge.
                 conv_mask = np.array([fd.get("converged") for fd in fitted_param_dicts], bool)
                 if (fail_count := sum(~conv_mask)) > 0:
                     warn_msgs += [f"{fail_count}/{len(lcs)} LC fits incomplete"]
                     print(f"\n## Warning: {fail_count} of {len(lcs)} LC fit(s) did not converge:",
                           ", ".join(lc.meta["LABEL"] for lc in lcs[~conv_mask]))
 
+                # Warn about any converged fits which have warnings wrt their final params
+                warn_mask = conv_mask \
+                    & np.array([len(fd.get("warn_msgs", []))>0 for fd in fitted_param_dicts], bool)
+                if (warn_count:= sum(warn_mask)) > 0:
+                    warn_msgs += [f"{warn_count}/{sum(conv_mask)} conv LC fits has warnings"]
+                    print(f"\n## Warning: {warn_count} of {sum(conv_mask)} converged LC fit(s)",
+                          "has warnings:", ", ".join(lc.meta["LABEL"] for lc in lcs[warn_mask]))
 
                 if args.plot_figs:
                     print("\nCreating a plot of the fit and residual of each lightcurve.")
