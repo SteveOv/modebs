@@ -126,12 +126,13 @@ def mask_lightcurves_unusable_fluxes(lcs: LightCurveCollection,
             for mask_times in (lightcurves.to_lc_time(t, lcs[ix]) for t in quality_masks):
                 _mask &= (lcs[ix].time < np.min(mask_times)) | (np.max(mask_times) < lcs[ix].time)
 
-        # We also look to clip any short isolated regions of the LCs, as they often contain little
-        # useful information and often have a detrimental affect on the effectiveness of detrending.
-        seg_gap_th = min_section_gap_bins * lcs[ix].meta['FRAMETIM'] * lcs[ix].meta['NUM_FRM'] * u.s
-        for seg in lightcurves.find_lightcurve_segments(lcs[ix], seg_gap_th, yield_times=True):
-            if max(seg) - min(seg) < min_section_dur:
-                _mask &= (lcs[ix].time < min(seg)) | (lcs[ix].time > max(seg))
+        # We also look to clip any short isolated sections of the LCs, as they often contain little
+        # useful information and yet have a detrimental affect on the effectiveness of detrending.
+        sec_gap_th = min_section_gap_bins * lcs[ix].meta['FRAMETIM'] * lcs[ix].meta['NUM_FRM'] * u.s
+        for sec in lightcurves.find_lightcurve_sections(lcs[ix], min_gap_duration=sec_gap_th,
+                                                        yield_times=True):
+            if max(sec) - min(sec) < min_section_dur:
+                _mask &= (lcs[ix].time < min(sec)) | (lcs[ix].time > max(sec))
 
         lcs[ix] = lcs[ix][_mask]
 
@@ -412,12 +413,12 @@ def append_mags_to_lightcurves_and_detrend(lcs: LightCurveCollection,
         # Create detrended & rectified delta_mag/delta_mag_err columns, by fitting & subtracting a
         # polynomial to delta_mags outside the eclipses.
         lightcurves.append_magnitude_columns(lcs[ix], "delta_mag", "delta_mag_err")
-        for s in lightcurves.find_lightcurve_segments(lcs[ix], threshold=detrend_gap_th):
-            lcs[ix][s]["delta_mag"] -= lightcurves.fit_polynomial(lcs[ix].time[s],
-                                                                  lcs[ix]["delta_mag"][s],
-                                                                  detrend_poly_degree,
-                                                                  detrend_iterations,
-                                                                  fit_mask=~eclipse_mask[s])
+        for sl in lightcurves.find_lightcurve_sections(lcs[ix], min_gap_duration=detrend_gap_th):
+            lcs[ix][sl]["delta_mag"] -= lightcurves.fit_polynomial(lcs[ix].time[sl],
+                                                                   lcs[ix]["delta_mag"][sl],
+                                                                   detrend_poly_degree,
+                                                                   detrend_iterations,
+                                                                   fit_mask=~eclipse_mask[sl])
     if verbose:
         print(f"Added delta_mag & delta_mag_err columns to {len(lcs)} LC(s),",
                "then detrended & rectified the mags to zero by subtracting polynomials",

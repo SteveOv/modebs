@@ -9,7 +9,7 @@ from uncertainties import nominal_value, std_dev
 
 from tests.helpers.lightcurve_helpers import load_lightcurves, KNOWN_TARGETS
 from libs.catalogues import query_tess_ebs_ephemeris
-from libs.lightcurves import find_lightcurve_segments, fit_polynomial
+from libs.lightcurves import find_lightcurve_sections, fit_polynomial
 
 from libs.pipeline import get_teff_from_spt, _spt_to_teff_map # pylint: disable=protected-access
 from libs.pipeline import add_eclipse_meta_to_lightcurves
@@ -240,8 +240,8 @@ class Testpipeline(unittest.TestCase):
         # Get and pre-process some known lightcurves
         lcs = load_lightcurves("CW Eri", [4, 31], with_mag_columns=True)
         for lc in lcs:
-            for s in find_lightcurve_segments(lc, threshold=0.5 * u.d):
-                lc[s]["delta_mag"] -= fit_polynomial(lc.time[s], lc[s]["delta_mag"], 1, 3)
+            for sl in find_lightcurve_sections(lc, min_gap_duration=0.5 * u.d, yield_times=False):
+                lc[sl]["delta_mag"] -= fit_polynomial(lc.time[sl], lc[sl]["delta_mag"], 1, 3)
             lc.meta["clip_mask"] = np.ones((len(lc)), dtype=bool)
 
         in_params = [{

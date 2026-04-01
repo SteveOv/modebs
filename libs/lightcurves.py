@@ -166,42 +166,35 @@ def append_magnitude_columns(lc: LightCurve,
         * u.mag)
 
 
-def find_lightcurve_segments(lc: LightCurve,
-                             threshold: TimeDelta,
+def find_lightcurve_sections(lc: LightCurve,
+                             min_gap_duration: TimeDelta,
                              yield_times: bool=False) \
                                 -> Generator[Union[slice, Tuple[Time, Time]], any, None]:
     """
-    Finds the start and end of contiguous segments in the passed LightCurve. These are contiguous
-    regions where the gaps between bins does not exceed the passed threshold. Gaps greater then the
-    threshold are treated as boundaries between segments. If no gaps found this will yield a single
-    segment for the whole LightCurve.
+    Finds the start and end of contiguous sections in the passed LightCurve.
+    These are sets of fluxes where the time gaps between obs are less than the passed threshold.
+    Gaps meeting the threshold are treated as boundaries between sections.
+    This will yield a single sections for the whole LightCurve if no gaps meet the threshold.
 
-    :lc: the source LightCurve to parse for gaps/segments.
-    :threshold: the threshold gap time beyond which a segment break is triggered
-    :yield_times: if true start/end times will be yielded, otherwise slices
+    :lc: the source LightCurve to parse for gaps/sections.
+    :min_gap_duration: the minimum gap time to break on
+    :yield_times: if true section start/end times will be yielded, otherwise slices
     :returns: generator of slice(start, end, 1) or tuple(start Time, end Time) if yield_times==True
     """
-    if isinstance(threshold, TimeDelta):
-        pass
-    elif isinstance(threshold, u.Quantity):
-        threshold = TimeDelta(threshold)
-    else:
-        threshold = TimeDelta(threshold * u.d)
-
-
     # Much quicker if we use primatives - make sure we work in days
-    threshold = threshold.to(u.d).value
     times = lc.time.value
+    if isinstance(min_gap_duration, TimeDelta|u.Quantity):
+        min_gap_duration = min_gap_duration.to(u.d).value
 
-    last_ix = len(lc) - 1
-    segment_start_ix = 0
-    for this_ix, previous_time in enumerate(times, start = 1):
-        if this_ix > last_ix or times[this_ix] - previous_time > threshold:
-            if yield_times:
-                yield (lc.time[segment_start_ix], lc.time[this_ix - 1])
-            else:
-                yield slice(segment_start_ix, this_ix, 1)
-            segment_start_ix = this_ix
+    # Find the time gaps between each obs, which gives an array 1 shorter than times.
+    # The gap indices can then be used to directly read the preceeding time.
+    seg_first_ix = 0
+    for seg_last_ix in np.append(np.where(np.diff(times) >= min_gap_duration), [len(times)-1]):
+        if yield_times:
+            yield (lc.time[seg_first_ix], lc.time[seg_last_ix])
+        else:
+            yield slice(seg_first_ix, seg_last_ix + 1, 1)
+        seg_first_ix = seg_last_ix + 1
 
 
 def fit_polynomial(times: Time,

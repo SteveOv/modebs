@@ -88,14 +88,14 @@ class Testlightcurves(unittest.TestCase):
 
 
     #
-    #   find_lightcurve_segments(LightCurve, gap: TimeDelta, yield_times: bool) -> Generator:
+    #   find_lightcurve_sections(LightCurve, min_gap_duration: TimeDelta, yield_times: bool) -> Generator:
     #
-    def test_find_lightcurve_segment_happy(self):
-        """ Simple happy path test of find_lightcurve_segments() known LC """
+    def test_find_lightcurve_sections_happy(self):
+        """ Simple happy path test of find_lightcurve_sections() known LC """
         # CW Eri S4 has 3 "contiguous" segments separated by gaps of 2.7 and 1.97 days (middle seg is only ~1.25 d long)
         #   and S31 has 2 "contiguous" segments separated by a gap of 2.2 days
         print()
-        for target,     sector, threshold,      yield_times,exp_segs in [
+        for target,     sector, min_gap_dur,    yield_times,exp_segs in [
             ("CW Eri",  4,    TimeDelta(2*u.d), False,      [slice(0, 5291, 1), slice(5291, 14824, 1)]),
             ("CW Eri",  4,      2 * u.d,        False,      [slice(0, 5291, 1), slice(5291, 14824, 1)]),
             ("CW Eri",  4,      48 * u.h,       False,      [slice(0, 5291, 1), slice(5291, 14824, 1)]),
@@ -108,11 +108,13 @@ class Testlightcurves(unittest.TestCase):
 
             ("CW Eri",  4,      3 * u.d,        True,       [(1410.907, 1436.517)]),
         ]:
-            msg = f"{target}-S{sector:02d}, threshold={threshold}, yield_times={yield_times}"
+            msg = f"{target}-S{sector:02d}, threshold={min_gap_dur}, yield_times={yield_times}"
             with self.subTest(msg):
                 lc = lightcurve_helpers.load_lightcurves(target, [sector])[0]
 
-                segs = list(lightcurves.find_lightcurve_segments(lc, threshold, yield_times))
+                segs = list(lightcurves.find_lightcurve_sections(lc=lc,
+                                                                 min_gap_duration=min_gap_dur,
+                                                                 yield_times=yield_times))
 
                 print(f"{msg}:", ", ".join(str(s) if isinstance(s, slice) else f"[{s[0].btjd:.3f}, {s[1].btjd:.3f}]" for s in segs))
 
