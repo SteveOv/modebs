@@ -95,28 +95,39 @@ class Testlightcurves(unittest.TestCase):
         # CW Eri S4 has 3 "contiguous" sections separated by gaps of 2.7 and 1.97 days
         # (middle one is only ~1.25 d long) and S31 has 2 sections separated by a gap of 2.2 days
         print()
-        for target,     sector, min_gap_dur,    yield_times,exp_segs in [
-            ("CW Eri",  4,    TimeDelta(2*u.d), False,      [slice(0, 5291, 1), slice(5291, 14824, 1)]),
-            ("CW Eri",  4,      2 * u.d,        False,      [slice(0, 5291, 1), slice(5291, 14824, 1)]),
-            ("CW Eri",  4,      48 * u.h,       False,      [slice(0, 5291, 1), slice(5291, 14824, 1)]),
-            ("CW Eri",  4,      2,              False,      [slice(0, 5291, 1), slice(5291, 14824, 1)]),
+        for target,     sector, min_gap_dur,    min_sec_dur,    times,  exp_segs in [
+            ("CW Eri",  4,    TimeDelta(2*u.d), None,           False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
+            ("CW Eri",  4,      2 * u.d,        None,           False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
+            ("CW Eri",  4,      48 * u.h,       None,           False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
+            ("CW Eri",  4,      2,              None,           False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
 
-            ("CW Eri",  4,      2 * u.d,        True,       [(1410.907, 1418.492), (1421.219, 1436.517)]),
-            ("CW Eri",  31,     2 * u.d,        True,       [(2144.520, 2156.667), (2158.867, 2169.949)]),
+            ("CW Eri",  4,      2 * u.d,        None,           True,   [(1410.907, 1418.492), (1421.219, 1436.517)]),
+            ("CW Eri",  31,     2 * u.d,        None,           True,   [(2144.520, 2156.667), (2158.867, 2169.949)]),
 
-            ("CW Eri",  4,      1 * u.d,        False,      [slice(0, 5291, 1), slice(5291, 6274, 1), slice(6274, 14824, 1)]),
-            ("CW Eri",  4,      1 * u.d,        True,       [(1410.907, 1418.492), (1421.219, 1422.587), (1424.560, 1436.517)]),
+            ("CW Eri",  4,      1 * u.d,        None,           False,  [slice(0, 5291, 1), slice(5291, 6274, 1), slice(6274, 14824, 1)]),
+            ("CW Eri",  4,      1 * u.d,        None,           True,   [(1410.907, 1418.492), (1421.219, 1422.587), (1424.560, 1436.517)]),
 
-            ("CW Eri",  4,      3 * u.d,        False,      [slice(0, 14824, 1)]),
-            ("CW Eri",  4,      3 * u.d,        True,       [(1410.907, 1436.517)]),
+            ("CW Eri",  4,      3 * u.d,        None,           False,  [slice(0, 14824, 1)]),
+            ("CW Eri",  4,      3 * u.d,        None,           True,   [(1410.907, 1436.517)]),
+
+            ("CW Eri",  4,      1 * u.d,        1 * u.d,        False,  [slice(0, 5291, 1), slice(5291, 6274, 1), slice(6274, 14824, 1)]),
+            ("CW Eri",  4,      1 * u.d,    TimeDelta(1 * u.d), False,  [slice(0, 5291, 1), slice(5291, 6274, 1), slice(6274, 14824, 1)]),
+            ("CW Eri",  4,      1 * u.d,        1,              False,  [slice(0, 5291, 1), slice(5291, 6274, 1), slice(6274, 14824, 1)]),
+            ("CW Eri",  4,      1 * u.d,        2 * u.d,        False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
+            ("CW Eri",  4,      1 * u.d,        15 * u.d,       False,  [slice(0, 14824, 1)]),
+
+            ("CW Eri",  4,      1 * u.d,        1 * u.d,        True,   [(1410.907, 1418.492), (1421.219, 1422.587), (1424.560, 1436.517)]),
+            ("CW Eri",  4,      1 * u.d,        2 * u.d,        True,   [(1410.907, 1418.492), (1421.219, 1436.517)]),
+            ("CW Eri",  4,      1 * u.d,        15 * u.d,       True,   [(1410.907, 1436.517)]),
         ]:
-            msg = f"{target}-S{sector:02d}, threshold={min_gap_dur}, yield_times={yield_times}"
+            msg = f"{target}-S{sector:02d}, min_gap={min_gap_dur}, min_sec={min_sec_dur} yield_times={times}"
             with self.subTest(msg):
                 lc = lightcurve_helpers.load_lightcurves(target, [sector])[0]
 
                 segs = list(lightcurves.find_lightcurve_sections(lc=lc,
                                                                  min_gap_duration=min_gap_dur,
-                                                                 yield_times=yield_times))
+                                                                 min_section_duration=min_sec_dur,
+                                                                 yield_times=times))
 
                 print(f"{msg}:", ", ".join(str(s) if isinstance(s, slice) else f"[{s[0].btjd:.3f}, {s[1].btjd:.3f}]" for s in segs))
 
