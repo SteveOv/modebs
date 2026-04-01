@@ -371,17 +371,8 @@ def read_fitted_params_from_par_file(par_filename: Path,
     :params: the list of params to read (see _param_file_line_beginswith for those supported)
     :returns: a dict with the value and any associated error for those parameters found
     """
-    def yield_lines_after(filename: Path, magic: str):
-        with open(filename, mode="r", encoding="utf8") as par:
-            do_read = False
-            for line in par.readlines():
-                if do_read:
-                    yield line
-                elif magic in line:
-                    do_read = True
-
     return read_fitted_params_from_par_lines(
-        yield_lines_after(par_filename, "Final values of the parameters:"), params)
+        _yield_file_lines(par_filename, after="Final values of the parameters:"), params)
 
 
 def read_fitted_params_from_par_lines(par_lines: Iterable[str],
@@ -412,7 +403,8 @@ def read_fitted_params_from_par_lines(par_lines: Iterable[str],
 
 def read_warnings_from_par_file(par_filename: Path) -> List[str]:
     """
-    Parses the indicated JKTEBOP parameter output file (.par) returning a list of any warning lines.
+    Parses the indicated JKTEBOP parameter output file (.par) returning a list of any warning lines
+    that may be added with respect to the final output parameters.
 
     :par_filename: path of the file to read
     :returns: a List[str] of warning message lines with newlines appended
@@ -420,17 +412,30 @@ def read_warnings_from_par_file(par_filename: Path) -> List[str]:
     # Warnings start with '## Warning:'. The text of each warning can continue onto the next line
     # (again prefixed ##). We'll just treat them all as text & capture each line with the ## prefix.
     warn_re = re.compile(r"^\#\#\s*(.+)", re.MULTILINE)
-    with open(par_filename, mode="r", encoding="utf8") as par:
-        warn_lines = []
-        for par_line in par.readlines():
-            if match := warn_re.match(par_line):
-                warn_lines += [match.group(0) + "\n"]
-        return warn_lines
+    warn_lines = []
+    for line in _yield_file_lines(par_filename, after="Final values of the parameters:"):
+        if match := warn_re.match(line):
+            warn_lines += [match.group(0) + "\n"]
+    return warn_lines
 
 
 #
 # Private helper functions
 # pylint: disable=too-many-arguments
+def _yield_file_lines(filename: Path, after: str=None):
+    """
+    Yield the lines in the requested file. If the after arg is set,
+    lines are not yielded until after the first time this text appears.
+    """
+    with open(filename, mode="r", encoding="utf8") as rf:
+        do_read = after is None
+        for line in rf.readlines():
+            if do_read:
+                yield line
+            elif after in line:
+                do_read = True
+
+
 def _prepare_params_for_task(task: int,
                              params: dict,
                              fit_rA_and_rB: bool = False,
