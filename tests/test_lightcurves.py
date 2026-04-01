@@ -8,6 +8,7 @@ from io import StringIO
 # pylint: disable=no-member, wrong-import-position, line-too-long
 import numpy as np
 import astropy.units as u
+from astropy.time import Time
 import matplotlib.pyplot as plt
 
 from tests.helpers import lightcurve_helpers
@@ -84,6 +85,48 @@ class Testlightcurves(unittest.TestCase):
                 self.assertIn("Loaded previously cached search results", stdout_text)
                 self.assertEqual(len(exp_sectors), len(lcs))
                 self.assertListEqual(exp_sectors, list(lcs.sector))
+
+
+    #
+    #   find_lightcurve_segments(LightCurve, gap: TimeDelta, yield_times: bool) -> Generator:
+    #
+    def test_find_lightcurve_segment_happy(self):
+        """ Simple happy path test of find_lightcurve_segments() known LC """
+        # CW Eri S4 has 3 "contiguous" segments separated by gaps of 2.7 and 1.97 days (middle seg is only ~1.25 d long)
+        #   and S31 has 2 "contiguous" segments separated by a gap of 2.2 days
+        print()
+        for target,     sector, threshold,  yield_times,    exp_segs in [
+            ("CW Eri",  4,      2 * u.d,    False,          [slice(0, 5291, 1), slice(5291, 14824, 1)]),
+            ("CW Eri",  4,      48 * u.h,   False,          [slice(0, 5291, 1), slice(5291, 14824, 1)]),
+            ("CW Eri",  4,      2,          False,          [slice(0, 5291, 1), slice(5291, 14824, 1)]),
+
+            ("CW Eri",  4,      2 * u.d,    True,           [(1410.907, 1418.492), (1421.219, 1436.517)]),
+            ("CW Eri",  31,     2 * u.d,    True,           [(2144.520, 2156.667), (2158.867, 2169.949)]),
+
+            ("CW Eri",  4,      1 * u.d,    True,           [(1410.907, 1418.492), (1421.219, 1422.587), (1424.560, 1436.517)]),
+
+            ("CW Eri",  4,      3 * u.d,    True,           [(1410.907, 1436.517)]),
+        ]:
+            msg = f"{target}-S{sector:02d}, threshold={threshold}, yield_times={yield_times}"
+            with self.subTest(msg):
+                lc = lightcurve_helpers.load_lightcurves(target, [sector])[0]
+
+                segs = list(lightcurves.find_lightcurve_segments(lc, threshold, yield_times))
+
+                print(f"{msg}:", ", ".join(str(s) if isinstance(s, slice) else f"[{s[0].btjd:.3f}, {s[1].btjd:.3f}]" for s in segs))
+
+                self.assertEqual(len(exp_segs), len(segs))
+                for seg_ix, (exp_seg, seg) in enumerate(zip(exp_segs, segs)):
+                    if isinstance(exp_seg, slice):
+                        self.assertIsInstance(seg, slice)
+                        self.assertEqual(exp_seg, seg, f"Seg[{seg_ix}]")
+                    else: # Times
+                        for ix in [0, 1]:
+                            item = seg[ix]
+                            if isinstance(item, Time|u.Quantity):
+                                item = item.btjd
+                            self.assertAlmostEqual(exp_seg[ix], item, 3, f"Seg[{seg_ix}][{ix}]")
+
 
 
     #
