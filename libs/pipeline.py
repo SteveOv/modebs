@@ -151,6 +151,7 @@ def add_eclipse_meta_to_lightcurves(lcs: LightCurveCollection,
     Will find the times of all primary and secondary eclipses within the bounds of each
     passed LightCurve sector and the corresponding completeness metrics. These data will
     be added/updated in each LightCurves meta dictionary with the following keys:
+    - sector_times: a list containing a tuple of the (min, max) time in the sector
     - t0: a sector specific reference primary eclipse time based on the eclipses within sector
     - primary_times: an array of the times of any primary eclipses that fall within the sector
     - primary_completeness: an array of completeness values, each the proportion of fluxes
@@ -173,6 +174,10 @@ def add_eclipse_meta_to_lightcurves(lcs: LightCurveCollection,
         ecl_data = lightcurves.find_and_characterise_eclipses(lc, ref_t0, period,
                                                               widthp, widths, depthp, depths,
                                                               phis, search_window_phase, verbose)
+
+        # Stick the LC's min/max times as a tuple in a list as client code can always expect a list
+        # and list values are automatically concatenated when LightCurves are stitched.
+        lc.meta["sector_times"] = [(lc.time.min(), lc.time.max())]
 
         # We will use the revised/refined reference time as a starting position for the next sector
         ref_t0 = lc.meta["t0"] = ecl_data[0] or ref_t0

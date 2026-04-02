@@ -79,6 +79,7 @@ class Testpipeline(unittest.TestCase):
         for lc in lcs:
             # See test_lightcurves.test_find_eclipses_and_completeness_known_targets
             # for test which address the values
+            self.assertIn("sector_times", lc.meta)
             self.assertIn("t0", lc.meta)
             self.assertIn("primary_times", lc.meta)
             self.assertIn("primary_depths", lc.meta)
