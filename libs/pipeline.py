@@ -19,6 +19,9 @@ from astropy.time import Time
 from astropy.io import ascii as io_ascii
 from lightkurve import LightCurve, LightCurveCollection
 
+from keras import layers
+from ebop_maven.estimator import Estimator
+
 from deblib import limb_darkening
 from deblib.vmath import arccos, degrees
 
@@ -660,6 +663,23 @@ def fit_target_lightcurves(lcs: LightCurveCollection,
             fitted_params = pool.starmap(_fit_target, iter_params)
 
     return fitted_params
+
+
+def force_seed_on_dropout_layers(estimator: Estimator, seed: int=42):
+    """
+    Forces a seed onto the dropout layers of the model wrapped by the passed Estimator.
+    Setting this is a way of making subsequent MC Dropout predictions repeatable.
+    Definitely not for "live" but may be useful for testing where repeatability is required.
+    
+    :estimator: the estimator to modify
+    :seed: the new seed value to assign
+    """
+    # pylint: disable=protected-access
+    dropout_layers = (l for l in estimator._model.layers if isinstance(l, layers.Dropout))
+    for ix, layer in enumerate(dropout_layers, start=1):
+        sg = layer.seed_generator
+        new_seed = sg.backend.convert_to_tensor(np.array([0, seed*ix], dtype=sg.state.dtype))
+        sg.state.assign(new_seed)
 
 
 def _create_lc_std_further_process_cmds(lc: LightCurve) -> List[str]:

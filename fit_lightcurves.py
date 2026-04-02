@@ -66,7 +66,7 @@ if __name__ == "__main__":
                     help="json file containing the details of the targets to fit")
     ap.add_argument("-pf", "--plot-figs", dest="plot_figs", action="store_true", required=False,
                     help="plot figs for each target as the process progresses")
-    ap.set_defaults(plot_figs=False, figs_type="png", figs_dpi=100)
+    ap.set_defaults(plot_figs=False, is_testing=True, figs_type="png", figs_dpi=100)
     args = ap.parse_args()
     drop_dir = Path.cwd() / f"drop/{args.targets_file.stem}"
     args.working_set_file = drop_dir / "working-set.table"
@@ -277,6 +277,9 @@ if __name__ == "__main__":
                     binned_fold[ix] = lightcurves.get_binned_phase_mags_data(flc, bins, wrap_phase)
 
                 print("\nEstimating fitting input parameters with EBOP MAVEN.")
+                if args.is_testing:
+                    print("Testing flagged. Fixing the estimator's seed for repeatable predictions")
+                    pipeline.force_seed_on_dropout_layers(estimator, 42)
                 preds = estimator.predict(binned_fold[:, 1], iterations=1000)
                 preds_dict = pipeline.predictions_to_mean_dict(preds, True, "inc")
                 print(("Mean predicted" if preds.size > 1 else "Predicted"), "parameters",
