@@ -59,9 +59,6 @@ exclude_tics = {
     393491149: "too close for JKTEBOP (rA+rB ~ 0.5, morph 0.595)",
 }
 
-# Too shallow (review depth criteria)
-exclude_tics |= { 4783257: "TBC" }
-
 # These may be excluded by selection criteria but are included as they're known to fit
 include_tics = {
     # pylint: disable=line-too-long
