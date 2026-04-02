@@ -95,53 +95,62 @@ class Testlightcurves(unittest.TestCase):
         # CW Eri S4 has 3 "contiguous" sections separated by gaps of 2.7 and 1.97 days
         # (middle one is only ~1.25 d long) and S31 has 2 sections separated by a gap of 2.2 days
         print()
-        for target,     sector, min_gap_dur,    min_sec_dur,    times,  exp_segs in [
-            ("CW Eri",  4,    TimeDelta(2*u.d), None,           False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
-            ("CW Eri",  4,      2 * u.d,        None,           False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
-            ("CW Eri",  4,      48 * u.h,       None,           False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
-            ("CW Eri",  4,      2,              None,           False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
+        for target, sector, min_gap_dur, min_sec_dur, max_secs, times,  exp_segs in [
+            # Test the effect of min_gap_dur; expected to only creation sections where the split is <= this
+            ("CW Eri",  4, TimeDelta(2*u.d),None,       None,   False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
+            ("CW Eri",  4,  2 * u.d,        None,       None,   False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
+            ("CW Eri",  4,  48 * u.h,       None,       None,   False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
+            ("CW Eri",  4,  2,              None,       None,   False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
 
-            ("CW Eri",  4,      2 * u.d,        None,           True,   [(1410.907, 1418.492), (1421.219, 1436.517)]),
-            ("CW Eri",  31,     2 * u.d,        None,           True,   [(2144.520, 2156.667), (2158.867, 2169.949)]),
+            ("CW Eri",  4,  2 * u.d,        None,       None,   True,   [(1410.907, 1418.492), (1421.219, 1436.517)]),
+            ("CW Eri",  31, 2 * u.d,        None,       None,   True,   [(2144.520, 2156.667), (2158.867, 2169.949)]),
 
-            ("CW Eri",  4,      1 * u.d,        None,           False,  [slice(0, 5291, 1), slice(5291, 6274, 1), slice(6274, 14824, 1)]),
-            ("CW Eri",  4,      1 * u.d,        None,           True,   [(1410.907, 1418.492), (1421.219, 1422.587), (1424.560, 1436.517)]),
+            ("CW Eri",  4,  1 * u.d,        None,       None,   False,  [slice(0, 5291, 1), slice(5291, 6274, 1), slice(6274, 14824, 1)]),
+            ("CW Eri",  4,  1 * u.d,        None,       None,   True,   [(1410.907, 1418.492), (1421.219, 1422.587), (1424.560, 1436.517)]),
 
-            ("CW Eri",  4,      3 * u.d,        None,           False,  [slice(0, 14824, 1)]),
-            ("CW Eri",  4,      3 * u.d,        None,           True,   [(1410.907, 1436.517)]),
+            ("CW Eri",  4,  3 * u.d,        None,       None,   False,  [slice(0, 14824, 1)]),
+            ("CW Eri",  4,  3 * u.d,        None,       None,   True,   [(1410.907, 1436.517)]),
 
-            ("CW Eri",  4,      1 * u.d,        1 * u.d,        False,  [slice(0, 5291, 1), slice(5291, 6274, 1), slice(6274, 14824, 1)]),
-            ("CW Eri",  4,      1 * u.d,    TimeDelta(1 * u.d), False,  [slice(0, 5291, 1), slice(5291, 6274, 1), slice(6274, 14824, 1)]),
-            ("CW Eri",  4,      1 * u.d,        1,              False,  [slice(0, 5291, 1), slice(5291, 6274, 1), slice(6274, 14824, 1)]),
-            ("CW Eri",  4,      1 * u.d,        2 * u.d,        False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
-            ("CW Eri",  4,      1 * u.d,        15 * u.d,       False,  [slice(0, 14824, 1)]),
+            # Test the effect of min_sector_duration; expect to affect the number of sections & their duration
+            ("CW Eri",  4,  1 * u.d,        1 * u.d,    None,   False,  [slice(0, 5291, 1), slice(5291, 6274, 1), slice(6274, 14824, 1)]),
+            ("CW Eri",  4,  1 * u.d, TimeDelta(1 * u.d),None,   False,  [slice(0, 5291, 1), slice(5291, 6274, 1), slice(6274, 14824, 1)]),
+            ("CW Eri",  4,  1 * u.d,        1,          None,   False,  [slice(0, 5291, 1), slice(5291, 6274, 1), slice(6274, 14824, 1)]),
+            ("CW Eri",  4,  1 * u.d,        2 * u.d,    None,   False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
+            ("CW Eri",  4,  1 * u.d,        15 * u.d,   None,   False,  [slice(0, 14824, 1)]),
+            ("CW Eri",  4,  1 * u.d,        2 * u.d,    None,   True,   [(1410.907, 1418.492), (1421.219, 1436.517)]),
 
-            ("CW Eri",  4,      1 * u.d,        1 * u.d,        True,   [(1410.907, 1418.492), (1421.219, 1422.587), (1424.560, 1436.517)]),
-            ("CW Eri",  4,      1 * u.d,        2 * u.d,        True,   [(1410.907, 1418.492), (1421.219, 1436.517)]),
-            ("CW Eri",  4,      1 * u.d,        15 * u.d,       True,   [(1410.907, 1436.517)]),
+            # Test the effect of max_sectors; expect no more sections but possibly fewer depending on other criteria
+            ("CW Eri",  4,  1 * u.d,        None,       4,      False,  [slice(0, 5291, 1), slice(5291, 6274, 1), slice(6274, 14824, 1)]),
+            ("CW Eri",  4,  1 * u.d,        None,       3,      False,  [slice(0, 5291, 1), slice(5291, 6274, 1), slice(6274, 14824, 1)]),
+            ("CW Eri",  4,  1 * u.d,        None,       2,      False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
+            ("CW Eri",  4,  1 * u.d,        None,       1,      False,  [slice(0, 14824, 1)]),
+            ("CW Eri",  4,  1 * u.d,        None,       0,      False,  [slice(0, 14824, 1)]),
+            ("CW Eri",  4,  1 * u.d,        2 * u.d,    4,      False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
+            ("CW Eri",  4,  2 * u.d,        None,       4,      False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
+            ("CW Eri",  4,  1 * u.d,        None,       2,      True,   [(1410.907, 1418.492), (1421.219, 1436.517)]),
         ]:
-            msg = f"{target}-S{sector:02d}, min_gap={min_gap_dur}, min_sec={min_sec_dur} yield_times={times}"
+            msg = f"{target}-S{sector:02d}, min_gap={min_gap_dur}, min_sec={min_sec_dur}, max_secs={max_secs}, yield_times={times}"
             with self.subTest(msg):
                 lc = lightcurve_helpers.load_lightcurves(target, [sector])[0]
 
                 segs = list(lightcurves.find_lightcurve_sections(lc=lc,
                                                                  min_gap_duration=min_gap_dur,
                                                                  min_section_duration=min_sec_dur,
+                                                                 max_sections=max_secs,
                                                                  yield_times=times))
 
-                print(f"{msg}:", ", ".join(str(s) if isinstance(s, slice) else f"[{s[0].btjd:.3f}, {s[1].btjd:.3f}]" for s in segs))
+                print(f"{msg} =>", ", ".join(str(s) if isinstance(s, slice) else f"[{s[0].btjd:.3f}, {s[1].btjd:.3f}]" for s in segs))
 
                 self.assertEqual(len(exp_segs), len(segs))
                 for seg_ix, (exp_seg, seg) in enumerate(zip(exp_segs, segs)):
-                    if isinstance(exp_seg, slice):
-                        self.assertIsInstance(seg, slice)
-                        self.assertEqual(exp_seg, seg, f"Seg[{seg_ix}]")
-                    else: # Times
+                    if times: # Expect Times
                         for ix in [0, 1]:
                             item = seg[ix]
-                            if isinstance(item, Time|u.Quantity):
-                                item = item.btjd
-                            self.assertAlmostEqual(exp_seg[ix], item, 3, f"Seg[{seg_ix}][{ix}]")
+                            self.assertIsInstance(item, Time, f"seg[{seg_ix}][{ix}] as a Time")
+                            self.assertAlmostEqual(exp_seg[ix], item.btjd, 3, f"seg[{seg_ix}][{ix}]")
+                    else: # should default to slices
+                        self.assertIsInstance(seg, slice)
+                        self.assertEqual(exp_seg, seg, f"Seg[{seg_ix}]")
 
 
     #
