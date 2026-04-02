@@ -178,6 +178,26 @@ if __name__ == "__main__":
                                                           min_section_dur=min_section_dur)
 
 
+                # Split the LCs on significant gaps if the period is sufficiently short that we can
+                # maintain good coverage. Gives a larger sample of fits from which to derive params.
+                if not config.do_not_split:
+                    new_lcs, min_gap, min_sec = [], 0.25 * u.d, nominal_value(period) * 3.0 * u.d
+                    for lc in lcs:
+                        sls = [*lightcurves.find_lightcurve_sections(lc, min_gap_duration=min_gap,
+                                                                     min_section_duration=min_sec)]
+                        if len(sls) > 1:
+                            for ix, sl in enumerate(sls, start=1):
+                                new_lcs += [lc.copy(True)[sl]]
+                                new_lcs[-1].sector += ix/10
+                        else:
+                            new_lcs += [lc]
+                    if len(new_lcs) > len(lcs):
+                        print(f"\nSplitting {len(lcs)} LC(s) into sections at least {min_sec:.6f}",
+                              f"(period * 3) long & separated by gaps >= {min_gap},",
+                              f"increasing those to be fitted to {len(new_lcs)}.")
+                        lcs = lightcurves.LightCurveCollection(new_lcs)
+
+
                 print("\nInspecting the lightcurves to find and characterise their eclipses")
                 pipeline.add_eclipse_meta_to_lightcurves(lcs, t0, period, widthP, widthS,
                                                          depthP, depthS, phiS, verbose=True)
@@ -186,7 +206,7 @@ if __name__ == "__main__":
                 if args.plot_figs:
                     print("\nCreating plot of the lightcurves with the eclipses marked.")
                     lc_plot_cols = min(len(lcs), 3) if len(lcs) < 12 else 4
-                    ax_titles=[f"S{l.sector:02d} ({l.meta['FLUX_ORIGIN']} @ {l.meta['FRAMETIM']*l.meta['NUM_FRM']} s)" for l in lcs] # pylint: disable=line-too-long
+                    ax_titles=[f"S{l.sector} ({l.meta['FLUX_ORIGIN']} @ {l.meta['FRAMETIM']*l.meta['NUM_FRM']} s)" for l in lcs] # pylint: disable=line-too-long
                     fig = plots.plot_lightcurves(lcs, "flux", normalize_lcs=True, cols=lc_plot_cols,
                                                  ax_func=indicate_eclipses, ax_titles=ax_titles)
                     fig.savefig(figs_dir / f"lcs-parsed.{args.figs_type}", dpi=args.figs_dpi)

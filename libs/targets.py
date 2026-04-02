@@ -15,6 +15,7 @@ _default_target_config_defaults = {
     "sectors": None,
     "exclude_sectors": None,
     "quality_masks": [],
+    "do_not_split": None,
     "do_not_stitch": None,
     "detrend_gap_threshold": 0.5,
     "detrend_poly_degree": 1,
