@@ -643,7 +643,7 @@ def fit_target_lightcurves(lcs: LightCurveCollection,
                     read_keys,
                     fit_stem,
                     lc.meta.get("clip_mask", None),
-                    _create_lc_std_further_process_cmds(lc, in_params["period"]),
+                    _create_lc_std_further_process_cmds(lc),
                     max_attempts,
                     timeout,
                     hold_stdout) \
@@ -662,21 +662,16 @@ def fit_target_lightcurves(lcs: LightCurveCollection,
     return fitted_params
 
 
-def _create_lc_std_further_process_cmds(lc: LightCurve, period: Union[float, UFloat]) -> List[str]:
+def _create_lc_std_further_process_cmds(lc: LightCurve) -> List[str]:
     """
     Creates a standard set of JKTEBOP processing instructions for appending to an in file.
     The instructions set up poly fits for scale factor and chi^sq adjustment
 
     :lc: the source LightCurve
-    :period: the known orbital period of the system, for use in deciding how many segments to fit
     :returns: the list of processing instructions
     """
-    if nominal_value(period) < 15 and "sector_times" in lc.meta:
-        _sf_segs = lc.meta["sector_times"]
-    else: # unless long period where there may be too few eclipses per sector
-        _sf_segs = [(lc.time.min(), lc.time.max())]
-
-    return [""] + jktebop.build_poly_instructions(_sf_segs, "sf", 1) + ["", "chif", ""]
+    sf_segs = lc.meta.get("sector_times", [(lc.time.min(), lc.time.max())])
+    return [""] + jktebop.build_poly_instructions(sf_segs, "sf", 1) + ["", "chif", ""]
 
 
 def _fit_target(time: ArrayLike,
