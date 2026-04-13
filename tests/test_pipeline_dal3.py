@@ -32,12 +32,10 @@ class TestQTableFileDal3(unittest.TestCase):
 
         dal = QTableFileDal3(test_file)
 
-        this_lock_id = f"{gethostname()}:{getpid()}"
-
         # Atomic adds don't require the lock semantics
         dal.add_row("AN Cam", fitted_lcs=True, fitted_sed=False, fitted_masses=False)
         dal.add_row("AN Other", locked_by="AN Other", fitted_lcs=False, fitted_sed=False, fitted_masses=False)
-        dal.add_row("CW Eri", locked_by=this_lock_id, fitted_lcs=False, fitted_sed=False, fitted_masses=False)
+        dal.add_row("CW Eri", locked_by=dal.lock_id, fitted_lcs=False, fitted_sed=False, fitted_masses=False)
         dal.add_row("ZZ Boo", fitted_lcs=False, fitted_sed=False, fitted_masses=False)
         dal.add_row("ZZ UMa", fitted_lcs=False, fitted_sed=True, fitted_masses=False)
 
@@ -46,7 +44,13 @@ class TestQTableFileDal3(unittest.TestCase):
             self.assertNotIn(row.key, ["AN Cam", "ZZ UMa"])
             row.fitted_lcs = True
             row.Teff_sys = ufloat(5750, 50)
+            row["logg_sys"] = ufloat(4.0, 0.1)
 
         for row in dal.acquire_next_row(fitted_lcs=True, fitted_sed=False, fitted_masses=False):
             print(row.key)
             print(row.Teff_sys)
+            print(row.logg_sys)
+
+        for row in dal.acquire_row_by_key("CW Eri"):
+            row.search_term = "V* CW Eri"
+

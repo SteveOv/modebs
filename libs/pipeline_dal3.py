@@ -8,6 +8,8 @@ from contextlib import AbstractContextManager as _AbstractContextManager
 from warnings import warn as _warn
 from threading import RLock as _RLock
 from os import getpid as _getpid
+from inspect import stack as _stack, getmodule as _getmodule
+from inspect import getsourcefile as _getsourcefile, getfullargspec as _getfullargspec
 from socket import gethostname as _gethostname
 
 import numpy as _np
@@ -26,14 +28,13 @@ class DalDataRow(_AbstractContextManager):
     to the underlying data store, via the persist_func, on leaving the current context (__exit__).
     """
 
-    _locked_by_len = 20
+    _locked_by_len = 30
 
     # Field definitions. These are in numpy name/dtype format which works directly
     # on astropy tables. Other storage mechanisms will need to interpret these.
     _storage_schema = [
         # Primary Key
         ("target_id", "<U14"),
-        ("locked_by", f"<U{_locked_by_len}"),
         # SIMBAD and IDs
         ("search_term", "<U20"),
         ("tics", "<U40"),
@@ -119,6 +120,7 @@ class DalDataRow(_AbstractContextManager):
         ("fitted_lcs", bool),
         ("fitted_sed", bool),
         ("fitted_masses", bool),
+        ("locked_by", f"<U{_locked_by_len}"),
         ("warnings", object),
         ("errors", object)
     ]
@@ -195,6 +197,11 @@ class DalDataRow(_AbstractContextManager):
             return (col in self._values.dtype.names) and (col not in self._hidden_cols or [])
         return False
 
+    def set_values(self, **kwargs):
+        """ Sets the value of multiple cols in single call. """
+        for c, v in kwargs.items():
+            self[c] = v
+
     def __getattr__(self, col: str) -> any:
         """
         Handles the default behaviour for attributes. Gets the value of the correspondingly
@@ -212,6 +219,10 @@ class DalDataRow(_AbstractContextManager):
                 return _ufloat(val, self._parse_value_func(err_col, self._values[err_col]))
             return val
         raise AttributeError(name=col, obj=self)
+
+    def __getitem__(self, col):
+        """ Get a column's value using row['col_name'] syntax """
+        return self.__getattr__(col)
 
     def __setattr__(self, col: str, value):
         """
@@ -248,6 +259,10 @@ class DalDataRow(_AbstractContextManager):
         else:
             raise AttributeError(name=col, obj=self)
 
+    def __setitem__(self, col, value):
+        """ Set a column value with the row['col_name'] = new_value syntax. """
+        self.__setattr__(col, value)
+
     def __exit__(self, exc_type, exc_value, traceback):
         self._persist_func(self._values[self._hidden_cols + self._dirty_cols])
         return super().__exit__(exc_type, exc_value, traceback)
@@ -258,8 +273,6 @@ class Dal3(_ABC):
     Base data access layer (Dal) for reading/writing simple table data via a generator
     which yields and locks the next available row matching the selected criteria.
     """
-    # Belt and braces: send writes interactions through a critical section
-    _WRITE_LOCK = _RLock()
 
     def __init__(self, key_col: str="target_id", lock_col: str="locked_by"):
         """
@@ -270,12 +283,21 @@ class Dal3(_ABC):
         """
         self._key_col: str = key_col
         self._lock_col: str = lock_col
+
+        client_name = self.__class__.__name__
+        this_file = _getsourcefile(lambda:0)
+        for frameinfo in _stack():
+            if (module := _getmodule(frameinfo.frame)) is not None and module.__file__ != this_file:
+                client_name = _Path(module.__file__).stem
+                break
+        self._lock_id = f"{_gethostname()}/{client_name}/{_getpid()}"[-DalDataRow._locked_by_len:]
+
         super().__init__()
 
     @property
     def lock_id(self) -> str:
         """ Return the id with which this instance locks rows. """
-        return f"{_gethostname()}:{_getpid()}"
+        return self._lock_id
 
     def acquire_next_row(self, **where) -> _Generator[DalDataRow, any, None]:
         """
@@ -298,6 +320,23 @@ class Dal3(_ABC):
                 # The write_func will be called to persist any changes when we exit this context.
                 yield row
 
+    def acquire_row_by_key(self, key: str) -> _Generator[DalDataRow, any, None]:
+        """
+        Yields the row with the requested key if it is currently unlocked. A lock will be placed
+        on the row which will be released when the row is persisted as it exits the current context.
+
+        This method is for use when setting up new data rows, otherwise use acquire_next_row().
+        Even though this func yields only 0 or 1 rows you should use it in a for loop as it allows
+        the row's context manager to do its magic, saving any changes as the row leaves the context.
+        Changes to the data may not be persisted to storage if used with next() or similar syntax.
+        """
+        yield from self.acquire_next_row(**dict([(self._key_col, key)]))
+
+    def count_where(self, **where) -> int:
+        """ Gets the current number of rows matching the passed where criteria. """
+        # This is a sub-optimal default implementation. Ideally we override this in subclasses.
+        return len(list(self.acquire_next_row(**where)))
+
     def _parse_col_value(self, col, value):
         """ Any additional parsing required to interpret values """
         # pylint: disable=unused-argument
@@ -319,6 +358,9 @@ class Dal3(_ABC):
 class QTableDal3(Dal3):
     """ Pipeline Dal for reading/writing of an in memory astropy QTable """
 
+    # Belt and braces: we send writes & reads through a critical section to guard for inconsistency
+    _CLIENT_LOCK = _RLock()
+
     def __init__(self):
         """
         Initializes the QTableDal Dal class which uses an in memory astropy QTable for storage.
@@ -331,35 +373,40 @@ class QTableDal3(Dal3):
                               rows=[])
         self._table.add_index(self._key_col, unique=True)
 
+    def count_where(self, **where) -> int:
+        with self._CLIENT_LOCK:
+            return sum(all(self._parse_col_value(c, row[c]) == v for c, v in where.items()) \
+                        for row in self._table)
+
     def add_row(self, key, **values):
-        with self._WRITE_LOCK:
+        with self._CLIENT_LOCK:
             # This will raise a ValueError if a row with the same key already exists.
             self._table.add_row({ self._key_col: key } | values)
 
     def _lock_and_yield_data_rows(self, **where):
-        with self._WRITE_LOCK:
+        with self._CLIENT_LOCK:
             # Yes, it's a table scan but the table is in memory and not expected to be large.
-            usable_lock_vals = (None, "", "None", self.lock_id)
+            usable_lock_vals = (None, "", "None", self._lock_id)
             for row in self._table:
-                test_vals = [self._parse_col_value(wcol, row[wcol]) for wcol in where]
-                if all((tval == wval) or (wcol == self._lock_col and tval in usable_lock_vals) \
-                                    for tval, (wcol, wval) in zip(test_vals, where.items())):
-                    row[self._lock_col] = self.lock_id
+                test_vals = [self._parse_col_value(c, row[c]) for c in where]
+                if all((tval == wval) or (c == self._lock_col and tval in usable_lock_vals) \
+                                        for tval, (c, wval) in zip(test_vals, where.items())):
+                    row[self._lock_col] = self._lock_id
                     yield row
 
     def _update_and_release_row(self, values: _ArrayLike):
-        with self._WRITE_LOCK:
+        with self._CLIENT_LOCK:
             # Will throw a KeyError if key is unknown, although this should not be possible
             key = values[self._key_col]
             row_ix = self._table.loc_indices[key]
 
-            if self._table[row_ix][self._lock_col] == self.lock_id:
+            if self._table[row_ix][self._lock_col] == self._lock_id:
                 wcols = (c for c in values.dtype.names if c not in [self._key_col, self._lock_col])
                 for col in wcols:
                     self._table[row_ix][col] = values[col]
 
                 # release the storage row
-                self._table[row_ix][self._lock_col] = None
+                self._table[row_ix][self._lock_col] = ""
             else:
                 raise ValueError(f"Cannot write to row with key={key}." +
                                  " It's not locked by this client instance.")
@@ -380,7 +427,7 @@ class QTableFileDal3(QTableDal3):
     def __init__(self,
                  file: _Union[str, _Path],
                  file_format: str="ascii.fixed_width_two_line",
-                 **file_format_kwargs):
+                 file_format_kwargs: dict[str, any] = None):
         """
         Initializes the QTableDal Dal class, associating it with a file in which to permanently
         store its data.
@@ -400,8 +447,9 @@ class QTableFileDal3(QTableDal3):
 
         :file: the file name of the storage file
         :file_format: the format of the file
-        :file_format_kwargs: optional kwargs specific to each file_format
+        :file_format_kwargs: optional set of kwargs specific to each file_format
         """
+        file_format_kwargs = file_format_kwargs or { }
         if file_format == "ascii.fixed_width_two_line" and "header_rows" not in file_format_kwargs:
             file_format_kwargs["header_rows"] = ["name", "dtype", "unit"]
 
@@ -409,22 +457,69 @@ class QTableFileDal3(QTableDal3):
         self._format = file_format
         self._format_kwargs = file_format_kwargs
 
-        with self._WRITE_LOCK:
+        with self._CLIENT_LOCK:
             # Inits a new in-memory table to be saved later, once data/changes are written to it
             super().__init__()
-            if file.exists():
-                print(f"Loading data file '{file.name}' as {file_format}/{file_format_kwargs}")
+            if self._file.exists():
+                print(f"Loading from '{self._file.name}' as {self._format}/{self._format_kwargs}")
                 self._table = _QTable.read(self._file, format=self._format, **self._format_kwargs)
-                self._table.add_index(self.key_name, unique=True)
+                self._table.add_index(self._key_col, unique=True)
             else:
                 # Cannot save the file immediately as we get a ValueError thrown with the message
                 # "max() arg is an empty sequence" from within astropy. Probably because there is no
                 # data yet and astropy isn't checking some list contents exist before calling max().
-                print(f"New data file '{file.name}', as {file_format}/{file_format_kwargs},",
+                print(f"New data file '{self._file.name}' as {self._format}/{self._format_kwargs}",
                       "will be created when values are first written to it.")
 
+    def _write_state_to_file(self):
+        """ (Over-)write this instance's in memory QTable to the storage file. """
+        self._table.write(self._file, overwrite=True, format=self._format, **self._format_kwargs)
+
+    def _lock_and_yield_data_rows(self, **where):
+        # Write the table file when locking each row so that the lock is visible while in place.
+        for row in super()._lock_and_yield_data_rows(**where):
+            self._write_state_to_file()
+            yield row
+
     def _update_and_release_row(self, values: _ArrayLike):
-        with self._WRITE_LOCK:
+        with self._CLIENT_LOCK:
             # First update the in table as held in memory, then write the whole thing to the file
             super()._update_and_release_row(values)
-            self._table.write(self._file, overwrite=True, format=self._format,**self._format_kwargs)
+            self._write_state_to_file()
+
+
+def create_dal(typename: _Union[str, type[Dal3]], **kwargs):
+    """
+    A factory method for creating a named Dal instance.
+
+    :typename: the dal type to create
+    :kwargs: the arguments with which to initialize the dal (specific to the type of dal)
+    :returns: the resulting initialized instance
+    """
+    dal_type = None
+    if isinstance(typename, str):
+        def get_subclasses(superclass):
+            for subclass in superclass.__subclasses__():
+                yield subclass
+                yield from get_subclasses(subclass)
+
+        possible_names = [typename.casefold(), typename.casefold() + "dal3"]
+        for subclass in get_subclasses(Dal3):
+            if subclass.__name__.casefold() in possible_names:
+                dal_type = subclass
+                break
+    elif issubclass(typename, Dal3):
+        dal_type = typename
+
+    if dal_type is None:
+        raise KeyError(f"No Dal type like {dal_type} was found.")
+    if _ABC in dal_type.__bases__:
+        # Must be careful with this check as we only ensuring the type is not itself abstract.
+        # For this, __bases__ is better than issubclass() as it only looks at direct base types.
+        raise ValueError(f"Cannot initialize the abstract class {dal_type.__name__}")
+
+    # Ignore kwargs not used by the type's __init__ otherwise we may get a TypeError. This allows
+    # calling code to send a superset of potential kwargs to this func & it will use what is needed.
+    argspec = _getfullargspec(dal_type.__init__)
+    expected_kwargs = { k: v for k, v in kwargs.items() if k in argspec.args and k not in ["self"] }
+    return dal_type(**expected_kwargs)
