@@ -12,6 +12,9 @@ emcee
 corner
 h5py
 
+# Used for MariaDbTableDal type. You may be able to comment this out if not needed.
+mariadb
+
 # Astropy affiliated lib for interacting with virtual observatory protocols
 pyvo
 

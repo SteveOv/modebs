@@ -1,6 +1,6 @@
 """ Data access components for reading/writing pipeline progress """
 # pylint: disable=no-member
-from typing import Union as _Union, List as _List
+from typing import Union as _Union, List as _List, Dict as _Dict
 from typing import Callable as _Callable, Generator as _Generator
 from pathlib import Path as _Path
 from abc import ABC as _ABC, abstractmethod as _abstractmethod
@@ -11,6 +11,8 @@ from os import getpid as _getpid
 from inspect import stack as _stack, getmodule as _getmodule
 from inspect import getsourcefile as _getsourcefile, getfullargspec as _getfullargspec
 from socket import gethostname as _gethostname
+import re as _re
+import mariadb as _mariadb
 
 import numpy as _np
 from numpy.typing import ArrayLike as _ArrayLike
@@ -355,7 +357,7 @@ class Dal3(_ABC):
         return value
 
     @_abstractmethod
-    def add_row(self, key: str, **values):
+    def add_row(self, key: str, **cols_and_values):
         """ Add a new row with the indicated unique key and col/value pairs"""
 
     @_abstractmethod
@@ -387,13 +389,14 @@ class QTableDal3(Dal3):
 
     def count_where(self, **where) -> int:
         with self._CLIENT_LOCK:
+            # TODO: we should also evaluate whether these are lockable (to be consistent with DB)
             return sum(all(self._parse_col_value(c, row[c]) == v for c, v in where.items()) \
                         for row in self._table)
 
-    def add_row(self, key, **values):
+    def add_row(self, key, **cols_and_values):
         with self._CLIENT_LOCK:
             # This will raise a ValueError if a row with the same key already exists.
-            self._table.add_row({ self._key_col: key } | values)
+            self._table.add_row({ self._key_col: key } | cols_and_values)
 
     def _lock_and_yield_data_rows(self, **where):
         with self._CLIENT_LOCK:
@@ -439,7 +442,7 @@ class QTableFileDal3(QTableDal3):
     def __init__(self,
                  file: _Union[str, _Path],
                  file_format: str="ascii.fixed_width_two_line",
-                 file_format_kwargs: dict[str, any] = None):
+                 file_format_kwargs: _Dict[str, any] = None):
         """
         Initializes the QTableDal Dal class, associating it with a file in which to permanently
         store its data.
@@ -499,6 +502,178 @@ class QTableFileDal3(QTableDal3):
             super()._update_and_release_row(values)
             self._write_state_to_file()
 
+class MariaDbTableDal(Dal3):
+    """ Pipeline Dal for storing data in a MariaDB Table """
+    # Used to parse the "<U##" style dtype declarations in the schema for table length
+    _u_str_pattern = _re.compile(r"(?:<|)U(?P<len>\d*)", _re.IGNORECASE)
+
+    def __init__(self, db_config: _Dict[str, any], table_name: str="working_set", ):
+        """
+        Initializes the MariaDBTableDal class, associating it with the database instance
+        and table which is storing the data.
+
+        Values are stored in the underlying data file in columns named for the param names used.
+        This Dal also supports reading/writing UFloats and expects the nominal and std_dev
+        components to be split across pairs of columns named as [param] and [param]_err.
+
+        This is not thread safe nor is it robust enough to be used where multiple clients expected.
+        There is no locking mechanism so it will happily overwrite updates from elsewhere. If you
+        need multiple clients, large datasets or more durable storage, use a "real" database Dal.
+
+        :database_url: a MariaDB url style connection string
+        :table_name: the name of the table
+        """
+        self._db_config = db_config
+        self._table_name = table_name
+        with _mariadb.connect(**self._db_config) as conn:
+            self.create_working_set_table(conn, table_name, exists_ok=True)
+        super().__init__()
+
+    @classmethod
+    def create_working_set_table(cls,
+                                 conn: _mariadb.Connection,
+                                 table_name: str,
+                                 exists_ok: bool=True):
+        """
+        Creates the requested working set table.
+        Assumes the connection is open and the database name has been set.
+
+        :conn: the connection to use
+        :table_name: the name of the table
+        :exists_ok: whether to suppress an error if the table exists (it will not be overwritten)
+        """
+        with conn.cursor() as cursor:
+            # TODO: add a unique index (with null) to the locked_by col
+
+            # Build the table creation DDL
+            # If exists_ok is False and the table exists we expect an 1050 same name exists error
+            ddl = "CREATE TABLE IF NOT EXISTS" if exists_ok else "CREATE TABLE"
+            ddl += f" `{table_name}` (\n\ttarget_id VARCHAR(14) PRIMARY KEY"
+
+            schema = DalDataRow._storage_schema # pylint: disable=protected-access
+            for field_name, dtype in [(f, d) for f, d in schema if f not in ["target_id"]]:
+                field_dbtype = ""
+                if isinstance(dtype, str):
+                    # These are expected to be in the form "<U##" where ## is the length
+                    match = cls._u_str_pattern.match(dtype)
+                    if match is not None and "len" in match.groupdict():
+                        field_dbtype = f"VARCHAR({match.group('len')}) NULL"
+                elif dtype is int:
+                    field_dbtype = "INT NULL"
+                elif dtype is float:
+                    field_dbtype = "FLOAT NULL"
+                elif dtype is bool:
+                    field_dbtype = "BOOL NOT NULL DEFAULT False"
+                elif dtype is object:
+                    field_dbtype = "LONG VARCHAR NULL"
+
+                if len(field_dbtype) > 0:
+                    ddl += f",\n\t`{field_name}` " + field_dbtype
+                else:
+                    raise ValueError(f"unexpected schema field {field_name} dtype of {dtype}")
+            ddl += "\n)"
+
+            cursor.execute(ddl)
+            conn.commit()
+
+    @classmethod
+    def _does_working_set_table_exist(cls, conn: _mariadb.Connection, table_name: str) -> bool:
+        """
+        Indicates whether the requested working set table exists
+        """
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME=?;",
+                           data=(table_name, ))
+            return cursor.rowcount > 0
+
+    def count_where(self, **where) -> int:
+        return len(self._list_keys_where(**where))
+
+    def add_row(self, key: str, **cols_and_values):
+        with _mariadb.connect(**self._db_config) as conn, conn.cursor() as cursor:
+            sql = f"INSERT INTO `{self._table_name}` " \
+                + f"(`{self._key_col}`," + ",".join(f"`{k}`" for k in cols_and_values) + ") "\
+                + "VALUES (?," + ",".join(["?"]*len(cols_and_values)) + ")"
+            cursor.execute(sql, data=tuple([key] + list(cols_and_values.values())))
+            conn.commit()
+
+    def _lock_and_yield_data_rows(self, **where) -> _Generator[_ArrayLike, any, None]:
+        # Snapshot of row keys which are currently suitable
+        for key in self._list_keys_where(**where):
+            db_table = f"{self._db_config['database']}.{self._table_name}"
+            wcols = [c for c in where if c not in [self._lock_col]]
+            wvals = [where[c] for c in wcols]
+
+            with _mariadb.connect(**self._db_config) as conn, conn.cursor() as cursor:
+                conn.autocommit = True
+                cursor.buffered = False
+                cursor.execute(f"SET @lock_id='{self._lock_id}';")
+
+                # Initial row selection using the the where clause(s) which set the @key variable.
+                # With a "for update" lock for duration of this transaction.
+                sql = f"SELECT T.`{self._key_col}` INTO @key FROM {db_table} AS T " + \
+                        f"WHERE T.`{self._key_col}`=? AND " + \
+                        f"(T.`{self._lock_col}` IS NULL OR T.`{self._lock_col}` IN ('', @lock_id))"
+                if len(wcols) > 0:
+                    sql += " AND " + " AND ".join(f"T.`{c}`=?" for c in wcols)
+                sql += " LIMIT 1 FOR UPDATE;"
+                cursor.execute(sql, data=tuple([key] + wvals))
+
+                # May not match if the row has changed since the initial list of keys was drawn up.
+                if cursor.rowcount > 0:
+                    # Put the soft lock the row
+                    sql = f"UPDATE {db_table} AS T SET T.`{self._lock_col}`=@lock_id" + \
+                        f" WHERE T.`{self._key_col}`=@key;"
+                    cursor.execute(sql)
+
+                    # Select entire row if it's locked
+                    sql = f"SELECT T.* FROM {db_table} AS T" + \
+                        f" WHERE T.`{self._key_col}`=@key AND T.`{self._lock_col}`=@lock_id;"
+                    cursor.execute(sql)
+
+                    # A bit of a hack but this gets it into a form that's compatible with schema.
+                    # Also the (qtable[k].unit or 1) bit is a massive hack which needs improving.
+                    # pylint: disable=protected-access
+                    qtable =_QTable(rows=[], masked=True,
+                                    dtype=DalDataRow._storage_schema, units=DalDataRow._col_units)
+                    for row in cursor:
+                        qtable.add_row({k: v * (qtable[k].unit or 1)
+                                for k, v in zip(cursor.metadata["field"], row) if v is not None})
+                    yield from qtable.as_array()
+
+    def _update_and_release_row(self, values: _ArrayLike):
+        key = values[self._key_col]
+        ucols = [c for c in values.dtype.names if c not in [self._key_col, self._lock_col]]
+        with _mariadb.connect(**self._db_config) as conn, conn.cursor() as cursor:
+            cursor.execute(f"SET @lock_id='{self._lock_id}';")
+            cursor.execute(f"SET @key='{key}';")
+
+            db_table = f"{self._db_config['database']}.{self._table_name}"
+            sql = f"UPDATE {db_table} AS T SET T.`{self._lock_col}`=NULL"
+            if len(ucols) > 0:
+                sql += "," + ",".join(f"T.`{c}`=?" for c in ucols)
+            sql += f" WHERE T.`{self._key_col}`=@key AND T.`{self._lock_col}`=@lock_id;"
+
+            # TODO: this is hacky. We need a way of deciding this at runtime
+            bool_fields = ["fitted_lcs", "fitted_sed", "fitted_masses"]
+            uvals = [int(values[c]) if c in bool_fields else values[c] for c in ucols]
+            cursor.execute(sql, data=tuple(uvals))
+            conn.commit()
+
+    def _list_keys_where(self, **where) -> _ArrayLike:
+        """ Gets a list of row keys which are currently available to lock & match the criteria. """
+        keys = []
+        with _mariadb.connect(**self._db_config) as conn, conn.cursor() as cursor:
+            sql = f"SELECT T.`{self._key_col}` " + \
+                    f"FROM {self._db_config['database']}.{self._table_name} AS T " + \
+                    f"WHERE (T.`{self._lock_col}` IS NULL OR T.`{self._lock_col}` IN ('', ?))"
+            if len(wcols := [c for c in where if c not in [self._lock_col]]) > 0:
+                sql += " AND " + " AND ".join(f"T.`{c}`=?" for c in wcols)
+
+            cursor.execute(sql, data=tuple([self._lock_id] + [where[c] for c in wcols]))
+            if cursor.rowcount > 0:
+                keys = [row[0] for row in cursor]
+        return keys
 
 def create_dal(typename: _Union[str, type[Dal3]], **kwargs):
     """
