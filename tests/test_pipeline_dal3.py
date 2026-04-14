@@ -34,11 +34,13 @@ class TestQTableFileDal3(unittest.TestCase):
 
         # Atomic adds don't require the lock semantics
         dal.add_row("AN Cam", fitted_lcs=True, fitted_sed=False, fitted_masses=False)
-        dal.add_row("AN Other", locked_by="AN Other", fitted_lcs=False, fitted_sed=False, fitted_masses=False)
         dal.add_row("CW Eri", locked_by=dal.lock_id, fitted_lcs=False, fitted_sed=False, fitted_masses=False)
         dal.add_row("ZZ Boo", fitted_lcs=False, fitted_sed=False, fitted_masses=False)
-        dal.add_row("ZZ UMa", fitted_lcs=False, fitted_sed=True, fitted_masses=False)
 
+        # These should not be picked up by acquire_next_row (blow).
+        # AN Other is locked by another inst. ZZ UMa doesn't match the where criteria.
+        dal.add_row("AN Other", locked_by="AN Other", fitted_lcs=False, fitted_sed=False, fitted_masses=False)
+        dal.add_row("ZZ UMa", fitted_lcs=False, fitted_sed=True, fitted_masses=False)
 
         for row in dal.acquire_next_row(fitted_lcs=False, fitted_sed=False, fitted_masses=False):
             self.assertNotIn(row.key, ["AN Cam", "ZZ UMa"])
@@ -46,11 +48,14 @@ class TestQTableFileDal3(unittest.TestCase):
             row.Teff_sys = ufloat(5750, 50)
             row["logg_sys"] = ufloat(4.0, 0.1)
 
+        # Check for updates (note the changed where criteria)
         for row in dal.acquire_next_row(fitted_lcs=True, fitted_sed=False, fitted_masses=False):
-            print(row.key)
-            print(row.Teff_sys)
-            print(row.logg_sys)
+            self.assertIn(row.key, ["AN Cam", "CW Eri", "ZZ Boo"])
+            print(f"{row.key} : Teff_sys={row.Teff_sys}, logg_sys={row.logg_sys}")
 
-        for row in dal.acquire_row_by_key("CW Eri"):
-            row.search_term = "V* CW Eri"
+        # Atomic update on unlocked row
+        dal.update_row("CW Eri", search_term="V* CW Eri")
 
+        with self.assertRaises(KeyError):
+            # Attempted atomic update on a row locked by another inst (should fail!)
+            dal.update_row("AN Other", search_term="V* AN Other")

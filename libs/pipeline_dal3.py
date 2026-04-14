@@ -28,7 +28,7 @@ class DalDataRow(_AbstractContextManager):
     to the underlying data store, via the persist_func, on leaving the current context (__exit__).
     """
 
-    _locked_by_len = 30
+    _locked_by_len = 50
 
     # Field definitions. These are in numpy name/dtype format which works directly
     # on astropy tables. Other storage mechanisms will need to interpret these.
@@ -197,9 +197,9 @@ class DalDataRow(_AbstractContextManager):
             return (col in self._values.dtype.names) and (col not in self._hidden_cols or [])
         return False
 
-    def set_values(self, **kwargs):
+    def set_values(self, **cols_and_values):
         """ Sets the value of multiple cols in single call. """
-        for c, v in kwargs.items():
+        for c, v in cols_and_values.items():
             self[c] = v
 
     def __getattr__(self, col: str) -> any:
@@ -301,12 +301,12 @@ class Dal3(_ABC):
 
     def acquire_next_row(self, **where) -> _Generator[DalDataRow, any, None]:
         """
-        Yields the next available row which both matches the criteria and is unlocked.
-        In doing so, a lock is placed on the row to prevent other clients acquiring it.
-        Updates made to the values yielded will be written back to the storage row
-        before the lock is released when the row goes out of client scope.
+        Yields the next available row which both matches the criteria and is unlocked. In doing so,
+        a lock is placed on the row to prevent other clients acquiring it while processing and
+        updates are carried out. Updates made to the DalDataRow yielded will be written back to the
+        underlying storage mechanism before the lock is released, as the row leaves its context.
 
-        :where: the simple column value criteria with which to make an exact match
+        :where: col/value criteria with which simple, col==value, matches are evaluated for each row
         """
         # We are only interested in rows which are currently unlocked
         where[self._lock_col] = None
@@ -320,17 +320,21 @@ class Dal3(_ABC):
                 # The write_func will be called to persist any changes when we exit this context.
                 yield row
 
-    def acquire_row_by_key(self, key: str) -> _Generator[DalDataRow, any, None]:
+    def update_row(self, key: str, **cols_and_values):
         """
-        Yields the row with the requested key if it is currently unlocked. A lock will be placed
-        on the row which will be released when the row is persisted as it exits the current context.
+        Acquire, lock, update and release a row in a single call.
 
-        This method is for use when setting up new data rows, otherwise use acquire_next_row().
-        Even though this func yields only 0 or 1 rows you should use it in a for loop as it allows
-        the row's context manager to do its magic, saving any changes as the row leaves the context.
-        Changes to the data may not be persisted to storage if used with next() or similar syntax.
+        Where long term locks are required, such as while fitting, use acquire_next_row() instead.
+
+        :key: the unique key of the row to update
+        :cols_and_values: the col/value pair for each column to update
         """
-        yield from self.acquire_next_row(**dict([(self._key_col, key)]))
+        # The where criterion is on the primary key so we can only get 0 or 1 rows.
+        for row in self.acquire_next_row(**dict([(self._key_col, key)])):
+            row.set_values(**cols_and_values)
+            # Changes will be persisted as we leave the context here (see acquire_next_row above).
+            return
+        raise KeyError(f"No unlocked row found for key '{key}'. Updates were not saved.")
 
     def count_where(self, **where) -> int:
         """ Gets the current number of rows matching the passed where criteria. """
