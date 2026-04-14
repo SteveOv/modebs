@@ -47,11 +47,16 @@ class TestQTableFileDal3(unittest.TestCase):
             row.fitted_lcs = True
             row.Teff_sys = ufloat(5750, 50)
             row["logg_sys"] = ufloat(4.0, 0.1)
+            row.append_warning("Hello")
 
         # Check for updates (note the changed where criteria)
         for row in dal.acquire_next_row(fitted_lcs=True, fitted_sed=False, fitted_masses=False):
             self.assertIn(row.key, ["AN Cam", "CW Eri", "ZZ Boo"])
-            print(f"{row.key} : Teff_sys={row.Teff_sys}, logg_sys={row.logg_sys}")
+
+            row.append_warning("Hello again")
+            row.append_warning("Hello") # Should not appear more than once
+
+            print(f"{row.key} : Teff_sys={row.Teff_sys}, logg_sys={row.logg_sys}, warnings={row.warnings}")
 
         # Atomic update on unlocked row
         dal.update_row("CW Eri", search_term="V* CW Eri")

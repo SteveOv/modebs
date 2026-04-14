@@ -183,6 +183,7 @@ class DalDataRow(_AbstractContextManager):
         self.__dict__["_parse_value_func"] = parse_value_func
         self.__dict__["_hidden_cols"] = hidden_cols or []
         self.__dict__["_dirty_cols"] = []
+        self.__dict__["_sep"] = ";"
 
     @property
     def key(self) -> str:
@@ -201,6 +202,13 @@ class DalDataRow(_AbstractContextManager):
         """ Sets the value of multiple cols in single call. """
         for c, v in cols_and_values.items():
             self[c] = v
+
+    def append_warning(self, new_warn_msg: str):
+        """ Appends a unique message to the warnings col. Non-unique messages are discarded. """
+        if new_warn_msg and len(new_warn_msg := new_warn_msg.strip()) > 0:
+            warn_msgs = (self["warnings"] or "").split(self._sep)
+            if new_warn_msg not in warn_msgs:
+                self["warnings"] = self._sep.join(w for w in warn_msgs + [new_warn_msg] if len(w))
 
     def __getattr__(self, col: str) -> any:
         """
