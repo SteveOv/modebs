@@ -5,6 +5,7 @@ from typing import Callable as _Callable, Generator as _Generator
 from pathlib import Path as _Path
 from abc import ABC as _ABC, abstractmethod as _abstractmethod
 from contextlib import AbstractContextManager as _AbstractContextManager
+from numbers import Number as _Number
 from warnings import warn as _warn
 from threading import RLock as _RLock
 from os import getpid as _getpid
@@ -28,6 +29,11 @@ class DalDataRow(_AbstractContextManager):
     
     Data may be read and modified through the public interface. Changes will be written
     to the underlying data store, via the persist_func, on leaving the current context (__exit__).
+
+    Values are stored in the underlying data store in columns matching the col names used.
+    This also supports reading/writing UFloats and expects the nominal and std_dev components
+    to be split across pairs of columns named as [col] and [col]_err. Astropy Quantities are
+    also supported, and units will be coerced to those expected by the underlying data store.
     """
 
     _locked_by_len = 50
@@ -164,15 +170,15 @@ class DalDataRow(_AbstractContextManager):
                  key: str,
                  values: _ArrayLike,
                  persist_func: _Callable[[_ArrayLike], None],
-                 parse_value_func: _Callable[[str, any], any]=lambda col, val: val,
                  hidden_cols: _List[str]=None):
         """
-        Generic representation of an updatable row of data from the underlying data store.
+        Generic representation of an updatable row of data from the underlying data store with
+        support for get/set of values and mass value setter. This is a ContextManager with data
+        persisted to its underlying store when an instance leaves its containing context.
 
         :key: the row's primary key value
         :values: the rows full set of values in an ArrayLike form
         :persist_func: the func called with the update set of values to make the updates permanent
-        :parse_value_func: func called whenever a value is read to interpret any special values
         :hidden_cols: those values cols which are not to be exposed as attr of this inst
         """
         # pylint: disable=too-many-arguments, too-many-positional-arguments
@@ -182,7 +188,6 @@ class DalDataRow(_AbstractContextManager):
         self.__dict__["_key"] = key
         self.__dict__["_values"] = values
         self.__dict__["_persist_func"] = persist_func
-        self.__dict__["_parse_value_func"] = parse_value_func
         self.__dict__["_hidden_cols"] = hidden_cols or []
         self.__dict__["_dirty_cols"] = []
         self.__dict__["_sep"] = ";"
@@ -219,14 +224,14 @@ class DalDataRow(_AbstractContextManager):
         """
         if self.has_col(col):
             err_col = col + "_err"
-            val = self._parse_value_func(col, self._values[col])
-            if isinstance(val, _u.Quantity):
+            val = self._read_col_value(self._values, col)
+            if isinstance(val, _u.Quantity): # Need to return value sans units
                 if self.has_col(err_col):
-                    val_err = self._parse_value_func(err_col, self._values[err_col])
+                    val_err = self._read_col_value(self._values, err_col)
                     return _ufloat(val.value, val_err.value if val_err is not None else None)
                 return val.value
             if self.has_col(err_col) and val is not None:
-                return _ufloat(val, self._parse_value_func(err_col, self._values[err_col]))
+                return _ufloat(val, self._read_col_value(self._values, err_col))
             return val
         raise AttributeError(name=col, obj=self)
 
@@ -241,28 +246,17 @@ class DalDataRow(_AbstractContextManager):
         """
         if self.has_col(col):
             err_col = err_col if self.has_col(err_col := col + "_err") else None
-
-            # Get the units to use if the storage supports/expects them (i.e. astropy QTable row).
-            unit = self._values[col].unit if hasattr(self._values[col], "unit") else 1
-
             if isinstance(value, _UFloat):
-                self._values[col] = _nom_val(value) * unit
+                self._set_col_value(self._values, col, _nom_val(value))
                 if err_col is not None:
-                    self._values[err_col] = _std_dev(value) * unit
+                    self._set_col_value(self._values, err_col, _std_dev(value))
                 else:
                     _warn(f"Uncertainty for {col} was discarded as there is no {col}_err column")
             else:
-                if isinstance(value, _u.Quantity):
-                    self._values[col] = value.to(unit) if isinstance(unit, _u.Unit) else value.value
-                elif value is None or unit is None:
-                    # This also covers "no unit expected", which includes non-numeric values.
-                    self._values[col] = value
-                else:
-                    self._values[col] = value * unit
-
+                self._set_col_value(self._values, col, value)
                 if err_col is not None:
                     # Assume an err column is always going to be numeric
-                    self._values[err_col] = 0 * unit
+                    self._set_col_value(self._values, err_col, 0)
 
             for c in (cc for cc in [col, err_col] if cc is not None and cc not in self._dirty_cols):
                 self._dirty_cols.append(c)
@@ -277,11 +271,38 @@ class DalDataRow(_AbstractContextManager):
         self._persist_func(self._values[self._hidden_cols + self._dirty_cols])
         return super().__exit__(exc_type, exc_value, traceback)
 
+    @classmethod
+    def _read_col_value(cls, values: _ArrayLike, col: str):
+        """ Low level col read with additional parsing for potentially masked values from QTable """
+        value = values[col]
+        if _np.ma.is_masked(value):
+            # Value is explicitly masked which is expected when no value has been stored
+            return None
+        if _np.ma.isMaskedArray(value) or hasattr(value, "unmasked"):
+            # We also seem to get masked value types, even when we have values
+            return value.unmasked
+        return value
+
+    @classmethod
+    def _set_col_value(cls, values: _ArrayLike, col: str, value: any, unit: _u.Unit=None):
+        """ Low level write of the requested value to the requested col while handling units. """
+        if unit is None:
+            unit = values[col].unit if hasattr(values[col], "unit") else 1
+        if isinstance(value, _u.Quantity):
+            values[col] = value.to(unit) if isinstance(unit, _u.Unit) else value.value
+        elif value is None or not isinstance(value, _Number):
+            values[col] = value
+        else:
+            values[col] = value * unit
+
 
 class Dal3(_ABC):
     """
-    Base data access layer (Dal) for reading/writing simple table data via a generator
-    which yields and locks the next available row matching the selected criteria.
+    Base data access layer (Dal) for reading/writing simple table data. This supports adding and
+    updating rows based on the key values. It also supports 'acquire_next_row' functionality which
+    iterates over rows matching the supplied 'where' criteria, yielding each for updates once
+    a lock has been applied to prevent other instances from selecting the same row. This is
+    intended to manage data while carrying out long running processes with it such as fitting.
     """
 
     def __init__(self, key_col: str="target_id", lock_col: str="locked_by"):
@@ -313,8 +334,8 @@ class Dal3(_ABC):
         """
         Yields the next available row which both matches the criteria and is unlocked. In doing so,
         a lock is placed on the row to prevent other clients acquiring it while processing and
-        updates are carried out. Updates made to the DalDataRow yielded will be written back to the
-        underlying storage mechanism before the lock is released, as the row leaves its context.
+        updates are carried out. Updates made to the yielded DalDataRow will be written back to the
+        underlying storage mechanism before the lock is released, when the row leaves its context.
 
         :where: col/value criteria with which simple, col==value, matches are evaluated for each row
         """
@@ -323,7 +344,6 @@ class Dal3(_ABC):
             with DalDataRow(key=row_data[self._key_col],
                             values=row_data,
                             persist_func=self._update_and_release_row,
-                            parse_value_func=self._parse_col_value,
                             hidden_cols=[self._key_col, self._lock_col]) as row:
                 # Yield the generic DalDataRow to the client, with which it can read/write values.
                 # The write_func will be called to persist any changes when we exit this context.
@@ -346,14 +366,9 @@ class Dal3(_ABC):
         raise KeyError(f"No unlocked row found for key '{key}'. Updates were not saved.")
 
     def count_where(self, **where) -> int:
-        """ Gets the current number of rows matching the passed where criteria. """
+        """ Gets the current number of unlocked rows matching the passed where criteria. """
         # This is a sub-optimal default implementation. Ideally we override this in subclasses.
         return len(list(self.acquire_next_row(**where)))
-
-    def _parse_col_value(self, col, value):
-        """ Any additional parsing required to interpret values """
-        # pylint: disable=unused-argument
-        return value
 
     @_abstractmethod
     def add_row(self, key: str, **cols_and_values):
@@ -392,7 +407,7 @@ class QTableDal3(Dal3):
         with self._CLIENT_LOCK:
             where.setdefault(self._lock_col, None)
             for row in self._table:
-                test_vals = [self._parse_col_value(c, row[c]) for c in where]
+                test_vals = [DalDataRow._read_col_value(row, c) for c in where] # pylint: disable=protected-access
                 count += all((tv == wv) or (c == self._lock_col and tv in self._usable_lock_vals) \
                                                 for tv, (c, wv) in zip(test_vals, where.items()))
         return count
@@ -406,7 +421,7 @@ class QTableDal3(Dal3):
         with self._CLIENT_LOCK:
             where[self._lock_col] = None
             for row in self._table:
-                test_vals = [self._parse_col_value(c, row[c]) for c in where]
+                test_vals = [DalDataRow._read_col_value(row, c) for c in where] # pylint: disable=protected-access
                 if all((tv == wv) or (c == self._lock_col and tv in self._usable_lock_vals) \
                                                 for tv, (c, wv) in zip(test_vals, where.items())):
                     row[self._lock_col] = self._lock_id
@@ -429,16 +444,6 @@ class QTableDal3(Dal3):
                 raise ValueError(f"Cannot write to row with key={key}." +
                                  " It's not locked by this client instance.")
 
-    def _parse_col_value(self, col: str, value):
-        """ Handle additional parsing to interpret potentially masked values from QTable """
-        if _np.ma.is_masked(value):
-            # Value is explicitly masked which is expected when no value has been stored
-            return None
-        if _np.ma.isMaskedArray(value) or hasattr(value, "unmasked"):
-            # We also seem to get masked value types, even when we have values
-            return value.unmasked
-        return super()._parse_col_value(col, value)
-
 
 class QTableFileDal3(QTableDal3):
     """ Pipeline data access for reading/writing a file based on an astropy QTable """
@@ -450,18 +455,14 @@ class QTableFileDal3(QTableDal3):
         Initializes the QTableDal Dal class, associating it with a file in which to permanently
         store its data.
 
-        Values are stored in the underlying data file in columns named for the param names used.
-        This Dal also supports reading/writing UFloats and expects the nominal and std_dev
-        components to be split across pairs of columns named as [param] and [param]_err.
+        **NOTE**: This is not robust enough to be used where multiple clients are expected. There
+        is no storage level locking mechanism so it will happily overwrite updates from elsewhere.
+        If you need multiple clients and/or robust locking, a database Dal is more suitable.
 
         See https://docs.astropy.org/en/stable/io/unified_table.html for information on
-        potential file formats and the kwargs that can be used to customize them.
-        Will apply sensible defaults, of ["name", "dtype", "unit"], to header_rows if the file
+        potential file formats and the kwargs that can be used to customize them. This will
+        apply the sensible defaults, of ["name", "dtype", "unit"], to header_rows if the file
         format 'ascii.fixed_width_two_line' is chosen but header_rows is not specified.
-
-        This is not thread safe nor is it robust enough to be used where multiple clients expected.
-        There is no storage locking mechanism so it will happily overwrite updates from elsewhere.
-        If you need multiple clients and/or robust locking, other Dal subclasses are more suitable.
 
         :file: the file name of the storage file
         :file_format: the format of the file
@@ -505,6 +506,7 @@ class QTableFileDal3(QTableDal3):
             super()._update_and_release_row(values)
             self._write_state_to_file()
 
+
 class MariaDbTableDal(Dal3):
     """ Pipeline Dal for storing data in a MariaDB Table """
     # Used to parse the "<U##" style dtype declarations in the schema for table length
@@ -513,48 +515,48 @@ class MariaDbTableDal(Dal3):
     def __init__(self, db_config: _Dict[str, any], table_name: str="working_set", ):
         """
         Initializes the MariaDBTableDal class, associating it with the database instance
-        and table which is storing the data.
+        and table which will be used to store the data. Whiile the data table will be created
+        if it does not already exist, the database is expected to exist and the connecting
+        user must have suitable permissions to create and interact with the data table.
 
-        Values are stored in the underlying data file in columns named for the param names used.
-        This Dal also supports reading/writing UFloats and expects the nominal and std_dev
-        components to be split across pairs of columns named as [param] and [param]_err.
+        See https://mariadb.com/docs/connectors/connectors-quickstart-guides/connector-python-guide
+        for information on the contents of a connection configuration dictionary.
 
-        This is not thread safe nor is it robust enough to be used where multiple clients expected.
-        There is no locking mechanism so it will happily overwrite updates from elsewhere. If you
-        need multiple clients, large datasets or more durable storage, use a "real" database Dal.
-
-        :database_url: a MariaDB url style connection string
+        :db_config: a MariaDB database config dictionary
         :table_name: the name of the table
         """
+        super().__init__()
         self._db_config = db_config
         self._full_table_name = f"{self._db_config['database']}.`{table_name}`"
         with _mariadb.connect(**self._db_config) as conn:
-            self.create_working_set_table(conn, table_name, exists_ok=True)
-        super().__init__()
+            self.create_working_set_table(conn, table_name, key_col=self._key_col,
+                                          lock_col=self._lock_col, exists_ok=True)
 
     @classmethod
     def create_working_set_table(cls,
                                  conn: _mariadb.Connection,
                                  table_name: str,
+                                 key_col: str,
+                                 lock_col: str,
                                  exists_ok: bool=True):
         """
-        Creates the requested working set table.
-        Assumes the connection is open and the database name has been set.
+        Creates the requested working set table. Assumes the connection is open,
+        the named database exists and the user has the necessary permissions to create the table.
 
         :conn: the connection to use
         :table_name: the name of the table
+        :key_col: the name of the primary key column
+        :lock_col: the name of the soft-lock column (which will have an index placed on it)
         :exists_ok: whether to suppress an error if the table exists (it will not be overwritten)
         """
         with conn.cursor() as cursor:
-            # TODO: add a unique index (with null) to the locked_by col
-
-            # Build the table creation DDL
             # If exists_ok is False and the table exists we expect an 1050 same name exists error
             ddl = "CREATE TABLE IF NOT EXISTS" if exists_ok else "CREATE TABLE"
-            ddl += f" `{table_name}` (\n\ttarget_id VARCHAR(14) PRIMARY KEY"
+            ddl += f" `{table_name}` (\n\t`{key_col}` VARCHAR(14) PRIMARY KEY"
 
             schema = DalDataRow._storage_schema # pylint: disable=protected-access
-            for field_name, dtype in [(f, d) for f, d in schema if f not in ["target_id"]]:
+            flag_cols = []
+            for col_name, dtype in ((c, d) for c, d in schema if c not in [key_col]):
                 field_dbtype = ""
                 if isinstance(dtype, str):
                     # These are expected to be in the form "<U##" where ## is the length
@@ -570,35 +572,38 @@ class MariaDbTableDal(Dal3):
                 elif dtype is object:
                     field_dbtype = "LONG VARCHAR NULL"
 
-                if len(field_dbtype) > 0:
-                    ddl += f",\n\t`{field_name}` " + field_dbtype
-                else:
-                    raise ValueError(f"unexpected schema field {field_name} dtype of {dtype}")
-            ddl += "\n)"
+                if col_name.startswith("fitted") and dtype is bool:
+                    flag_cols += [col_name]
 
+                if len(field_dbtype) > 0:
+                    ddl += f",\n\t`{col_name}` " + field_dbtype
+                else:
+                    raise ValueError(f"unexpected schema field {col_name} dtype of {dtype}")
+
+            ddl += f",\n\tINDEX `lock_index` (`{lock_col}`)"
+            ddl += ",\n\tINDEX `flags_index` (" + ",".join(f"`{c}`" for c in flag_cols) + ")"
+            ddl += "\n)"
             cursor.execute(ddl)
             conn.commit()
 
     def count_where(self, **where) -> int:
-        return len(self._list_keys_where(**where))
+        return len(self._list_lockable_keys_where(**where))
 
     def add_row(self, key: str, **cols_and_values):
-        with _mariadb.connect(**self._db_config) as conn, conn.cursor() as cursor:
+        with _mariadb.connect(**self._db_config, autocommit=True) as conn, conn.cursor() as cursor:
             sql = f"INSERT INTO {self._full_table_name} " \
                 + f"(`{self._key_col}`," + ",".join(f"`{k}`" for k in cols_and_values) + ") "\
                 + "VALUES (?," + ",".join(["?"]*len(cols_and_values)) + ")"
             cursor.execute(sql, data=tuple([key] + list(cols_and_values.values())))
-            conn.commit()
 
     def _lock_and_yield_data_rows(self, **where) -> _Generator[_ArrayLike, any, None]:
         # Snapshot of row keys which are currently suitable
-        for key in self._list_keys_where(**where):
+        for key in self._list_lockable_keys_where(**where):
             wcols = [c for c in where if c not in [self._lock_col]]
             wvals = [where[c] for c in wcols]
 
-            with _mariadb.connect(**self._db_config) as conn, conn.cursor() as cursor:
-                conn.autocommit = True
-                cursor.buffered = False
+            with _mariadb.connect(**self._db_config, autocommit=True) as conn,\
+                        conn.cursor(buffered=False) as cursor:
                 cursor.execute(f"SET @lock_id='{self._lock_id}';")
 
                 # Initial row selection using the the where clause(s) which set the @key variable.
@@ -636,7 +641,7 @@ class MariaDbTableDal(Dal3):
     def _update_and_release_row(self, values: _ArrayLike):
         key = values[self._key_col]
         ucols = [c for c in values.dtype.names if c not in [self._key_col, self._lock_col]]
-        with _mariadb.connect(**self._db_config) as conn, conn.cursor() as cursor:
+        with _mariadb.connect(**self._db_config, autocommit=True) as conn, conn.cursor() as cursor:
             cursor.execute(f"SET @lock_id='{self._lock_id}';")
             cursor.execute(f"SET @key='{key}';")
 
@@ -645,15 +650,11 @@ class MariaDbTableDal(Dal3):
                 sql += "," + ",".join(f"T.`{c}`=?" for c in ucols)
             sql += f" WHERE T.`{self._key_col}`=@key AND T.`{self._lock_col}`=@lock_id;"
 
-            # TODO: this is hacky. We need a way of deciding this at runtime
-            bool_fields = ["fitted_lcs", "fitted_sed", "fitted_masses"]
-            uvals = [int(values[c]) if c in bool_fields else values[c] for c in ucols]
-            cursor.execute(sql, data=tuple(uvals))
-            conn.commit()
+            uvals = [DalDataRow._read_col_value(values, c) for c in ucols] # pylint: disable=protected-access
+            cursor.execute(sql, tuple(int(v) if isinstance(v,bool|_np.bool_) else v for v in uvals))
 
-    def _list_keys_where(self, **where) -> _ArrayLike:
+    def _list_lockable_keys_where(self, **where) -> _ArrayLike:
         """ Gets a list of row keys which are currently available to lock & match the criteria. """
-        keys = []
         with _mariadb.connect(**self._db_config) as conn, conn.cursor() as cursor:
             sql = f"SELECT T.`{self._key_col}` FROM {self._full_table_name} AS T " + \
                     f"WHERE (T.`{self._lock_col}` IS NULL OR T.`{self._lock_col}` IN ('', ?))"
@@ -662,15 +663,8 @@ class MariaDbTableDal(Dal3):
 
             cursor.execute(sql, data=tuple([self._lock_id] + [where[c] for c in wcols]))
             if cursor.rowcount > 0:
-                keys = [row[0] for row in cursor]
-        return keys
-
-    @classmethod
-    def _does_working_set_table_exist(cls, conn: _mariadb.Connection, name: str) -> bool:
-        """ Indicates whether the requested working set table exists """
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME=?;", (name, ))
-            return cursor.rowcount > 0
+                return [row[0] for row in cursor]
+        return []
 
 
 def create_dal(typename: _Union[str, type[Dal3]], **kwargs):
