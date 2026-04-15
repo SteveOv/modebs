@@ -34,16 +34,16 @@ if __name__ == "__main__":
     ap.set_defaults(force_overwrite=False, batch_size=20)
     args = ap.parse_args()
     drop_dir = Path.cwd() / f"drop/{args.targets_file.stem}"
-    args.working_set_file = drop_dir / "working-set.table"
 
-    if not args.force_overwrite and args.working_set_file.exists():
+    working_set_file = drop_dir / "working-set.table"
+    if not args.force_overwrite and working_set_file.exists():
         resp = input(f"** Warning: output data exists in '{drop_dir}'. Continue & overwrite y/N? ")
         if resp.strip().lower() not in ["y", "yes"]:
             sys.exit()
 
     # Rather nuclear option; replace any existing working set. Maybe more nuanced approach later.
     drop_dir.mkdir(parents=True, exist_ok=True)
-    args.working_set_file.unlink(missing_ok=True)
+    working_set_file.unlink(missing_ok=True)
 
 
     with redirect_stdout(Tee(open(drop_dir / f"{THIS_STEM}.log", "w", encoding="utf8"))):
@@ -53,11 +53,13 @@ if __name__ == "__main__":
         print(f"\nThe targets configuration file:   {args.targets_file}")
         print(f"Directory for data, logs & plots: {drop_dir}")
 
-        dal = create_dal("QTableFileDal3", file=args.working_set_file)
         targets_config = Targets(args.targets_file)
         print(f"Read in the configuration from '{args.targets_file.name}'",
               f"which contains {targets_config.count()} target(s) not excluded.")
 
+        dal_kwargs = targets_config.get("dal_kwargs", {})
+        dal_kwargs.setdefault("file", working_set_file)
+        dal = create_dal(targets_config.get("dal_type", "QTableFileDal3"), True, **dal_kwargs)
 
         print("\nSetting up a storage row and search_term for each target.")
         search_term_index = { }

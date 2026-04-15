@@ -72,7 +72,6 @@ if __name__ == "__main__":
                     max_mcmc_steps=100000, mcmc_walkers=100, mcmc_thin_by=10, mcmc_processes=5)
     args = ap.parse_args()
     drop_dir = Path.cwd() / f"drop/{args.targets_file.stem}"
-    args.working_set_file = drop_dir / "working-set.table"
 
     with redirect_stdout(Tee(open(drop_dir / f"{THIS_STEM}.log", "a", encoding="utf8"))) as log:
         print("\n\n============================================================")
@@ -85,7 +84,9 @@ if __name__ == "__main__":
         print(f"Read in the configuration from '{args.targets_file.name}'",
               f"which contains {targets_config.count()} target(s) that have not been excluded.")
 
-        dal = create_dal(targets_config.get("Dal", "QTableFileDal3"), file=args.working_set_file)
+        dal_kwargs = targets_config.get("dal_kwargs", {})
+        dal_kwargs.setdefault("file", drop_dir / "working-set.table")
+        dal = create_dal(targets_config.get("dal_type", "QTableFileDal3"), True, **dal_kwargs)
         to_fit_criteria = { "fitted_lcs": True, "fitted_sed": False }
         to_fit_count = dal.count_where(**to_fit_criteria)
         print(f"The working-set indicates there are {to_fit_count} targets to be fitted.")

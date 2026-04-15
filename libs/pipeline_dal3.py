@@ -667,11 +667,12 @@ class MariaDbTableDal(Dal3):
         return []
 
 
-def create_dal(typename: _Union[str, type[Dal3]], **kwargs):
+def create_dal(typename: _Union[str, type[Dal3]], verbose: bool=False, **kwargs):
     """
     A factory method for creating a named Dal instance.
 
     :typename: the dal type to create
+    :verbose: whether or not to write details of the Dal being created to StdOut
     :kwargs: the arguments with which to initialize the dal (specific to the type of dal)
     :returns: the resulting initialized instance
     """
@@ -693,7 +694,7 @@ def create_dal(typename: _Union[str, type[Dal3]], **kwargs):
     if dal_type is None:
         raise KeyError(f"No Dal type like {dal_type} was found.")
     if _ABC in dal_type.__bases__:
-        # Must be careful with this check as we only ensuring the type is not itself abstract.
+        # Must be careful with this check as we're only ensuring the type is not itself abstract.
         # For this, __bases__ is better than issubclass() as it only looks at direct base types.
         raise ValueError(f"Cannot initialize the abstract class {dal_type.__name__}")
 
@@ -701,4 +702,6 @@ def create_dal(typename: _Union[str, type[Dal3]], **kwargs):
     # calling code to send a superset of potential kwargs to this func & it will use what is needed.
     argspec = _getfullargspec(dal_type.__init__)
     expected_kwargs = { k: v for k, v in kwargs.items() if k in argspec.args and k not in ["self"] }
+    if verbose:
+        print(f"Creating a {dal_type.__name__} with kwargs={expected_kwargs}")
     return dal_type(**expected_kwargs)

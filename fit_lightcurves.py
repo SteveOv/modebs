@@ -70,7 +70,6 @@ if __name__ == "__main__":
     ap.set_defaults(plot_figs=False, is_testing=True, figs_type="png", figs_dpi=100)
     args = ap.parse_args()
     drop_dir = Path.cwd() / f"drop/{args.targets_file.stem}"
-    args.working_set_file = drop_dir / "working-set.table"
 
     # EBOP MAVEN estimator for JKTEBOP input params; rA+rB, k, J, ecosw, esinw and bP/inc
     estimator = Estimator()
@@ -95,7 +94,9 @@ if __name__ == "__main__":
               f"which contains {targets_config.count()} target(s) that have not been exluded.")
 
         # Open the targets table and the configs
-        dal = create_dal(targets_config.get("Dal", "QTableFileDal3"), file=args.working_set_file)
+        dal_kwargs = targets_config.get("dal_kwargs", {})
+        dal_kwargs.setdefault("file", drop_dir / "working-set.table")
+        dal = create_dal(targets_config.get("dal_type", "QTableFileDal3"), True, **dal_kwargs)
         to_fit_criteria = { "fitted_lcs": False }
         to_fit_count = dal.count_where(**to_fit_criteria)
         print(f"The working-set indicates there are {to_fit_count} target(s) to be fitted.")
