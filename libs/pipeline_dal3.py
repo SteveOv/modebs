@@ -564,7 +564,7 @@ class MariaDbTableDal(Dal3):
                     if match is not None and "len" in match.groupdict():
                         field_dbtype = f"VARCHAR({match.group('len')}) NULL"
                 elif dtype is int:
-                    field_dbtype = "INT NULL"
+                    field_dbtype = "BIGINT NULL"
                 elif dtype is float:
                     field_dbtype = "FLOAT NULL"
                 elif dtype is bool:
