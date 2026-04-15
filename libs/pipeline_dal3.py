@@ -524,7 +524,7 @@ class MariaDbTableDal(Dal3):
         :table_name: the name of the table
         """
         self._db_config = db_config
-        self._table_name = table_name
+        self._full_table_name = f"{self._db_config['database']}.`{table_name}`"
         with _mariadb.connect(**self._db_config) as conn:
             self.create_working_set_table(conn, table_name, exists_ok=True)
         super().__init__()
@@ -576,22 +576,12 @@ class MariaDbTableDal(Dal3):
             cursor.execute(ddl)
             conn.commit()
 
-    @classmethod
-    def _does_working_set_table_exist(cls, conn: _mariadb.Connection, table_name: str) -> bool:
-        """
-        Indicates whether the requested working set table exists
-        """
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME=?;",
-                           data=(table_name, ))
-            return cursor.rowcount > 0
-
     def count_where(self, **where) -> int:
         return len(self._list_keys_where(**where))
 
     def add_row(self, key: str, **cols_and_values):
         with _mariadb.connect(**self._db_config) as conn, conn.cursor() as cursor:
-            sql = f"INSERT INTO `{self._table_name}` " \
+            sql = f"INSERT INTO {self._full_table_name} " \
                 + f"(`{self._key_col}`," + ",".join(f"`{k}`" for k in cols_and_values) + ") "\
                 + "VALUES (?," + ",".join(["?"]*len(cols_and_values)) + ")"
             cursor.execute(sql, data=tuple([key] + list(cols_and_values.values())))
@@ -600,7 +590,6 @@ class MariaDbTableDal(Dal3):
     def _lock_and_yield_data_rows(self, **where) -> _Generator[_ArrayLike, any, None]:
         # Snapshot of row keys which are currently suitable
         for key in self._list_keys_where(**where):
-            db_table = f"{self._db_config['database']}.{self._table_name}"
             wcols = [c for c in where if c not in [self._lock_col]]
             wvals = [where[c] for c in wcols]
 
@@ -611,7 +600,7 @@ class MariaDbTableDal(Dal3):
 
                 # Initial row selection using the the where clause(s) which set the @key variable.
                 # With a "for update" lock for duration of this transaction.
-                sql = f"SELECT T.`{self._key_col}` INTO @key FROM {db_table} AS T " + \
+                sql = f"SELECT T.`{self._key_col}` INTO @key FROM {self._full_table_name} AS T " + \
                         f"WHERE T.`{self._key_col}`=? AND " + \
                         f"(T.`{self._lock_col}` IS NULL OR T.`{self._lock_col}` IN ('', @lock_id))"
                 if len(wcols) > 0:
@@ -622,13 +611,13 @@ class MariaDbTableDal(Dal3):
                 # May not match if the row has changed since the initial list of keys was drawn up.
                 if cursor.rowcount > 0:
                     # Put the soft lock the row
-                    sql = f"UPDATE {db_table} AS T SET T.`{self._lock_col}`=@lock_id" + \
-                        f" WHERE T.`{self._key_col}`=@key;"
+                    sql = f"UPDATE {self._full_table_name} AS T " + \
+                            f"SET T.`{self._lock_col}`=@lock_id WHERE T.`{self._key_col}`=@key;"
                     cursor.execute(sql)
 
                     # Select entire row if it's locked
-                    sql = f"SELECT T.* FROM {db_table} AS T" + \
-                        f" WHERE T.`{self._key_col}`=@key AND T.`{self._lock_col}`=@lock_id;"
+                    sql = f"SELECT T.* FROM {self._full_table_name} AS T" + \
+                            f" WHERE T.`{self._key_col}`=@key AND T.`{self._lock_col}`=@lock_id;"
                     cursor.execute(sql)
 
                     # A bit of a hack but this gets it into a form that's compatible with schema.
@@ -648,8 +637,7 @@ class MariaDbTableDal(Dal3):
             cursor.execute(f"SET @lock_id='{self._lock_id}';")
             cursor.execute(f"SET @key='{key}';")
 
-            db_table = f"{self._db_config['database']}.{self._table_name}"
-            sql = f"UPDATE {db_table} AS T SET T.`{self._lock_col}`=NULL"
+            sql = f"UPDATE {self._full_table_name} AS T SET T.`{self._lock_col}`=NULL"
             if len(ucols) > 0:
                 sql += "," + ",".join(f"T.`{c}`=?" for c in ucols)
             sql += f" WHERE T.`{self._key_col}`=@key AND T.`{self._lock_col}`=@lock_id;"
@@ -664,8 +652,7 @@ class MariaDbTableDal(Dal3):
         """ Gets a list of row keys which are currently available to lock & match the criteria. """
         keys = []
         with _mariadb.connect(**self._db_config) as conn, conn.cursor() as cursor:
-            sql = f"SELECT T.`{self._key_col}` " + \
-                    f"FROM {self._db_config['database']}.{self._table_name} AS T " + \
+            sql = f"SELECT T.`{self._key_col}` FROM {self._full_table_name} AS T " + \
                     f"WHERE (T.`{self._lock_col}` IS NULL OR T.`{self._lock_col}` IN ('', ?))"
             if len(wcols := [c for c in where if c not in [self._lock_col]]) > 0:
                 sql += " AND " + " AND ".join(f"T.`{c}`=?" for c in wcols)
@@ -674,6 +661,14 @@ class MariaDbTableDal(Dal3):
             if cursor.rowcount > 0:
                 keys = [row[0] for row in cursor]
         return keys
+
+    @classmethod
+    def _does_working_set_table_exist(cls, conn: _mariadb.Connection, name: str) -> bool:
+        """ Indicates whether the requested working set table exists """
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME=?;", (name, ))
+            return cursor.rowcount > 0
+
 
 def create_dal(typename: _Union[str, type[Dal3]], **kwargs):
     """
