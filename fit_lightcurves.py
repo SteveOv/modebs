@@ -15,8 +15,8 @@ import astropy.units as u
 
 # pylint: disable=line-too-long, wrong-import-position
 warnings.filterwarnings("ignore", "Using UFloat objects with std_dev==0 may give unexpected results.", category=UserWarning)
-from uncertainties import ufloat, UFloat, nominal_value, std_dev
-from uncertainties.unumpy import nominal_values
+from uncertainties import ufloat, UFloat, nominal_value as nom_val, std_dev
+from uncertainties.unumpy import nominal_values as nom_vals
 from matplotlib import use as mpl_use
 import matplotlib.pyplot as plt
 
@@ -26,7 +26,7 @@ from libs import pipeline, lightcurves, plots
 from libs.pipeline import PipelineError
 from libs.iohelpers import Tee
 from libs.targets import Targets
-from libs.pipeline_dal import QTableFileDal
+from libs.pipeline_dal3 import create_dal
 
 
 THIS_STEM = Path(getsourcefile(lambda: 0)).stem
@@ -43,10 +43,11 @@ def indicate_eclipses(_, ax, lc): # pylint: disable=redefined-outer-name
         ("secondary", "--", "g"),
         ("primary", "-.", "r")
     ]:
-        alphas = [0.33 if cf else 0.1 for cf in lc.meta[f"{ecl_type}_completeness"] > ecl_complete_th]
+        alphas = [.33 if cf else .1 for cf in lc.meta[f"{ecl_type}_completeness"] > ecl_complete_th]
         if len(times := lc.meta[f"{ecl_type}_times"]) > 0:
             ax.vlines(times, 0.5, 1.1, c, ls, label=ecl_type, alpha=alphas, zorder=-20)
-            ax.plot(times, 1.0-lc.meta[f"{ecl_type}_depths"], f"{c}+", markersize=10, alpha=0.33, zorder=-20)
+            ax.plot(times, 1.0-lc.meta[f"{ecl_type}_depths"], f"{c}+",
+                    markersize=10, alpha=0.33, zorder=-20)
     # Also highlight the t0/primary epoch time
     ax.plot(lc.meta["t0"], 1.08, "rv", markersize=6, alpha=0.5, zorder=-20)
 
@@ -81,8 +82,8 @@ if __name__ == "__main__":
     write_keys = ["rA_plus_rB", "k", "J", "ecosw", "esinw", "bP", "inc", "qphot", "L3", "LR"]
     warn_keys = ["k", "J", "LR"]
 
-    with open(drop_dir/f"{THIS_STEM}.log", "a", encoding="utf8") as lf, \
-                                                                    redirect_stdout(Tee(lf)) as log:
+    with open(drop_dir / f"{THIS_STEM}.log", "a", encoding="utf8") as lf, \
+            redirect_stdout(Tee(lf)) as log:
         print("\n\n============================================================")
         print(f"Started {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
         print("============================================================")
@@ -94,43 +95,38 @@ if __name__ == "__main__":
               f"which contains {targets_config.count()} target(s) that have not been exluded.")
 
         # Open the targets table and the configs
-        wset = QTableFileDal(args.working_set_file)
-        to_fit_target_ids = list(wset.yield_keys("fitted_lcs", where=lambda fl: fl == False)) # pylint: disable=singleton-comparison
-        to_fit_count = len(to_fit_target_ids)
+        dal = create_dal(targets_config.get("Dal", "QTableFileDal3"), file=args.working_set_file)
+        to_fit_criteria = { "fitted_lcs": False }
+        to_fit_count = dal.count_where(**to_fit_criteria)
         print(f"The working-set indicates there are {to_fit_count} target(s) to be fitted.")
 
 
-        for fit_counter, target_id in enumerate(to_fit_target_ids, start=1):
+        for fit_counter, trow in enumerate(dal.acquire_next_row(**to_fit_criteria), start=1):
             try:
+                target_id = trow.key
                 print("\n\n------------------------------------------------------------")
                 print(f"Processing target {fit_counter} of {to_fit_count}: {target_id}")
                 print("------------------------------------------------------------")
                 config = targets_config.get_target_config(target_id)
-                warn_msgs = (wset.read_values(target_id, "warnings") or "").split(";")
                 if args.plot_figs:
                     figs_dir = drop_dir / "figs" / pipeline.to_file_safe_str(target_id)
                     figs_dir.mkdir(parents=True, exist_ok=True)
-
-                # Get basic ephemeris information
-                t0, period, widthP, widthS, depthP, depthS, phiS, morph = wset.read_values(
-                    target_id, "t0","period","widthP","widthS","depthP","depthS","phiS","morph")
 
                 # The quality bitmask excludes fluxes by their quality flag. If unset, choose on the
                 # period. For shorter periods we're more discriminating as orbital coverage is good.
                 quality_bitmask = config.quality_bitmask
                 if quality_bitmask is None:
                     quality_bitmask = "default"
-                    per = nominal_value(period)
+                    per = nom_val(trow.period)
                     if per < config.get("quality_bitmask_to_hardest_threshold", 5):
                         quality_bitmask = "hardest"
                     elif per < config.get("quality_bitmask_to_hard_threshold", 10):
                         quality_bitmask = "hard"
-                    print(f"Set quality_bitmask to {quality_bitmask} as the period is {period:.6f}")
+                    print(f"Using quality_bitmask {quality_bitmask} as period is {trow.period:.6f}")
 
                 # It's quicker to get LCs once and cache the results than to continue to bother MAST
-                search_term, tics = wset.read_values(target_id, "search_term", "tics")
                 lcs = lightcurves.load_lightcurves(target_id,
-                                                   search_term,
+                                                   trow.search_term,
                                                    sectors=None,
                                                    mission=config.mission,
                                                    author=config.author,
@@ -141,11 +137,11 @@ if __name__ == "__main__":
                                                    cache_dir=Path() / ".cache/.mast/",
                                                    verbose=True)
                 if lcs is None or len(lcs) == 0:
-                    raise PipelineError(target_id, f"No lightcurves found for {search_term}.")
+                    raise PipelineError(target_id, f"No lightcurves found for {trow.search_term}.")
 
                 # Then filter out any results that are for a different TIC (unlikely but possible).
                 select_mask = np.in1d([l.meta['TARGETID'] for l in lcs],
-                                    [int(t) for t in tics.split("|")])
+                                    [int(t) for t in trow.tics.split("|")])
                 lcs = lcs[select_mask]
                 print(f"Found {len(lcs)} lightcurves prior to applying any configured selections.")
 
@@ -169,7 +165,7 @@ if __name__ == "__main__":
                 if len(lcs) > 1:
                     print(f"Variance in CROWDSAP over {len(lcs)} LCs: {var_crowdsap:.6f}")
                     if var_crowdsap > 1e-3:
-                        warn_msgs += ["var(CROWDSAP)>1e-3"]
+                        trow.append_warning("var(CROWDSAP)>1e-3")
 
                 min_section_dur = config.get("min_lc_section_days", 2) * u.d
                 print("\nClipping the lightcurves' invalid fluxes, known distorted sections",
@@ -181,7 +177,7 @@ if __name__ == "__main__":
                 # Split the LCs on significant gaps if the period is sufficiently short that we can
                 # maintain good coverage. Gives a larger sample of fits from which to derive params.
                 if not config.do_not_split:
-                    new_lcs, min_gap, min_sec = [], 0.25 * u.d, nominal_value(period) * 3.0 * u.d
+                    new_lcs, min_gap, min_sec = [], 0.25 * u.d, nom_val(trow.period) * 3.0 * u.d
                     for lc in lcs:
                         sls = [*lightcurves.find_lightcurve_sections(lc, min_gap_duration=min_gap,
                                                                      min_section_duration=min_sec)]
@@ -199,8 +195,10 @@ if __name__ == "__main__":
 
 
                 print("\nInspecting the lightcurves to find and characterise their eclipses")
-                pipeline.add_eclipse_meta_to_lightcurves(lcs, t0, period, widthP, widthS,
-                                                         depthP, depthS, phiS, verbose=True)
+                pipeline.add_eclipse_meta_to_lightcurves(lcs, trow.t0, trow.period,
+                                                         trow.widthP, trow.widthS,
+                                                         trow.depthP, trow.depthS,
+                                                         trow.phiS, verbose=True)
 
 
                 if args.plot_figs:
@@ -238,10 +236,11 @@ if __name__ == "__main__":
                 # Flatten (optional depending on morph), append delta_mag & delta_mag_err columns
                 # and then detrend & rectify the mags to zero by subtracting a low order polynomial
                 flatten_morph_th = config.get("flatten_morph_threshold", 0)
-                do_flatten = config.flatten or (config.flatten is None and morph<=flatten_morph_th)
+                do_flatten = config.flatten \
+                                or (config.flatten is None and trow.morph <= flatten_morph_th)
                 if do_flatten:
-                    print(f"\nFluxes for {target_id} (with morph={morph:.3f}) will be flattened,",
-                        "prior to detrending, as it has a", 
+                    print(f"\nFluxes for {target_id} (with morph={trow.morph:.3f})",
+                        "will be flattened prior to detrending, as it has a",
                         "config override set." if config.flatten else f"morph<={flatten_morph_th}.")
                 else:
                     print()
@@ -250,8 +249,8 @@ if __name__ == "__main__":
                                                                 config.detrend_poly_degree,
                                                                 config.detrend_iterations,
                                                                 do_flatten,
-                                                                durp=nominal_value(widthP * period),
-                                                                durs=nominal_value(widthS * period),
+                                                                nom_val(trow.widthP * trow.period),
+                                                                nom_val(trow.widthS * trow.period),
                                                                 override_poly_on_flatten=True,
                                                                 verbose=True)
 
@@ -268,12 +267,11 @@ if __name__ == "__main__":
                 # EBOP MAVEN estimates of fitting input params. Requires phase folded & binned mags
                 print("\nPreparing phase-folded & binned copies of the lightcurves for EBOP MAVEN.")
                 bins = estimator.mags_feature_bins
-                wrap_phase = u.Quantity(estimator.mags_feature_wrap_phase or (0.5 + phiS / 2))
+                wrap_phase = u.Quantity(estimator.mags_feature_wrap_phase or (0.5 + trow.phiS / 2))
                 binned_fold = np.zeros(shape=(len(lcs), 2, bins), dtype=np.float32)
                 for ix, lc in enumerate(lcs):
-                    flc = lc.fold(period.n * u.d, lc.meta["t0"],
-                                wrap_phase=wrap_phase,
-                                normalize_phase=True)
+                    flc = lc.fold(trow.period.n * u.d, lc.meta["t0"],
+                                  wrap_phase=wrap_phase, normalize_phase=True)
                     binned_fold[ix] = lightcurves.get_binned_phase_mags_data(flc, bins, wrap_phase)
 
                 print("\nEstimating fitting input parameters with EBOP MAVEN.")
@@ -285,8 +283,8 @@ if __name__ == "__main__":
                 print(("Mean predicted" if preds.size > 1 else "Predicted"), "parameters",
                       f"from {len(lcs)} LC group(s), including the value calculated for inc.")
                 print("\n".join(f"{p:>14s}: {preds_dict[p]:12.6f}" for p in preds_dict))
-                if nominal_value(preds_dict["rA_plus_rB"]) > 0.4:
-                    warn_msgs += ["MAVEN rA_plus_rB>0.4"]
+                if nom_val(preds_dict["rA_plus_rB"]) > 0.4:
+                    trow.append_warning("MAVEN rA_plus_rB>0.4")
 
 
                 # Clip masks retain only obs within 2.5 d of an eclipse for fitting. Can optimise
@@ -299,10 +297,10 @@ if __name__ == "__main__":
                     if do_clip:
                         # To be picked up by pipeline.fit_target_lightcurves to exlude rows from dat
                         lc.meta["clip_mask"] = lightcurves.create_eclipse_mask(lc,
-                                                                        lc.meta["primary_times"],
-                                                                        lc.meta["secondary_times"],
-                                                                        widthP * period.n * 5,
-                                                                        widthS * period.n * 5)
+                                                            lc.meta["primary_times"],
+                                                            lc.meta["secondary_times"],
+                                                            nom_val(trow.widthP * trow.period * 5),
+                                                            nom_val(trow.widthS * trow.period * 5))
 
                 # Extract any fitting overrides from the target config. May contain LD params which
                 # are popped from the dicts, so each dict must be independent with the copy calls.
@@ -310,9 +308,8 @@ if __name__ == "__main__":
                 if isinstance(fit_overrides, dict):
                     fit_overrides = [fit_overrides.copy() for _ in range(len(lcs))]
 
-                Teff_sys, logg_sys, st = wset.read_values(target_id, "Teff_sys", "logg_sys", "spt")
-                Teff_sys = Teff_sys or lcs[0].meta["TEFF"] or pipeline.get_teff_from_spt(st) or 5650
-                logg_sys = logg_sys or lcs[0].meta["LOGG"] or 4.0
+                Teff_sys = trow.Teff_sys or lcs[0].meta["TEFF"] or pipeline.get_teff_from_spt(trow.spt) or 5650
+                logg_sys = trow.logg_sys or lcs[0].meta["LOGG"] or 4.0
 
                 # LD params based on the system temperature & log(g) (deferring to any overrides)
                 # Substiturte LR ~= J*k^2 giving TeffR ~= ((J*k^2)/k^2)^1/4 ~= J^1/4
@@ -320,12 +317,12 @@ if __name__ == "__main__":
                 print(f"\nSetting up LD params based on Teff_sys={Teff_sys:.0f} K, ",
                       f"logg_sys={logg_sys:.3f}, subject to any overrides from config.",
                       f"The default algorithm in {def_ld_algo}.")
-                TeffR = nominal_value(preds_dict["J"]**0.25)
+                TeffR = nom_val(preds_dict["J"]**0.25)
                 ld_Teffs = (Teff_sys, Teff_sys*TeffR) if TeffR < 1 else (Teff_sys/TeffR, Teff_sys)
-                ld_params = [pipeline.pop_and_complete_ld_config(fo,
-                                                            *nominal_values(ld_Teffs),
-                                                            *nominal_values((logg_sys, logg_sys)),
-                                                            def_ld_algo) for fo in fit_overrides]
+                ld_params = [pipeline.pop_and_complete_ld_config(o,
+                                                                *nom_vals(ld_Teffs),
+                                                                *nom_vals((logg_sys, logg_sys)),
+                                                                def_ld_algo) for o in fit_overrides]
 
                 # Build the values and flags for the JKTEBOP in files
                 # The refl flags can be 0 (fixed), 1 (fitted) or -1 (calculated from sys geometry)
@@ -334,12 +331,12 @@ if __name__ == "__main__":
                 # Mass ratio can be -1 (force spherical) or specific value. Only used for LC effects
                 if do_flatten:
                     qphot = -1
-                elif np.prod(nominal_values([preds_dict[k] for k in ["k", "J"]]) - 1) <= -0.04:
+                elif np.prod(nom_vals([preds_dict[k] for k in ["k", "J"]]) - 1) <= -0.04:
                     # k & J differ significantly either side of 1. Potentially evolved component
                     # with the M-S approximation is invalid, so default to spherical.
                     if "qphot" not in fit_overrides:
                         print("Predicted k & J indicate potentially evolved component: qphot = -1")
-                    warn_msgs += ["evolved?"]
+                    trow.append_warning("evolved?")
                     qphot = -1
                 else:
                     # Assume M-S components and use approximation of qphot \sim k^1.4
@@ -351,8 +348,8 @@ if __name__ == "__main__":
                     "L3": max(0, 1-lc.meta.get("CROWDSAP", 1)),
                     "reflA": 0.,                "reflB": 0.,
 
-                    "t0": nominal_value(lc.meta.get("t0", t0)),
-                    "period": nominal_value(period),
+                    "t0": nom_val(lc.meta.get("t0", trow.t0)),
+                    "period": nom_val(trow.period),
 
                     "rA_plus_rB_fit": 1,        "k_fit": 1,
                     "inc_fit": 1,               "qphot_fit": 0,
@@ -387,7 +384,7 @@ if __name__ == "__main__":
                 # Review fitting metadata to find and warn if any of the fits did not converge.
                 conv_mask = np.array([fd.get("converged") for fd in fitted_param_dicts], bool)
                 if (fail_count := sum(~conv_mask)) > 0:
-                    warn_msgs += [f"{fail_count}/{len(lcs)} LC fits incomplete"]
+                    trow.append_warning(f"{fail_count}/{len(lcs)} LC fits incomplete")
                     print(f"\n## Warning: {fail_count} of {len(lcs)} LC fit(s) did not converge:",
                           ", ".join(lc.meta["LABEL"] for lc in lcs[~conv_mask]))
 
@@ -395,7 +392,7 @@ if __name__ == "__main__":
                 warn_mask = conv_mask \
                     & np.array([len(fd.get("warn_msgs", []))>0 for fd in fitted_param_dicts], bool)
                 if (warn_count:= sum(warn_mask)) > 0:
-                    warn_msgs += [f"{warn_count}/{sum(conv_mask)} conv LC fits has warnings"]
+                    trow.append_warning(f"{warn_count}/{sum(conv_mask)} conv LC fits has warnings")
                     print(f"\n## Warning: {warn_count} of {sum(conv_mask)} converged LC fit(s)",
                           "has warnings:", ", ".join(lc.meta["LABEL"] for lc in lcs[warn_mask]))
 
@@ -460,7 +457,7 @@ if __name__ == "__main__":
                     print(f"\nApplying a minimum of {min_err_pc:.0%} to the uncertainties.",end=" ")
                     kup = []
                     for k in (n for n in final_params.dtype.names if final_params[n] is not None):
-                        nom, err = nominal_value(final_params[k]), std_dev(final_params[k])
+                        nom, err = nom_val(final_params[k]), std_dev(final_params[k])
                         if err < (new_err:= abs(nom * min_err_pc)):
                             kup += [k]
                             final_params[k] = ufloat(nom, new_err)
@@ -482,32 +479,26 @@ if __name__ == "__main__":
 
 
                 # Raise warnings about anomolous parameter values
-                if len(warn_params:=[k for k in warn_keys if nominal_value(final_params[k])<0]) > 0:
-                    warn_msgs += [f"fitted {','.join(warn_params)}<0"]
+                if len(warn_params:=[k for k in warn_keys if nom_val(final_params[k])<0]) > 0:
+                    trow.append_warning(f"fitted {','.join(warn_params)}<0")
                 if len(warn_params:=[k for k, v in [(r, final_params[r]) for r in warn_keys]
-                                                if std_dev(v) > abs(nominal_value(v)*0.20)]) > 0:
-                    warn_msgs += [f"uncert {','.join(warn_params)}>20%"]
+                                                if std_dev(v) > abs(nom_val(v)*0.20)]) > 0:
+                    trow.append_warning(f"uncert {','.join(warn_params)}>20%")
 
-
-                # Finally, store the params and the flag that indicates LC fitting has completed
+                # Finally, store the params and the flag that indicates LC fitting has completed.
                 print(f"\nWriting final values for {', '.join(k for k in write_keys)},",
                       "TeffR, Teff_sys & logg_sys to working-set.")
-                params = { k: final_params[k] for k in write_keys }
-                params["TeffR"] = TeffR
-                params["Teff_sys"] = Teff_sys   # These have come from TIC
-                params["logg_sys"] = logg_sys   # and will be used later in SED fitting
-                wset.write_values(target_id, fitted_lcs=True, errors="",
-                                  warnings=";".join(w for w in dict.fromkeys(warn_msgs) if len(w)),
-                                  **params)
+                trow.set_values(**{ k: final_params[k] for k in write_keys }, TeffR=TeffR,
+                                Teff_sys=Teff_sys, logg_sys=logg_sys, fitted_lcs=True, errors="")
 
 
             except Exception as exc: # pylint: disable=broad-exception-caught
                 print("\n*** Failed with the following error. Depending on the nature of the",
                       "error, it may be possible to rerun this module to fit failed targets. ***")
                 traceback.print_exception(exc, file=log)
-                wset.write_values(target_id, fitted_lcs=False, errors=type(exc).__name__,
-                                  warnings=";".join(w for w in dict.fromkeys(warn_msgs) if len(w)))
+                trow.set_values(fitted_lcs=False, errors=type(exc).__name__)
 
+            # Each row's values will be written to the underlying data store as it goes out of scope
 
         print("\n\n============================================================")
         print(f"Completed {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")

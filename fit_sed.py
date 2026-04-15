@@ -18,8 +18,8 @@ from astropy.coordinates import SkyCoord
 
 # pylint: disable=line-too-long, wrong-import-position
 warnings.filterwarnings("ignore", "Using UFloat objects with std_dev==0 may give unexpected results.", category=UserWarning)
-from uncertainties import ufloat, nominal_value, std_dev
-from uncertainties.unumpy import nominal_values
+from uncertainties import ufloat, nominal_value as nom_val, std_dev
+from uncertainties.unumpy import nominal_values as nom_vals
 
 # Dereddening of SEDS
 from dust_extinction.parameter_averages import G23
@@ -33,7 +33,7 @@ from libs.pipeline import PipelineError
 from libs.sed import get_sed_for_target, group_and_average_fluxes, create_outliers_mask
 from libs.iohelpers import Tee
 from libs.targets import Targets
-from libs.pipeline_dal import QTableFileDal
+from libs.pipeline_dal3 import create_dal
 
 THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 
@@ -85,10 +85,9 @@ if __name__ == "__main__":
         print(f"Read in the configuration from '{args.targets_file.name}'",
               f"which contains {targets_config.count()} target(s) that have not been excluded.")
 
-        wset = QTableFileDal(args.working_set_file)
-        to_fit_target_ids = list(wset.yield_keys("fitted_lcs", "fitted_sed",
-                                                 where=lambda fl, fs: fl == True and fs == False)) # pylint: disable=singleton-comparison
-        to_fit_count = len(to_fit_target_ids)
+        dal = create_dal(targets_config.get("Dal", "QTableFileDal3"), file=args.working_set_file)
+        to_fit_criteria = { "fitted_lcs": True, "fitted_sed": False }
+        to_fit_count = dal.count_where(**to_fit_criteria)
         print(f"The working-set indicates there are {to_fit_count} targets to be fitted.")
 
         # Extinction model: G23 (Gordon et al., 2023) Milky Way R(V) filter gives us broad coverage
@@ -111,33 +110,32 @@ if __name__ == "__main__":
         teff_limits = model_grid.teff_range
         radius_limits = (0.1, 100)
 
-        for fit_counter, target_id in enumerate(to_fit_target_ids, start=1):
+        for fit_counter, trow in enumerate(dal.acquire_next_row(**to_fit_criteria), start=1):
             if fit_counter > 1:
                 sleep(10) # Give emcee a quick break, in prep for the next target
 
             try:
+                target_id = trow.key
                 print("\n\n------------------------------------------------------------")
                 print(f"Processing target {fit_counter} of {to_fit_count}: {target_id}")
                 print("------------------------------------------------------------")
                 config = targets_config.get_target_config(target_id)
-                warn_msgs = (wset.read_values(target_id, "warnings") or "").split(";")
                 if args.plot_figs:
                     figs_dir = drop_dir / "figs" / pipeline.to_file_safe_str(target_id)
                     figs_dir.mkdir(parents=True, exist_ok=True)
 
-                search_term, k, TeffR, Teff_sys, logg_sys = wset.read_values(target_id,
-                                                "search_term", "k", "TeffR", "Teff_sys", "logg_sys")
-                ra, dec, parallax = wset.read_values(target_id, "ra_coord", "dec_coord", "parallax")
-                coords = SkyCoord(ra=nominal_value(ra) * u.deg, dec=nominal_value(dec) * u.deg,
-                                  distance=(1000 / nominal_value(parallax)) * u.pc, frame="icrs")
+                coords = SkyCoord(ra=nom_val(trow.ra_coord) * u.deg,
+                                  dec=nom_val(trow.dec_coord) * u.deg,
+                                  distance=(1000 / nom_val(trow.parallax)) * u.pc,
+                                  frame="icrs")
 
 
                 # Get the SED for this target and de-duplicate (obs may appear multiple times).
                 print()
-                sed = get_sed_for_target(target_id, search_term,
+                sed = get_sed_for_target(target_id, trow.search_term,
                                          radius=0.1, remove_duplicates=True, verbose=True)
                 if sed is None or len(sed) == 0:
-                    raise PipelineError(target_id, f"No SED observations found for '{search_term}'")
+                    raise PipelineError(target_id, f"No SED observations for '{trow.search_term}'")
 
                 sed = group_and_average_fluxes(sed, verbose=True)
 
@@ -150,7 +148,7 @@ if __name__ == "__main__":
                             & (sed["sed_wl"] <= max(model_grid.wavelength_range))
                 sed = sed[model_mask]
 
-                out_mask = create_outliers_mask(sed, Teff_sys, [TeffR], 15, verbose=True)
+                out_mask = create_outliers_mask(sed, trow.Teff_sys, [trow.TeffR], 15, verbose=True)
                 sed = sed[~out_mask]
                 sed.sort(["sed_wl"])
                 print(f"{len(sed)} unique SED observation(s) retained after range & outlier",
@@ -173,14 +171,14 @@ if __name__ == "__main__":
                     else:
                         Av = np.mean(avs[0])
                         print(f"Using the mean of {len(rmask)} value(s): A_V={Av:.6f}")
-                        warn_msgs += ["unreliable A_V"]
+                        trow.append_warning("unreliable A_V")
 
                 if Av:
                     print("Dereddening SED observations")
                     sed["sed_der_flux"] = \
                             sed["sed_flux"] / ext_model.extinguish(sed["sed_wl"].to(u.um), Av=Av)
                 else:
-                    warn_msgs += ["No A_V found"]
+                    trow.append_warning("No A_V found")
                     sed["sed_der_flux"] = sed["sed_flux"]
                     Av = 0
 
@@ -198,8 +196,9 @@ if __name__ == "__main__":
                 # Set up the MCMC fitting theta and priors. For now, hard coded to 2 stars.
                 # The ratios are wrt the primary components - the prior_func ignores the 0th item
                 print("\nSetting up the fitting priors and the ln_prior_func() callback.")
-                Teff_ratios = [ufloat(TeffR.n, max(TeffR.s, TeffR.n*0.1))] * NUM_STARS
-                rad_ratios = [ufloat(k.n, max(k.s, k.n*0.1))] * NUM_STARS
+                TeffR, radR = trow.TeffR, trow.k
+                Teff_ratios = [ufloat(TeffR.n, max(TeffR.s, TeffR.n * 0.1))] * NUM_STARS
+                rad_ratios = [ufloat(radR.n, max(radR.s, radR.n * 0.1))] * NUM_STARS
                 dist_prior = ufloat(coords.distance.value, coords.distance.value * 0.05)
                 print(f"Teff ratios={', '.join(f'{r:.3f}' for r in Teff_ratios[1:])}",
                       f"radius_ratios={', '.join(f'{r:.3f}' for r in rad_ratios[1:])},",
@@ -223,6 +222,7 @@ if __name__ == "__main__":
 
                     # Gaussian prior criteria: g(x) = 1/(σ*sqrt(2*pi)) * exp(-1/2 * (x-µ)^2/σ^2)
                     # Omitting scaling expressions and note the implicit ln() cancelling the exp
+                    # TODO: probable bug here in radii prior (should be / radR.s)
                     rval = 0
                     for star_ix in range(1, NUM_STARS):
                         rval += ((teffs[star_ix] / teffs[0]-Teff_ratios[star_ix].n) / TeffR.s)**2
@@ -233,9 +233,9 @@ if __name__ == "__main__":
 
                 print("\nSetting up the starting position (theta0) for fitting.")
                 init_teff = max(min(model_grid.teff_range),
-                                min(nominal_value(Teff_sys), max(model_grid.teff_range)))
+                                min(nom_val(trow.Teff_sys), max(model_grid.teff_range)))
                 init_logg = max(min(model_grid.logg_range),
-                                min(nominal_value(logg_sys), max(model_grid.logg_range)))
+                                min(nom_val(trow.logg_sys), max(model_grid.logg_range)))
                 theta0 = create_theta(teffs=init_teff,
                                       loggs=init_logg,
                                       radii=1.0,
@@ -280,7 +280,7 @@ if __name__ == "__main__":
                         fig = corner.corner(data=_data, show_titles=True, plot_datapoints=True,
                                             quantiles=[0.16, 0.5, 0.84],
                                             labels=theta_labels[fit_mask],
-                                            truths=nominal_values(theta_fit[fit_mask]))
+                                            truths=nom_vals(theta_fit[fit_mask]))
                         fig.savefig(figs_dir/f"sed-mcmc-corner.{args.figs_type}", dpi=args.figs_dpi)
                         plt.close(fig)
 
@@ -305,18 +305,16 @@ if __name__ == "__main__":
                     # *** also updates the target data ***
                     if mask:
                         write_params[k] = val
-                        if std_dev(val) > abs(nominal_value(val) * 0.20):
+                        if std_dev(val) > abs(nom_val(val) * 0.20):
                             high_uncert_params += [k]
 
                 if len(high_uncert_params) > 0:
-                    warn_msgs += [f"uncert {','.join(k for k in high_uncert_params)}>20%"]
+                    trow.append_warning(f"uncert {','.join(k for k in high_uncert_params)}>20%")
 
 
                 # Finally, store the params and the flag that indicates SED fitting has completed
                 print(f"\nWriting fitted params for {list(write_params.keys())} to working-set.")
-                wset.write_values(target_id, fitted_sed=True, errors="",
-                                  warnings=";".join(w for w in dict.fromkeys(warn_msgs) if len(w)),
-                                  **write_params)
+                trow.set_values(**write_params, fitted_sed=True, errors="")
 
 
 
@@ -324,9 +322,9 @@ if __name__ == "__main__":
                 print("\n*** Failed with the following error. Depending on the nature of the",
                       "error, it may be possible to rerun this module to fit failed targets. ***")
                 traceback.print_exception(exc, file=log)
-                wset.write_values(target_id, fitted_sed=False, errors=type(exc).__name__,
-                                  warnings=";".join(w for w in dict.fromkeys(warn_msgs) if len(w)))
+                trow.set_values(fitted_sed=False, errors=type(exc).__name__)
 
+            # Each row's values will be written to the underlying data store as it goes out of scope
 
         print("\n\n============================================================")
         print(f"Completed {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")

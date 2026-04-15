@@ -17,8 +17,8 @@ import astropy.units as u
 
 # pylint: disable=line-too-long, wrong-import-position
 warnings.filterwarnings("ignore", "Using UFloat objects with std_dev==0 may give unexpected results.", category=UserWarning)
-from uncertainties import ufloat, nominal_value, std_dev
-from uncertainties.unumpy import nominal_values
+from uncertainties import ufloat, nominal_value as nom_val, std_dev
+from uncertainties.unumpy import nominal_values as nom_vals
 
 from deblib.constants import G, R_sun, M_sun
 
@@ -27,10 +27,9 @@ from sed_fit.fitter import samples_from_sampler
 
 from libs.fit_masses import minimize_fit, mcmc_fit, log_age_for_mass_and_eep
 from libs import pipeline
-from libs.pipeline import PipelineError
 from libs.iohelpers import Tee
 from libs.targets import Targets
-from libs.pipeline_dal import QTableFileDal
+from libs.pipeline_dal3 import create_dal
 
 
 THIS_STEM = Path(getsourcefile(lambda: 0)).stem
@@ -77,62 +76,60 @@ if __name__ == "__main__":
         print(f"Read in the configuration from '{args.targets_file.name}'",
               f"which contains {targets_config.count()} target(s) that have not been excluded.")
 
-        wset = QTableFileDal(args.working_set_file)
-        to_fit_targets = list(wset.yield_keys("fitted_lcs", "fitted_sed", "fitted_masses",
-                                              where=lambda fl, fs, fm: fl and fs and not fm))
-        to_fit_count = len(to_fit_targets)
+        dal = create_dal(targets_config.get("Dal", "QTableFileDal3"), file=args.working_set_file)
+        to_fit_criteria = { "fitted_lcs": True, "fitted_sed": True, "fitted_masses": False }
+        to_fit_count = dal.count_where(**to_fit_criteria)
         print(f"The working-set indicates there are {to_fit_count} target(s) to be fitted.")
 
 
-        for fit_counter, target_id in enumerate(to_fit_targets, start=1):
+        for fit_counter, trow in enumerate(dal.acquire_next_row(**to_fit_criteria), start=1):
             if fit_counter > 1:
                 sleep(10) # Give emcee a quick break, in prep for the next target
 
             try:
+                target_id = trow.key
                 print("\n\n------------------------------------------------------------")
                 print(f"Processing target {fit_counter} of {to_fit_count}: {target_id}")
                 print("------------------------------------------------------------")
                 config = targets_config.get_target_config(target_id)
-                warn_msgs = (wset.read_values(target_id, "warnings") or "").split(";")
                 if args.plot_figs:
                     figs_dir = drop_dir / "figs" / pipeline.to_file_safe_str(target_id)
                     figs_dir.mkdir(parents=True, exist_ok=True)
 
 
                 print("Getting known values from previous steps to set up fitting priors")
-                TeffA, TeffB, RA, RB = wset.read_values(target_id, "TeffA", "TeffB", "RA", "RB")
-                rA_plus_rB, k, period, qphot = wset.read_values(target_id, "rA_plus_rB", "k",
-                                                                "period", "qphot")
-                rA = rA_plus_rB / (k + 1)
-                rB = rA_plus_rB / ((1/k) + 1)
-                print("\n".join(f"{p:>20s}: {v:12.3f}" for p, v in [("TeffA", TeffA),
-                                                                    ("TeffB", TeffB),
-                                                                    ("RA", RA), ("RB", RB),
-                                                                    ("rA", rA), ("rB", rB),
-                                                                    ("period", period)]))
+                rA = trow.rA_plus_rB / (trow.k + 1)
+                rB = trow.rA_plus_rB / ((1 / trow.k) + 1)
+                print("\n".join(f"{p:>20s}: {v:12.3f}" for p, v in [("TeffA", trow.TeffA),
+                                                                    ("TeffB", trow.TeffB),
+                                                                    ("RA", trow.RA),
+                                                                    ("RB", trow.RB),
+                                                                    ("rA", rA),
+                                                                    ("rB", rB),
+                                                                    ("period", trow.period)]))
 
 
                 # Calculate the system's semi-major axis and system mass (with Kepler's 3rd law)
-                a = np.mean([RA / rA, RB / rB])
+                a = np.mean([trow.RA / rA, trow.RB / rB])
                 print(f" semi-major axis (a): {a:12.3f} {u.Rsun:unicode}",
                       "(calculated from fitted & fractional radii)")
-                M_sys = (4 * np.pi**2 * (a * R_sun)**3) / (G * (period * 86400)**2) / M_sun
+                M_sys = (4 * np.pi**2 * (a * R_sun)**3) / (G * (trow.period * 86400)**2) / M_sun
                 print(f" system mass (M_sys): {M_sys:12.3f} {u.Msun:unicode}",
                       "(calculated from semi-major axis & orbital period)")
 
 
                 # Priors: observations from SED fitting
-                prior_radii = np.array([RA, RB])
-                prior_Teffs = np.array([TeffA, TeffB])
+                prior_radii = np.array([trow.RA, trow.RB])
+                prior_Teffs = np.array([trow.TeffA, trow.TeffB])
 
 
                 # Estimate fit starting position with masses derived from M_sys & the expected mass
                 # ratio and an approximate age for the more massive star within the main-sequence.
                 print("\nSetting up the starting position (theta0) for fitting.")
-                if qphot is None or nominal_value(qphot) <= 0:
+                if (qphot := trow.qphot) is None or nom_val(qphot) <= 0:
                     # The approx single k-q (k=q^0.715) relations of Demircan & Kahraman (1991).
-                    qphot = k**1.4
-                theta_masses = nominal_values([_MA := M_sys / (qphot + 1), M_sys - _MA])
+                    qphot = trow.k**1.4
+                theta_masses = nom_vals([_MA := M_sys / (qphot + 1), M_sys - _MA])
                 theta_age = log_age_for_mass_and_eep(np.max(theta_masses))
                 theta0 = np.concatenate([theta_masses, [theta_age]])
                 print_mass_theta(theta0, "theta0")
@@ -169,7 +166,7 @@ if __name__ == "__main__":
                         _data = samples_from_sampler(sampler, thin_by=args.mcmc_thin_by, flat=True)
                         fig = corner.corner(data=_data, show_titles=True, plot_datapoints=True,
                                             quantiles=[0.16, 0.5, 0.84], labels=theta_labels,
-                                            truths=nominal_values(theta_fit))
+                                            truths=nom_vals(theta_fit))
                         fig.savefig(figs_dir / f"masses-mcmc-corner.{args.figs_type}",
                                     dpi=args.figs_dpi)
                         plt.close(fig)
@@ -187,27 +184,25 @@ if __name__ == "__main__":
 
                     # *** also updates the target data ***
                     write_params[k] = val
-                    if std_dev(val) > abs(nominal_value(val) * 0.20):
+                    if std_dev(val) > abs(nom_val(val) * 0.20):
                         high_uncert_params += [k]
 
                 if len(high_uncert_params) > 0:
-                    warn_msgs += [f"uncert {','.join(high_uncert_params)}>20%"]
+                    trow.append_warning(f"uncert {','.join(high_uncert_params)}>20%")
 
 
                 # Finally, store the params and the flag that indicates fitting has completed
                 print(f"\nWriting fitted params for {list(write_params.keys())} to working-set.")
-                wset.write_values(target_id, fitted_masses=True, errors="",
-                                  warnings=";".join(w for w in dict.fromkeys(warn_msgs) if len(w)),
-                                  **write_params)
+                trow.set_values(**write_params, fitted_masses=True, errors="")
 
 
             except Exception as exc: # pylint: disable=broad-exception-caught
                 print("\n*** Failed with the following error. Depending on the nature of the",
                       "error, it may be possible to rerun this module to fit failed targets. ***")
                 traceback.print_exception(exc, file=log)
-                wset.write_values(target_id, fitted_masses=False, errors=type(exc).__name__,
-                                  warnings=";".join(w for w in dict.fromkeys(warn_msgs) if len(w)))
+                trow.set_values(**write_params, fitted_masses=False, errors=type(exc).__name__)
 
+            # Each row's values will be written to the underlying data store as it goes out of scope
 
         print("\n\n============================================================")
         print(f"Completed {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")

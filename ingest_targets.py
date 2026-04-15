@@ -20,7 +20,7 @@ import numpy as np
 from libs import pipeline
 from libs.iohelpers import Tee
 from libs.targets import Targets
-from libs.pipeline_dal import QTableFileDal
+from libs.pipeline_dal3 import create_dal
 
 THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 
@@ -53,13 +53,14 @@ if __name__ == "__main__":
         print(f"\nThe targets configuration file:   {args.targets_file}")
         print(f"Directory for data, logs & plots: {drop_dir}")
 
-        dal = QTableFileDal(args.working_set_file)
+        dal = create_dal("QTableFileDal3", file=args.working_set_file)
         targets_config = Targets(args.targets_file)
         print(f"Read in the configuration from '{args.targets_file.name}'",
               f"which contains {targets_config.count()} target(s) not excluded.")
 
 
         print("\nSetting up a storage row and search_term for each target.")
+        search_term_index = { }
         for ix, config in enumerate(targets_config.iterate_known_targets()):
             if (target_id := config.target_id).isnumeric():
                 search_term = config.get("search_term", f"TIC {int(target_id):d}")
@@ -67,9 +68,9 @@ if __name__ == "__main__":
                 search_term = config.get("search_term", target_id).strip()
                 if not search_term.startswith("TIC"):
                     search_term = "V* " + search_term
-            dal.write_values(target_id, search_term=search_term, morph=0.5, phiS=0.5,
-                             fitted_lcs=False, fitted_sed=False, fitted_masses=False)
-
+            dal.add_row(key=target_id, search_term=search_term, morph=0.5, phiS=0.5,
+                        fitted_lcs=False, fitted_sed=False, fitted_masses=False)
+            search_term_index[search_term] = target_id
 
         # Get the basic published information from SIMBAD (keyed on search_term). We do batched
         # queries and code is dependent on SIMBAD returning the rows in the requested order.
@@ -77,14 +78,14 @@ if __name__ == "__main__":
         simbad = Simbad()
         simbad.add_votable_fields("parallax", "sp", "ids")
         id_patt = re.compile(r"(Gaia DR3|V\*|TIC|HD|HIP|2MASS)\s+(.+?(?=\||$))", re.IGNORECASE)
-        st_index = {m: t for m, t in dal.yield_values("search_term", dal.key_name) if m is not None}
-        for sterms in pipeline.grouper(st_index.keys(), size=args.batch_size, fillvalue=None):
+        gaia_id_index = { }
+        for sterms in pipeline.grouper(search_term_index.keys(), args.batch_size, fillvalue=None):
             # zip strict so we get ValueError if not same len as the sterms
             sterms = [m for m in sterms if m is not None]
             for sterm, srow in zip(sterms, simbad.query_objects(sterms), strict=True):
-                target_id = st_index[sterm]
+                target_id = search_term_index[sterm]
                 ids = np.array(id_patt.findall(srow["ids"]), [("type", "O"), ("id", "O")])
-                params = {
+                cols_and_values = {
                     "tics": "|".join(f"{i}" for i in ids[ids["type"]=="TIC"]["id"]),
                     ** { col: srow[scol] for (col, scol) in [("ra_coord", "ra"),
                                                             ("dec_coord", "dec"),
@@ -95,65 +96,68 @@ if __name__ == "__main__":
                 }
 
                 if any(dr3_mask := ids["type"]=="Gaia DR3"):
-                    params["gaia_dr3_id"] = int(ids[dr3_mask][0]["id"])
-                dal.write_values(target_id, **params)
+                    gaia_id = int(ids[dr3_mask][0]["id"])
+                    cols_and_values["gaia_dr3_id"] = gaia_id
+                    gaia_id_index[gaia_id] = target_id
+
+                dal.update_row(key=target_id, **cols_and_values)
 
 
         # Augment the basic information from Gaia DR3 (where target is in DR3).
         # Gaia DR3 queries are keyed on the gaia_dr3_id from above against the source_id field.
         print("\nQuerying Gaia DR3 in batches for coordinates and ruwe data.")
-        gt_index = {g: t for g, t in dal.yield_values("gaia_dr3_id", dal.key_name) if g is not None}
-        for gids in pipeline.grouper(gt_index.keys(), size=args.batch_size, fillvalue=None):
+        for gids in pipeline.grouper(gaia_id_index.keys(), size=args.batch_size, fillvalue=None):
             AQL = f"SELECT TOP {args.batch_size*2} source_id, ra, dec, parallax, parallax_error, " \
                 + "ruwe, teff_gspphot, logg_gspphot FROM gaiadr3.gaia_source_lite " \
                 + f"WHERE source_id in ({','.join(f'{i:d}' for i in gids if i is not None)})"
             for srow in Gaia.launch_job(AQL).get_results():
-                if (target_id := gt_index.get(srow["source_id"], None)) is not None:
-                    params = { "ruwe": srow["ruwe"]}
+                if (target_id := gaia_id_index.get(srow["source_id"], None)) is not None:
+                    cols_and_values = { "ruwe": srow["ruwe"]}
                     if all((srow[k] or 0) != 0 for k in ["ra", "dec", "parallax"]):
-                        params |= {
+                        cols_and_values |= {
                             "ra_coord": srow["ra"],
                             "dec_coord": srow["dec"],
                             "parallax": srow["parallax"],
                             "parallax_err": srow["parallax_error"],
                             "parallax_bibcode": "2022yCat.1355....0G", # GaiaDR3 Part 1. Main source
                         }
-                    dal.write_values(target_id, **params)
+
+                    dal.update_row(key=target_id, **cols_and_values)
 
 
         # Highlight missing coords as this will inhibit accounting for extinction when fitting SED
         print()
-        for target_id, ra, dec, par, warn_msgs in \
-                dal.yield_values(dal.key_name, "ra_coord", "dec_coord", "parallax", "warnings"):
+        for row in dal.acquire_next_row():
+            ra, dec, par = row.ra_coord, row.dec_coord, row.parallax
             if any(v is None for v in [ra, dec, par]) or nominal_value(par) == 0:
-                warn_msgs = (warn_msgs or "").split(";") + ["coords incomplete"]
-                dal.write_values(target_id,
-                                 warnings=";".join(w for w in dict.fromkeys(warn_msgs) if len(w)))
+                warn_msgs = (row.warn_msgs or "").split(";") + ["coords incomplete"]
+                row.warnings = ";".join(w for w in dict.fromkeys(warn_msgs) if len(w))
                 print(f"** Warning {target_id} coords incomplete: ra={ra},dec={dec},parallax={par}")
 
 
         print("\nGathering ephemeris, morphology and eclipse data.")
         ephem_keys = ["t0", "period", "morph", "widthP", "depthP", "widthS", "depthS", "phiS"]
-        for target_id, tics, warn_msgs in dal.yield_values(dal.key_name, "tics", "warnings"):
-            warn_msgs = (dal.read_values(target_id, "warnings") or "").split(";")
-            params = {}
+        for row  in dal.acquire_next_row():
+            target_id = row.key
+            warn_msgs = (row.warnings or "").split(";")
+            cols_and_values = {}
 
             config = targets_config.get_target_config(target_id)
             if len(ephem_config_keys := [k for k in ephem_keys if config.has_value(k)]) > 0:
                 print(f"{target_id}: copying ephemeris values for {ephem_config_keys} from config")
                 for k in ephem_config_keys:
                     if config.has_value(k_err := f"{k}_err"):
-                        params[k] = ufloat(config.get(k), config.get(k_err, 0))
+                        cols_and_values[k] = ufloat(config.get(k), config.get(k_err, 0))
                     else:
-                        params[k] = config.get(k)
+                        cols_and_values[k] = config.get(k)
 
-            if missing_ephem_keys := [k for k in ephem_keys if k not in params]:
+            if missing_ephem_keys := [k for k in ephem_keys if k not in cols_and_values]:
                 print(f"** Warning the following ephemeris values were not in {target_id} config:",
                       ",".join(k for k in missing_ephem_keys))
-                warn_msgs += ["incomplete ephemeris"]
+                warn_msgs = (row.warnings or "").split(";") + ["incomplete ephemeris"]
+                row.warnings = ";".join(w for w in dict.fromkeys(warn_msgs) if len(w))
 
-            dal.write_values(target_id, **params,
-                             warnings=";".join(w for w in dict.fromkeys(warn_msgs) if len(w)))
+            row.set_values(**cols_and_values)
 
 
         print("\nApplying any non-ephemeris overrides from config.")
@@ -163,13 +167,14 @@ if __name__ == "__main__":
             if len(with_overs_keys) > 0:
                 target_id = config.target_id
                 print(f"{target_id}: copying override(s) for {with_overs_keys} from config.")
-                params = { }
+                cols_and_values = { }
                 for k in with_overs_keys:
                     if config.has_value(k_err := f"{k}_err"):
-                        params[k] = ufloat(config.get(k), config.get(k_err, 0))
+                        cols_and_values[k] = ufloat(config.get(k), config.get(k_err, 0))
                     else:
-                        params[k] = config.get(k)
-                dal.write_values(target_id, **params)
+                        cols_and_values[k] = config.get(k)
+
+                dal.update_row(key=target_id, **cols_and_values)
 
 
         print("\n\n============================================================")
