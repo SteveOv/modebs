@@ -35,18 +35,18 @@ class TestQTableFileDal3(unittest.TestCase):
 
         # Atomic adds don't require the lock semantics
         dal.add_row("AN Cam", fitted_lcs=True, fitted_sed=False, fitted_masses=False)
-        dal.add_row("CW Eri", locked_by=dal.lock_id, fitted_lcs=False, fitted_sed=False, fitted_masses=False)
+        dal.add_row("CW Eri", fitted_lcs=False, fitted_sed=False, fitted_masses=False, locked_by=dal.lock_id)
         dal.add_row("ZZ Boo", fitted_lcs=False, fitted_sed=False, fitted_masses=False)
 
         # These should not be picked up by acquire_next_row (blow).
         # AN Other is locked by another inst. ZZ UMa doesn't match the where criteria.
-        dal.add_row("AN Other", locked_by="AN Other", fitted_lcs=False, fitted_sed=False, fitted_masses=False)
+        dal.add_row("AN Other", fitted_lcs=False, fitted_sed=False, fitted_masses=False, locked_by="AN Other")
         dal.add_row("ZZ UMa", fitted_lcs=False, fitted_sed=True, fitted_masses=False)
 
         where = { "fitted_lcs": False, "fitted_sed": False, "fitted_masses": False }
-        self.assertEqual(3, dal.count_where(**where))
+        self.assertEqual(2, dal.count_where(**where))
         for row in dal.acquire_next_row(**where):
-            self.assertNotIn(row.key, ["AN Cam", "AN Other", "ZZ UMa"])
+            self.assertIn(row.key, ["CW Eri", "ZZ Boo"])
             row.fitted_lcs = True
             row.Teff_sys = ufloat(5750, 50)
             row["logg_sys"] = ufloat(4.0, 0.1)
@@ -56,11 +56,9 @@ class TestQTableFileDal3(unittest.TestCase):
         where["fitted_lcs"] = True
         self.assertEqual(3, dal.count_where(**where))
         for row in dal.acquire_next_row(**where):
-            self.assertNotIn(row.key, ["AN Other", "ZZ UMa"])
-
+            self.assertIn(row.key, ["CW Eri", "ZZ Boo", "AN Cam"])
             row.append_warning("Hello again")
             row.append_warning("Hello") # Should not appear more than once
-
             print(f"{row.key} : Teff_sys={row.Teff_sys}, logg_sys={row.logg_sys}, warnings={row.warnings}")
 
         # Atomic update on unlocked row
@@ -95,18 +93,18 @@ class TestMariaDbTableDal(unittest.TestCase):
 
         # Atomic adds don't require the lock semantics
         dal.add_row("AN Cam", fitted_lcs=True, fitted_sed=False, fitted_masses=False)
-        dal.add_row("CW Eri", locked_by=dal.lock_id, fitted_lcs=False, fitted_sed=False, fitted_masses=False)
+        dal.add_row("CW Eri", fitted_lcs=False, fitted_sed=False, fitted_masses=False, locked_by=dal.lock_id)
         dal.add_row("ZZ Boo", fitted_lcs=False, fitted_sed=False, fitted_masses=False)
 
         # These should not be picked up by acquire_next_row (blow).
         # AN Other is locked by another inst. ZZ UMa doesn't match the where criteria.
-        dal.add_row("AN Other", locked_by="AN Other", fitted_lcs=False, fitted_sed=False, fitted_masses=False)
+        dal.add_row("AN Other", fitted_lcs=False, fitted_sed=False, fitted_masses=False, locked_by="AN Other")
         dal.add_row("ZZ UMa", fitted_lcs=False, fitted_sed=True, fitted_masses=False)
 
         where = { "fitted_lcs": False, "fitted_sed": False, "fitted_masses": False }
         self.assertEqual(2, dal.count_where(**where))
         for row in dal.acquire_next_row(**where):
-            self.assertNotIn(row.key, ["AN Cam", "AN Other", "ZZ UMa"])
+            self.assertIn(row.key, ["CW Eri", "ZZ Boo"])
             row.fitted_lcs = True
             row.Teff_sys = ufloat(5750, 50)
             row["logg_sys"] = ufloat(4.0, 0.1)
@@ -118,11 +116,9 @@ class TestMariaDbTableDal(unittest.TestCase):
         where["fitted_lcs"] = True
         self.assertEqual(3, dal.count_where(**where))
         for row in dal.acquire_next_row(**where):
-            self.assertNotIn(row.key, ["AN Other", "ZZ UMa"])
-
+            self.assertIn(row.key, ["CW Eri", "ZZ Boo", "AN Cam"])
             row.append_warning("Hello again")
             row.append_warning("Hello") # Should not appear more than once
-
             print(f"{row.key} : Teff_sys={row.Teff_sys}, logg_sys={row.logg_sys}, warnings={row.warnings}")
 
         # Atomic update on unlocked row

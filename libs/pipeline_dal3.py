@@ -319,7 +319,6 @@ class Dal3(_ABC):
         :where: col/value criteria with which simple, col==value, matches are evaluated for each row
         """
         # We are only interested in rows which are currently unlocked
-        where[self._lock_col] = None
         for row_data in self._lock_and_yield_data_rows(**where):
             with DalDataRow(key=row_data[self._key_col],
                             values=row_data,
@@ -386,12 +385,17 @@ class QTableDal3(Dal3):
                               units=DalDataRow._col_units,
                               rows=[])
         self._table.add_index(self._key_col, unique=True)
+        self._usable_lock_vals = ("", None, "None", self._lock_id)
 
     def count_where(self, **where) -> int:
+        count = 0
         with self._CLIENT_LOCK:
-            # TODO: we should also evaluate whether these are lockable (to be consistent with DB)
-            return sum(all(self._parse_col_value(c, row[c]) == v for c, v in where.items()) \
-                        for row in self._table)
+            where.setdefault(self._lock_col, None)
+            for row in self._table:
+                test_vals = [self._parse_col_value(c, row[c]) for c in where]
+                count += all((tv == wv) or (c == self._lock_col and tv in self._usable_lock_vals) \
+                                                for tv, (c, wv) in zip(test_vals, where.items()))
+        return count
 
     def add_row(self, key, **cols_and_values):
         with self._CLIENT_LOCK:
@@ -400,12 +404,11 @@ class QTableDal3(Dal3):
 
     def _lock_and_yield_data_rows(self, **where):
         with self._CLIENT_LOCK:
-            # Yes, it's a table scan but the table is in memory and not expected to be large.
-            usable_lock_vals = (None, "", "None", self._lock_id)
+            where[self._lock_col] = None
             for row in self._table:
                 test_vals = [self._parse_col_value(c, row[c]) for c in where]
-                if all((tval == wval) or (c == self._lock_col and tval in usable_lock_vals) \
-                                        for tval, (c, wval) in zip(test_vals, where.items())):
+                if all((tv == wv) or (c == self._lock_col and tv in self._usable_lock_vals) \
+                                                for tv, (c, wv) in zip(test_vals, where.items())):
                     row[self._lock_col] = self._lock_id
                     yield row
 
