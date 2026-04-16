@@ -195,6 +195,10 @@ class DalDataRow(_AbstractContextManager):
         self.__dict__["_dirty_cols"] = []
         self.__dict__["_sep"] = ";"
 
+    def __repr__(self):
+        return str(self.__class__) + \
+            f"{{ key:{self._key}, dirty:{len(self._dirty_cols)>0}, read_only:{self._read_only} }}"
+
     @property
     def key(self) -> str:
         """ Gets the value of the row's key col. """
@@ -338,6 +342,9 @@ class Dal3(_ABC):
         self._lock_id = f"{_gethostname()}/{client_name}/{_getpid()}"[-DalDataRow._locked_by_len:]
 
         super().__init__()
+
+    def __repr__(self):
+        return f"{self.__class__}{{ lock_id:{self._lock_id} }}"
 
     @property
     def lock_id(self) -> str:
