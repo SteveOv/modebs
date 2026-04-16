@@ -170,7 +170,8 @@ class DalDataRow(_AbstractContextManager):
                  key: str,
                  values: _ArrayLike,
                  persist_func: _Callable[[_ArrayLike], None],
-                 hidden_cols: _List[str]=None):
+                 hidden_cols: _List[str]=None,
+                 read_only: bool=False):
         """
         Generic representation of an updatable row of data from the underlying data store with
         support for get/set of values and mass value setter. This is a ContextManager with data
@@ -180,6 +181,7 @@ class DalDataRow(_AbstractContextManager):
         :values: the rows full set of values in an ArrayLike form
         :persist_func: the func called with the update set of values to make the updates permanent
         :hidden_cols: those values cols which are not to be exposed as attr of this inst
+        :read_only: if True, this instance will not accept or persist any changes
         """
         # pylint: disable=too-many-arguments, too-many-positional-arguments
         super().__init__()
@@ -189,6 +191,7 @@ class DalDataRow(_AbstractContextManager):
         self.__dict__["_values"] = values
         self.__dict__["_persist_func"] = persist_func
         self.__dict__["_hidden_cols"] = hidden_cols or []
+        self.__dict__["_read_only"] = read_only
         self.__dict__["_dirty_cols"] = []
         self.__dict__["_sep"] = ";"
 
@@ -196,6 +199,11 @@ class DalDataRow(_AbstractContextManager):
     def key(self) -> str:
         """ Gets the value of the row's key col. """
         return self._key
+
+    @property
+    def read_only(self) -> bool:
+        """ Get whether or not this row is read only. """
+        return self._read_only
 
     def has_col(self, col):
         """
@@ -244,6 +252,8 @@ class DalDataRow(_AbstractContextManager):
         Handles the default behaviour for attributes. Sets the value of the similarly named column
         in the row's value array and also the uncertainty if a corresponding _err column exists.
         """
+        if self._read_only:
+            raise ValueError(f"Cannot update {col} as this row is ReadOnly.")
         if self.has_col(col):
             err_col = err_col if self.has_col(err_col := col + "_err") else None
             if isinstance(value, _UFloat):
@@ -268,7 +278,8 @@ class DalDataRow(_AbstractContextManager):
         self.__setattr__(col, value)
 
     def __exit__(self, exc_type, exc_value, traceback):
-        self._persist_func(self._values[self._hidden_cols + self._dirty_cols])
+        if not self._read_only and not self._persist_func is None:
+            self._persist_func(self._values[self._hidden_cols + self._dirty_cols])
         return super().__exit__(exc_type, exc_value, traceback)
 
     @classmethod
