@@ -1,6 +1,6 @@
 """ Data access components for reading/writing pipeline progress """
 # pylint: disable=no-member
-from typing import Union as _Union, List as _List, Dict as _Dict
+from typing import Union as _Union, List as _List, Dict as _Dict, Tuple as _Tuple
 from typing import Callable as _Callable, Generator as _Generator
 from pathlib import Path as _Path
 from abc import ABC as _ABC, abstractmethod as _abstractmethod
@@ -169,7 +169,7 @@ class DalDataRow(_AbstractContextManager):
     def __init__(self,
                  key: str,
                  values: _ArrayLike,
-                 persist_func: _Callable[[_ArrayLike], None],
+                 persist_func: _Callable[[_ArrayLike], None] = None,
                  hidden_cols: _List[str]=None,
                  read_only: bool=False):
         """
@@ -364,11 +364,21 @@ class Dal3(_ABC):
         for row_data in self._lock_and_yield_data_rows(**where):
             with DalDataRow(key=row_data[self._key_col],
                             values=row_data,
-                            persist_func=self._update_and_release_row,
+                            persist_func=self._update_and_unlock_row,
                             hidden_cols=[self._key_col, self._lock_col]) as row:
                 # Yield the generic DalDataRow to the client, with which it can read/write values.
                 # The write_func will be called to persist any changes when we exit this context.
                 yield row
+
+    def iterate_rows(self, **where) -> _Generator[DalDataRow, any, None]:
+        """
+        Yields **read-only** copies of the data for each row which matches the where criteria.
+
+        :where: col/value criteria with which simple, col==value, matches are evaluated for each row
+        """
+        for row_data in self._yield_data_rows(**where):
+            yield DalDataRow(row_data[self._key_col], row_data,
+                             hidden_cols=[self._key_col, self._lock_col], read_only=True)
 
     def update_row(self, key: str, **cols_and_values):
         """
@@ -389,18 +399,23 @@ class Dal3(_ABC):
     def count_where(self, **where) -> int:
         """ Gets the current number of unlocked rows matching the passed where criteria. """
         # This is a sub-optimal default implementation. Ideally we override this in subclasses.
-        return len(list(self.acquire_next_row(**where)))
+        where.setdefault(self._lock_col, None)
+        return sum(1 for _ in self._yield_data_rows(**where))
 
     @_abstractmethod
     def add_row(self, key: str, **cols_and_values):
         """ Add a new row with the indicated unique key and col/value pairs"""
 
     @_abstractmethod
-    def _lock_and_yield_data_rows(self, **where) -> _Generator[_ArrayLike, any, None]:
-        """ Iterate the unlocked storage rows, locking & yield those matching the where criteria """
+    def _yield_data_rows(self, **where) -> _Generator[_ArrayLike, any, None]:
+        """ Iterate storage rows matching the where criteria. No locks applied. """
 
     @_abstractmethod
-    def _update_and_release_row(self, values: _ArrayLike):
+    def _lock_and_yield_data_rows(self, **where) -> _Generator[_ArrayLike, any, None]:
+        """ Iterate storage unlocked rows matching the where criteria, locking each as yielded """
+
+    @_abstractmethod
+    def _update_and_unlock_row(self, values: _ArrayLike):
         """ Will update any indicated values before removing the lock on the row. """
 
 
@@ -421,34 +436,29 @@ class QTableDal3(Dal3):
                               units=DalDataRow._col_units,
                               rows=[])
         self._table.add_index(self._key_col, unique=True)
-        self._usable_lock_vals = ("", None, "None")
-
-    def count_where(self, **where) -> int:
-        count = 0
-        with self._CLIENT_LOCK:
-            where.setdefault(self._lock_col, None)
-            for row in self._table:
-                test_vals = [DalDataRow._read_col_value(row, c) for c in where] # pylint: disable=protected-access
-                count += all((tv == wv) or (c == self._lock_col and tv in self._usable_lock_vals) \
-                                                for tv, (c, wv) in zip(test_vals, where.items()))
-        return count
+        self._poss_unlocked_vals = ("", None, "None")
 
     def add_row(self, key, **cols_and_values):
         with self._CLIENT_LOCK:
             # This will raise a ValueError if a row with the same key already exists.
             self._table.add_row({ self._key_col: key } | cols_and_values)
 
-    def _lock_and_yield_data_rows(self, **where):
+    def _yield_data_rows(self, **where) -> _Generator[_ArrayLike, any, None]:
         with self._CLIENT_LOCK:
-            where[self._lock_col] = None
             for row in self._table:
                 test_vals = [DalDataRow._read_col_value(row, c) for c in where] # pylint: disable=protected-access
-                if all((tv == wv) or (c == self._lock_col and tv in self._usable_lock_vals) \
+                if all((tv == wv) or (c == self._lock_col and tv in self._poss_unlocked_vals) \
                                                 for tv, (c, wv) in zip(test_vals, where.items())):
-                    row[self._lock_col] = self._lock_id
                     yield row
 
-    def _update_and_release_row(self, values: _ArrayLike):
+    def _lock_and_yield_data_rows(self, **where):
+        with self._CLIENT_LOCK:
+            where[self._lock_col] = None    # Only rows without an existing lock can be locked.
+            for row in self._yield_data_rows(**where):
+                row[self._lock_col] = self._lock_id
+                yield row
+
+    def _update_and_unlock_row(self, values: _ArrayLike):
         with self._CLIENT_LOCK:
             # Will throw a KeyError if key is unknown, although this should not be possible
             key = values[self._key_col]
@@ -516,15 +526,15 @@ class QTableFileDal3(QTableDal3):
         self._table.write(self._file, overwrite=True, format=self._format, **self._format_kwargs)
 
     def _lock_and_yield_data_rows(self, **where):
-        # Write the table file when locking each row so that the lock is visible while in place.
         for row in super()._lock_and_yield_data_rows(**where):
+            # Write the table file when locking each row so that the lock is visible while in place.
             self._write_state_to_file()
             yield row
 
-    def _update_and_release_row(self, values: _ArrayLike):
+    def _update_and_unlock_row(self, values: _ArrayLike):
         with self._CLIENT_LOCK:
             # First update the in table as held in memory, then write the whole thing to the file
-            super()._update_and_release_row(values)
+            super()._update_and_unlock_row(values)
             self._write_state_to_file()
 
 
@@ -614,7 +624,12 @@ class MariaDbTableDal(Dal3):
             conn.commit()
 
     def count_where(self, **where) -> int:
-        return len(self._list_lockable_keys_where(**where))
+        where.setdefault(self._lock_col, None)
+        with _mariadb.connect(**self._db_config) as conn, conn.cursor() as cursor:
+            cursor.execute("SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;")
+            sql = f"SELECT COUNT(T.`{self._prim_key_col}`) FROM {self._full_table_name} AS T"
+            cursor.execute(*self._set_up_sql_where_clauses_for_execute(sql, "WHERE", where))
+            return cursor.fetchone()[0]
 
     def add_row(self, key: str, **cols_and_values):
         add_cols = [c for c in cols_and_values if c not in [self._prim_key_col, self._key_col]]
@@ -625,24 +640,29 @@ class MariaDbTableDal(Dal3):
                     ") VALUES (" + ",".join(["?"] * (ncols+1)) + ")"
             cursor.execute(sql, data=tuple([key] + list(cols_and_values[c] for c in add_cols)))
 
+    def _yield_data_rows(self, **where):
+        with _mariadb.connect(**self._db_config, autocommit=True) as conn,\
+                    conn.cursor(buffered=False) as cursor:
+            cursor.execute("SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;")
+            sql = f"SELECT T.* FROM {self._full_table_name} AS T"
+            cursor.execute(*self._set_up_sql_where_clauses_for_execute(sql, "WHERE", where))
+            for row in cursor:
+                yield from self._cursor_row_to_qtable(cursor, row)
+
     def _lock_and_yield_data_rows(self, **where) -> _Generator[_ArrayLike, any, None]:
         # Snapshot of row keys which are currently suitable
+        where[self._lock_col] = None
         for key in self._list_lockable_keys_where(**where):
-            wcols = [c for c in where if c not in [self._lock_col]]
-            wvals = [where[c] for c in wcols]
-
+            where[self._key_col] = key
             with _mariadb.connect(**self._db_config, autocommit=True) as conn,\
                         conn.cursor(buffered=False) as cursor:
                 cursor.execute(f"SET @lock_id='{self._lock_id}';")
 
                 # Initial row selection using the the where clause(s) which set the @key variable.
                 # With a "for update" lock for duration of this transaction.
-                sql = f"SELECT T.`{self._key_col}` INTO @key FROM {self._full_table_name} AS T " + \
-                        f"WHERE T.`{self._key_col}`=? AND T.`{self._lock_col}` IS NULL"
-                if len(wcols) > 0:
-                    sql += " AND " + " AND ".join(f"T.`{c}`=?" for c in wcols)
-                sql += " LIMIT 1 FOR UPDATE;"
-                cursor.execute(sql, data=tuple([key] + wvals))
+                sql = f"SELECT T.`{self._key_col}` INTO @key FROM {self._full_table_name} AS T"
+                sql, wvals = self._set_up_sql_where_clauses_for_execute(sql, "WHERE", where)
+                cursor.execute(sql + " LIMIT 1 FOR UPDATE;", wvals)
 
                 # May not match if the row has changed since the initial list of keys was drawn up.
                 if cursor.rowcount > 0:
@@ -656,17 +676,9 @@ class MariaDbTableDal(Dal3):
                             f" WHERE T.`{self._key_col}`=@key AND T.`{self._lock_col}`=@lock_id;"
                     cursor.execute(sql)
                     for row in cursor:
-                        # A bit of a hack, but a QTable works nicely with DalDataRow & its schema.
-                        # pylint: disable=protected-access
-                        qtable =_QTable(rows=[], masked=True, dtype=DalDataRow._storage_schema,
-                                    units=DalDataRow._col_units)
-                        qtable.add_row({ c: DalDataRow._append_column_unit(qtable[c], v)
-                                            for c, v in zip(cursor.metadata["field"], row)
-                                                if c in qtable.dtype.names and v is not None })
-                        yield from qtable
-                        break
+                        yield from self._cursor_row_to_qtable(cursor, row)
 
-    def _update_and_release_row(self, values: _ArrayLike):
+    def _update_and_unlock_row(self, values: _ArrayLike):
         key = values[self._key_col]
         ucols = [c for c in values.dtype.names
                         if c not in [self._prim_key_col, self._key_col, self._lock_col]]
@@ -687,17 +699,42 @@ class MariaDbTableDal(Dal3):
 
     def _list_lockable_keys_where(self, **where) -> _ArrayLike:
         """ Gets a list of row keys which are currently available to lock & match the criteria. """
+        where[self._lock_col] = None
         with _mariadb.connect(**self._db_config) as conn, conn.cursor() as cursor:
-            sql = f"SELECT T.`{self._key_col}` FROM {self._full_table_name} AS T " + \
-                    f"WHERE T.`{self._lock_col}` IS NULL"
-            if len(wcols := [c for c in where if c not in [self._lock_col]]) > 0:
-                sql += " AND " + " AND ".join(f"T.`{c}`=?" for c in wcols)
-
-            cursor.execute(sql, data=tuple(where[c] for c in wcols))
+            sql = f"SELECT T.`{self._key_col}` FROM {self._full_table_name} AS T"
+            cursor.execute(*self._set_up_sql_where_clauses_for_execute(sql, "WHERE", where))
             if cursor.rowcount > 0:
                 return [row[0] for row in cursor]
         return []
 
+    @classmethod
+    def _set_up_sql_where_clauses_for_execute(cls, prefix: str="", keyword: str="",
+                                        where: _Dict=None, suffix: str="") -> _Tuple[str, _Tuple]:
+        """
+        Helper function to parse where dict and generate SQL AND clauses & corresponding data values
+        while handling None -> IS NULL conversion. Returns the SQL text and where values sans Nones.
+        Text is built up as '{prefix} [{keyword} {where-clauses}] {suffix}'. The func can be used as
+        ```python
+        cursor.execute(*_set_up_sql_where_clauses_for_execute("SELECT * FROM T1", "WHERE", where))
+        ```
+        """
+        text = (prefix or "") + " "
+        if len(where or {}) > 0:
+            text += (keyword or "") + " " + \
+            " AND ".join(f"T.`{c}`" + (" IS NULL" if v is None else "=?") for c, v in where.items())
+        text += " " + (suffix or "")
+        return text.strip(), tuple(v for v in where.values() if v is not None)
+
+    @classmethod
+    def _cursor_row_to_qtable(cls, cursor, row):
+        """ A bit of a hack, but a QTable works nicely with DalDataRow & its schema. """
+        # pylint: disable=protected-access
+        qtable =_QTable(rows=[], masked=True,
+                        dtype=DalDataRow._storage_schema, units=DalDataRow._col_units)
+        qtable.add_row({ c: DalDataRow._append_column_unit(qtable[c], v)
+                            for c, v in zip(cursor.metadata["field"], row)
+                                if c in qtable.dtype.names and v is not None })
+        return qtable
 
 def create_dal(typename: _Union[str, type[Dal3]], verbose: bool=False, **kwargs):
     """

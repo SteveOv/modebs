@@ -53,8 +53,11 @@ class TestSubclassesOfDal3(unittest.TestCase):
                 dal.add_row("AN Cam", fitted_lcs=False, fitted_sed=False, fitted_masses=False, locked_by=dal.lock_id)
                 dal.add_row("AN Other", fitted_lcs=False, fitted_sed=False, fitted_masses=False, locked_by="AN Other")
 
+                print("About to iterate all rows (incl those locked).")
+                print("\tMatching rows:", ", ".join(row.key for row in dal.iterate_rows()))
+
                 where = { "fitted_lcs": False, "fitted_sed": False, "fitted_masses": False }
-                print(f"About to period acquire_next_row loop 1 for criteria: {where}")
+                print(f"About to acquire_next_row loop 1 for criteria: {where}")
                 self.assertEqual(2, dal.count_where(**where), "Failed count before loop 1")
                 for row in dal.acquire_next_row(**where):
                     self.assertNotIn(row.key, ["ZZ Boo", "ZZ UMa", "AN Cam", "AN Other"], "Failed exclude on loop 1")
@@ -77,7 +80,7 @@ class TestSubclassesOfDal3(unittest.TestCase):
 
                 # Check for updates (note the changed where criteria which should cover the above updates)
                 where["fitted_lcs"] = True
-                print(f"About to period acquire_next_row loop 2 for criteria: {where}")
+                print(f"About to acquire_next_row loop 2 for criteria: {where}")
                 self.assertEqual(3, dal.count_where(**where), "Failed count before loop 2")
                 for row in dal.acquire_next_row(**where):
                     self.assertNotIn(row.key, ["ZZ UMa", "AN Cam", "AN Other"], "Failed exclude on loop 2")
