@@ -400,7 +400,7 @@ class QTableDal3(Dal3):
                               units=DalDataRow._col_units,
                               rows=[])
         self._table.add_index(self._key_col, unique=True)
-        self._usable_lock_vals = ("", None, "None", self._lock_id)
+        self._usable_lock_vals = ("", None, "None")
 
     def count_where(self, **where) -> int:
         count = 0
@@ -609,8 +609,7 @@ class MariaDbTableDal(Dal3):
                 # Initial row selection using the the where clause(s) which set the @key variable.
                 # With a "for update" lock for duration of this transaction.
                 sql = f"SELECT T.`{self._key_col}` INTO @key FROM {self._full_table_name} AS T " + \
-                        f"WHERE T.`{self._key_col}`=? AND " + \
-                        f"(T.`{self._lock_col}` IS NULL OR T.`{self._lock_col}` IN ('', @lock_id))"
+                        f"WHERE T.`{self._key_col}`=? AND T.`{self._lock_col}` IS NULL"
                 if len(wcols) > 0:
                     sql += " AND " + " AND ".join(f"T.`{c}`=?" for c in wcols)
                 sql += " LIMIT 1 FOR UPDATE;"
@@ -657,11 +656,11 @@ class MariaDbTableDal(Dal3):
         """ Gets a list of row keys which are currently available to lock & match the criteria. """
         with _mariadb.connect(**self._db_config) as conn, conn.cursor() as cursor:
             sql = f"SELECT T.`{self._key_col}` FROM {self._full_table_name} AS T " + \
-                    f"WHERE (T.`{self._lock_col}` IS NULL OR T.`{self._lock_col}` IN ('', ?))"
+                    f"WHERE T.`{self._lock_col}` IS NULL"
             if len(wcols := [c for c in where if c not in [self._lock_col]]) > 0:
                 sql += " AND " + " AND ".join(f"T.`{c}`=?" for c in wcols)
 
-            cursor.execute(sql, data=tuple([self._lock_id] + [where[c] for c in wcols]))
+            cursor.execute(sql, data=tuple(where[c] for c in wcols))
             if cursor.rowcount > 0:
                 return [row[0] for row in cursor]
         return []

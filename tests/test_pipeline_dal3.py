@@ -35,36 +35,52 @@ class TestSubclassesOfDal3(unittest.TestCase):
                 dal = create_dal(typename, **kwargs)
 
                 # Atomic adds don't require the lock semantics
-                dal.add_row("AN Cam", fitted_lcs=True, fitted_sed=False, fitted_masses=False)
-                dal.add_row("CW Eri", fitted_lcs=False, fitted_sed=False, fitted_masses=False, locked_by=dal.lock_id)
-                dal.add_row("ZZ Boo", fitted_lcs=False, fitted_sed=False, fitted_masses=False)
+                dal.add_row("CW Eri", fitted_lcs=False, fitted_sed=False, fitted_masses=False)
+                dal.add_row("HP Dra", fitted_lcs=False, fitted_sed=False, fitted_masses=False)
 
-                # These should not be picked up by acquire_next_row (blow).
-                # AN Other is locked by another inst. ZZ UMa doesn't match the where criteria.
-                dal.add_row("AN Other", fitted_lcs=False, fitted_sed=False, fitted_masses=False, locked_by="AN Other")
+                # Should not be picked up by first acquire loop, but matches criteria for the 2nd
+                dal.add_row("ZZ Boo", fitted_lcs=True, fitted_sed=False, fitted_masses=False)
+
+                # Should not be picked up by any of the below as it doesn't match either set of where criteria
                 dal.add_row("ZZ UMa", fitted_lcs=False, fitted_sed=True, fitted_masses=False)
 
-                where = { "fitted_lcs": False, "fitted_sed": False, "fitted_masses": False }
-                self.assertEqual(2, dal.count_where(**where))
-                for row in dal.acquire_next_row(**where):
-                    self.assertIn(row.key, ["CW Eri", "ZZ Boo"])
-                    row.fitted_lcs = True
-                    row.Teff_sys = ufloat(5750, 50)
-                    row["logg_sys"] = ufloat(4.0, 0.1)
-                    row.append_warning("Hello")
-                    print(f"{row.key} : Teff_sys={row.Teff_sys}, logg_sys={row.logg_sys}, warnings={row.warnings}")
+                # These should not be picked up by any of the below as they have existing locks in place.
+                # This includes a row that appears to have already been locked by this instance.
+                dal.add_row("AN Cam", fitted_lcs=False, fitted_sed=False, fitted_masses=False, locked_by=dal.lock_id)
+                dal.add_row("AN Other", fitted_lcs=False, fitted_sed=False, fitted_masses=False, locked_by="AN Other")
 
-                # Check for updates (note the changed where criteria which should cover the above updates + AN Cam)
-                where["fitted_lcs"] = True
-                self.assertEqual(3, dal.count_where(**where))
+                where = { "fitted_lcs": False, "fitted_sed": False, "fitted_masses": False }
+                print(f"About to period acquire_next_row loop 1 for criteria: {where}")
+                self.assertEqual(2, dal.count_where(**where), "Failed count before loop 1")
                 for row in dal.acquire_next_row(**where):
-                    self.assertIn(row.key, ["CW Eri", "ZZ Boo", "AN Cam"])
+                    self.assertNotIn(row.key, ["ZZ Boo", "ZZ UMa", "AN Cam", "AN Other"], "Failed exclude on loop 1")
+
+                    # Use all options for updating the fields of a row
+                    row["spt"] = "SpT"
+                    row.set_values(Teff_sys=ufloat(5750, 50), logg_sys=ufloat(4.0, 0.1))
+                    row.fitted_lcs = True
+                    row.append_warning("Hello")
+
+                    print(f"\t{row.key}: SpT={row.spt}, Teff_sys={row.Teff_sys}, logg_sys={row.logg_sys}, warnings={row.warnings}")
+
+                    # Fail atomic update on this row. Cannot update row with any existing lock (even this row/lock).
+                    # This prevents update_row from releasing this acquired row's lock before it is updated.
+                    with self.assertRaises(KeyError):
+                        dal.update_row(row.key, search_term=f"V* {row.key}")
+
+                # Atomic update on, what is once more, an unlocked row
+                dal.update_row("CW Eri", search_term="V* CW Eri")
+
+                # Check for updates (note the changed where criteria which should cover the above updates)
+                where["fitted_lcs"] = True
+                print(f"About to period acquire_next_row loop 2 for criteria: {where}")
+                self.assertEqual(3, dal.count_where(**where), "Failed count before loop 2")
+                for row in dal.acquire_next_row(**where):
+                    self.assertNotIn(row.key, ["ZZ UMa", "AN Cam", "AN Other"], "Failed exclude on loop 2")
                     row.append_warning("Hello again")
                     row.append_warning("Hello") # Should not appear more than once
-                    print(f"{row.key} : Teff_sys={row.Teff_sys}, logg_sys={row.logg_sys}, warnings={row.warnings}")
+                    print(f"\t{row.key}: search_term={row.search_term}, SpT={row.spt}, Teff_sys={row.Teff_sys}, logg_sys={row.logg_sys}, warnings={row.warnings}")
 
-                # Atomic update on unlocked row
-                dal.update_row("CW Eri", search_term="V* CW Eri")
 
                 with self.assertRaises(KeyError):
                     # Attempted atomic update on a row locked by another inst (should fail!)
