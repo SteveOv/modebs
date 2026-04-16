@@ -284,16 +284,19 @@ class DalDataRow(_AbstractContextManager):
         return value
 
     @classmethod
-    def _set_col_value(cls, values: _ArrayLike, col: str, value: any, unit: _u.Unit=None):
+    def _set_col_value(cls, values: _ArrayLike, col: str, value: any):
         """ Low level write of the requested value to the requested col while handling units. """
-        if unit is None:
-            unit = values[col].unit if hasattr(values[col], "unit") else 1
+        values[col] = cls._append_column_unit(values[col], value)
+
+    @classmethod
+    def _append_column_unit(cls, column: any, value: any):
+        """ Applies the indicated column's unit to the passed value """
+        if value is None or not isinstance(value, _Number|_u.Quantity):
+            return value
+        unit = (column.unit or 1) if hasattr(column, "unit") else 1
         if isinstance(value, _u.Quantity):
-            values[col] = value.to(unit) if isinstance(unit, _u.Unit) else value.value
-        elif value is None or not isinstance(value, _Number):
-            values[col] = value
-        else:
-            values[col] = value * unit
+            return value.to(unit) if isinstance(unit, _u.Unit) else value.value
+        return value * unit
 
 
 class Dal3(_ABC):
@@ -634,17 +637,16 @@ class MariaDbTableDal(Dal3):
                     sql = f"SELECT T.* FROM {self._full_table_name} AS T" + \
                             f" WHERE T.`{self._key_col}`=@key AND T.`{self._lock_col}`=@lock_id;"
                     cursor.execute(sql)
-
-                    # A bit of a hack but this gets it into a form that's compatible with schema.
-                    # Also the (qtable[k].unit or 1) bit is a massive hack which needs improving.
-                    # pylint: disable=protected-access
-                    qtable =_QTable(rows=[], masked=True,
-                                    dtype=DalDataRow._storage_schema, units=DalDataRow._col_units)
                     for row in cursor:
-                        qtable.add_row({k: v * (qtable[k].unit or 1)
-                                for k, v in zip(cursor.metadata["field"], row)
-                                        if v is not None and k in qtable.dtype.names})
-                    yield from qtable.as_array()
+                        # A bit of a hack, but a QTable works nicely with DalDataRow & its schema.
+                        # pylint: disable=protected-access
+                        qtable =_QTable(rows=[], masked=True, dtype=DalDataRow._storage_schema,
+                                    units=DalDataRow._col_units)
+                        qtable.add_row({ c: DalDataRow._append_column_unit(qtable[c], v)
+                                            for c, v in zip(cursor.metadata["field"], row)
+                                                if c in qtable.dtype.names and v is not None })
+                        yield from qtable
+                        break
 
     def _update_and_release_row(self, values: _ArrayLike):
         key = values[self._key_col]
@@ -659,8 +661,11 @@ class MariaDbTableDal(Dal3):
                 sql += "," + ",".join(f"T.`{c}`=?" for c in ucols)
             sql += f" WHERE T.`{self._key_col}`=@key AND T.`{self._lock_col}`=@lock_id;"
 
-            uvals = [DalDataRow._read_col_value(values, c) for c in ucols] # pylint: disable=protected-access
-            cursor.execute(sql, tuple(int(v) if isinstance(v,bool|_np.bool_) else v for v in uvals))
+            # pylint: disable=protected-access
+            uvals = tuple(int(v) if isinstance(v, bool|_np.bool_)
+                                else v.value if isinstance(v, _u.Quantity) else v
+                          for v in (DalDataRow._read_col_value(values, c) for c in ucols))
+            cursor.execute(sql, uvals)
 
     def _list_lockable_keys_where(self, **where) -> _ArrayLike:
         """ Gets a list of row keys which are currently available to lock & match the criteria. """
