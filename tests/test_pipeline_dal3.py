@@ -27,16 +27,20 @@ class TestSubclassesOfDal3(unittest.TestCase):
                     # Reset the table if it was already present
                     db_config, table_name = kwargs["db_config"], kwargs.get("table_name", "working_set")
                     with mariadb.connect(**db_config) as conn, conn.cursor() as cursor:
-                        cursor.execute(f"DELETE FROM {db_config['database']}.`{table_name}`")
-                        # cursor.execute(f"DROP TABLE {db_config['database']}.`{table_name}`")
+                        cursor.execute("SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME=?;", data=(table_name, ))
+                        if cursor.rowcount > 0:
+                            cursor.execute(f"DELETE FROM {db_config['database']}.`{table_name}`")
+                            # cursor.execute(f"DROP TABLE {db_config['database']}.`{table_name}`")
                         conn.commit()
 
                 print(f"\nTesting {typename} for consistency")
                 dal = create_dal(typename, **kwargs)
 
-                # Atomic adds don't require the lock semantics
-                dal.add_row("CW Eri", fitted_lcs=False, fitted_sed=False, fitted_masses=False)
+                # Atomic adds don't require lock semantics.
+
+                # These match the first set of where criteria & should be acquired in this order they're added.
                 dal.add_row("HP Dra", fitted_lcs=False, fitted_sed=False, fitted_masses=False)
+                dal.add_row("CW Eri", fitted_lcs=False, fitted_sed=False, fitted_masses=False)
 
                 # Should not be picked up by first acquire loop, but matches criteria for the 2nd
                 dal.add_row("ZZ Boo", fitted_lcs=True, fitted_sed=False, fitted_masses=False)
@@ -69,7 +73,7 @@ class TestSubclassesOfDal3(unittest.TestCase):
                         dal.update_row(row.key, search_term=f"V* {row.key}")
 
                 # Atomic update on, what is once more, an unlocked row
-                dal.update_row("CW Eri", search_term="V* CW Eri")
+                dal.update_row("HP Dra", search_term="V* HP Dra")
 
                 # Check for updates (note the changed where criteria which should cover the above updates)
                 where["fitted_lcs"] = True

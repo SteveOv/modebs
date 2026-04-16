@@ -528,14 +528,16 @@ class MariaDbTableDal(Dal3):
         super().__init__()
         self._db_config = db_config
         self._full_table_name = f"{self._db_config['database']}.`{table_name}`"
+        self._prim_key_col = "row_id"
         with _mariadb.connect(**self._db_config) as conn:
-            self.create_working_set_table(conn, table_name, key_col=self._key_col,
-                                          lock_col=self._lock_col, exists_ok=True)
+            self.create_working_set_table(conn, table_name, self._prim_key_col,
+                                          self._key_col, self._lock_col, exists_ok=True)
 
     @classmethod
     def create_working_set_table(cls,
                                  conn: _mariadb.Connection,
                                  table_name: str,
+                                 prim_key_col: str,
                                  key_col: str,
                                  lock_col: str,
                                  exists_ok: bool=True):
@@ -545,24 +547,26 @@ class MariaDbTableDal(Dal3):
 
         :conn: the connection to use
         :table_name: the name of the table
-        :key_col: the name of the primary key column
+        :prim_key_col: the name of the primary key column
+        :key_col: the name of the unique key/identifier column
         :lock_col: the name of the soft-lock column (which will have an index placed on it)
         :exists_ok: whether to suppress an error if the table exists (it will not be overwritten)
         """
         with conn.cursor() as cursor:
             # If exists_ok is False and the table exists we expect an 1050 same name exists error
             ddl = "CREATE TABLE IF NOT EXISTS" if exists_ok else "CREATE TABLE"
-            ddl += f" `{table_name}` (\n\t`{key_col}` VARCHAR(14) PRIMARY KEY"
+            ddl += f" `{table_name}` (\n\t`{prim_key_col}` BIGINT UNSIGNED AUTO_INCREMENT NOT NULL"
 
             schema = DalDataRow._storage_schema # pylint: disable=protected-access
             flag_cols = []
-            for col_name, dtype in ((c, d) for c, d in schema if c not in [key_col]):
+            for col_name, dtype in schema:
                 field_dbtype = ""
                 if isinstance(dtype, str):
                     # These are expected to be in the form "<U##" where ## is the length
                     match = cls._u_str_pattern.match(dtype)
                     if match is not None and "len" in match.groupdict():
-                        field_dbtype = f"VARCHAR({match.group('len')}) NULL"
+                        field_dbtype = f"VARCHAR({match.group('len')}) "
+                    field_dbtype += "NOT NULL" if col_name in [key_col] else "NULL"
                 elif dtype is int:
                     field_dbtype = "BIGINT NULL"
                 elif dtype is float:
@@ -580,7 +584,9 @@ class MariaDbTableDal(Dal3):
                 else:
                     raise ValueError(f"unexpected schema field {col_name} dtype of {dtype}")
 
-            ddl += f",\n\tINDEX `lock_index` (`{lock_col}`)"
+            ddl += f",\n\tPRIMARY KEY (`{prim_key_col}`)"
+            ddl += f",\n\tUNIQUE INDEX `{key_col}_unique_index` (`{key_col}`)"
+            ddl += f",\n\tINDEX `{lock_col}_index` (`{lock_col}`)"
             ddl += ",\n\tINDEX `flags_index` (" + ",".join(f"`{c}`" for c in flag_cols) + ")"
             ddl += "\n)"
             cursor.execute(ddl)
@@ -590,11 +596,13 @@ class MariaDbTableDal(Dal3):
         return len(self._list_lockable_keys_where(**where))
 
     def add_row(self, key: str, **cols_and_values):
+        add_cols = [c for c in cols_and_values if c not in [self._prim_key_col, self._key_col]]
+        ncols = len(add_cols)
         with _mariadb.connect(**self._db_config, autocommit=True) as conn, conn.cursor() as cursor:
-            sql = f"INSERT INTO {self._full_table_name} " \
-                + f"(`{self._key_col}`," + ",".join(f"`{k}`" for k in cols_and_values) + ") "\
-                + "VALUES (?," + ",".join(["?"]*len(cols_and_values)) + ")"
-            cursor.execute(sql, data=tuple([key] + list(cols_and_values.values())))
+            sql = f"INSERT INTO {self._full_table_name} (`{self._key_col}`" + \
+                        ("," if ncols else "") + ",".join(f"`{c}`" for c in add_cols) + \
+                    ") VALUES (" + ",".join(["?"] * (ncols+1)) + ")"
+            cursor.execute(sql, data=tuple([key] + list(cols_and_values[c] for c in add_cols)))
 
     def _lock_and_yield_data_rows(self, **where) -> _Generator[_ArrayLike, any, None]:
         # Snapshot of row keys which are currently suitable
@@ -634,12 +642,14 @@ class MariaDbTableDal(Dal3):
                                     dtype=DalDataRow._storage_schema, units=DalDataRow._col_units)
                     for row in cursor:
                         qtable.add_row({k: v * (qtable[k].unit or 1)
-                                for k, v in zip(cursor.metadata["field"], row) if v is not None})
+                                for k, v in zip(cursor.metadata["field"], row)
+                                        if v is not None and k in qtable.dtype.names})
                     yield from qtable.as_array()
 
     def _update_and_release_row(self, values: _ArrayLike):
         key = values[self._key_col]
-        ucols = [c for c in values.dtype.names if c not in [self._key_col, self._lock_col]]
+        ucols = [c for c in values.dtype.names
+                        if c not in [self._prim_key_col, self._key_col, self._lock_col]]
         with _mariadb.connect(**self._db_config, autocommit=True) as conn, conn.cursor() as cursor:
             cursor.execute(f"SET @lock_id='{self._lock_id}';")
             cursor.execute(f"SET @key='{key}';")
