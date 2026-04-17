@@ -132,8 +132,7 @@ if __name__ == "__main__":
         for row in dal.acquire_next_row():
             ra, dec, par = row.ra_coord, row.dec_coord, row.parallax
             if any(v is None for v in [ra, dec, par]) or nominal_value(par) == 0:
-                warn_msgs = (row.warn_msgs or "").split(";") + ["coords incomplete"]
-                row.warnings = ";".join(w for w in dict.fromkeys(warn_msgs) if len(w))
+                row.append_warning("coords incomplete")
                 print(f"** Warning {target_id} coords incomplete: ra={ra},dec={dec},parallax={par}")
 
 
@@ -141,7 +140,6 @@ if __name__ == "__main__":
         ephem_keys = ["t0", "period", "morph", "widthP", "depthP", "widthS", "depthS", "phiS"]
         for row  in dal.acquire_next_row():
             target_id = row.key
-            warn_msgs = (row.warnings or "").split(";")
             cols_and_values = {}
 
             config = targets_config.get_target_config(target_id)
@@ -156,8 +154,7 @@ if __name__ == "__main__":
             if missing_ephem_keys := [k for k in ephem_keys if k not in cols_and_values]:
                 print(f"** Warning the following ephemeris values were not in {target_id} config:",
                       ",".join(k for k in missing_ephem_keys))
-                warn_msgs = (row.warnings or "").split(";") + ["incomplete ephemeris"]
-                row.warnings = ";".join(w for w in dict.fromkeys(warn_msgs) if len(w))
+                row.append_warning("ephemeris incomplete")
 
             row.set_values(**cols_and_values)
 
