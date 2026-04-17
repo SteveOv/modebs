@@ -198,11 +198,11 @@ if __name__ == "__main__":
                 # The ratios are wrt the primary components - the prior_func ignores the 0th item
                 print("\nSetting up the fitting priors and the ln_prior_func() callback.")
                 TeffR, radR = trow.TeffR, trow.k
-                Teff_ratios = [ufloat(TeffR.n, max(TeffR.s, TeffR.n * 0.1))] * NUM_STARS
-                rad_ratios = [ufloat(radR.n, max(radR.s, radR.n * 0.1))] * NUM_STARS
+                TeffR_priors = [ufloat(TeffR.n, max(TeffR.s, TeffR.n * 0.1))] * NUM_STARS
+                radR_priors = [ufloat(radR.n, max(radR.s, radR.n * 0.1))] * NUM_STARS
                 dist_prior = ufloat(coords.distance.value, coords.distance.value * 0.05)
-                print(f"Teff ratios={', '.join(f'{r:.3f}' for r in Teff_ratios[1:])}",
-                      f"radius_ratios={', '.join(f'{r:.3f}' for r in rad_ratios[1:])},",
+                print(f"Priors: Teff ratios={', '.join(f'{r:.3f}' for r in TeffR_priors[1:])},",
+                      f"radius ratios={', '.join(f'{r:.3f}' for r in radR_priors[1:])},",
                       f"dist={dist_prior:.3f},",
                       f"Teff_limits={teff_limits}, radius_limits={radius_limits}")
 
@@ -223,11 +223,10 @@ if __name__ == "__main__":
 
                     # Gaussian prior criteria: g(x) = 1/(σ*sqrt(2*pi)) * exp(-1/2 * (x-µ)^2/σ^2)
                     # Omitting scaling expressions and note the implicit ln() cancelling the exp
-                    # TODO: probable bug here in radii prior (should be / radR.s)
                     rval = 0
-                    for star_ix in range(1, NUM_STARS):
-                        rval += ((teffs[star_ix] / teffs[0]-Teff_ratios[star_ix].n) / TeffR.s)**2
-                        rval += ((radii[star_ix] / radii[0]-rad_ratios[star_ix].n) / TeffR.s)**2
+                    for ix in range(1, NUM_STARS):
+                        rval += ((teffs[ix]/teffs[0] - TeffR_priors[ix].n) / TeffR_priors[ix].s)**2
+                        rval += ((radii[ix]/radii[0] - radR_priors[ix].n) / radR_priors[ix].s)**2
                     rval += ((dist - dist_prior.n) / dist_prior.s)**2
                     return 0.5 * rval
 
