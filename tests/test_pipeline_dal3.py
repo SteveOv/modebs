@@ -53,8 +53,12 @@ class TestSubclassesOfDal3(unittest.TestCase):
                 dal.add_row("AN Cam", fitted_lcs=False, fitted_sed=False, fitted_masses=False, locked_by=dal.lock_id)
                 dal.add_row("AN Other", fitted_lcs=False, fitted_sed=False, fitted_masses=False, locked_by="AN Other")
 
-                print("About to iterate all rows (incl those locked).")
+                print("About to iterate all rows (incl those locked). These data will be read-only.")
                 print("\tMatching rows:", ", ".join(row.key for row in dal.iterate_rows()))
+                for row in dal.iterate_rows(target_id="HP Dra"):
+                    self.assertTrue(row.read_only)
+                    with self.assertRaises(ValueError):
+                        row.search_term = "Cannot write to R/O"
 
                 where = { "fitted_lcs": False, "fitted_sed": False, "fitted_masses": False }
                 print(f"About to acquire_next_row loop 1 for criteria: {where}")
@@ -86,7 +90,9 @@ class TestSubclassesOfDal3(unittest.TestCase):
                     self.assertNotIn(row.key, ["ZZ UMa", "AN Cam", "AN Other"], "Failed exclude on loop 2")
                     row.append_warning("Hello again")
                     row.append_warning("Hello") # Should not appear more than once
-                    print(f"\t{row.key}: search_term={row.search_term}, SpT={row.spt}, Teff_sys={row.Teff_sys}, logg_sys={row.logg_sys}, warnings={row.warnings}")
+
+                    spt, Teff_sys, logg_sys, warnings = row.get_values(("spt", "Teff_sys", "logg_sys", "warnings"))
+                    print(f"\t{row.key}: search_term={row.search_term}, SpT={spt}, Teff_sys={Teff_sys}, logg_sys={logg_sys}, warnings={warnings}")
 
 
                 with self.assertRaises(KeyError):

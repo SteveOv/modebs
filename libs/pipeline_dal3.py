@@ -1,7 +1,7 @@
 """ Data access components for reading/writing pipeline progress """
 # pylint: disable=no-member
 from typing import Union as _Union, List as _List, Dict as _Dict, Tuple as _Tuple
-from typing import Callable as _Callable, Generator as _Generator
+from typing import Callable as _Callable, Generator as _Generator, Iterable as _Iterable
 from pathlib import Path as _Path
 from abc import ABC as _ABC, abstractmethod as _abstractmethod
 from contextlib import AbstractContextManager as _AbstractContextManager
@@ -214,13 +214,17 @@ class DalDataRow(_AbstractContextManager):
         Returns whether or not the underlying row has a col with the requested name
         """
         if self._values is not None:
-            return (col in self._values.dtype.names) and (col not in self._hidden_cols or [])
+            return (col in self._values.dtype.names) and (col not in self._hidden_cols)
         return False
 
     def set_values(self, **cols_and_values):
         """ Sets the value of multiple cols in single call. """
         for c, v in cols_and_values.items():
             self[c] = v
+
+    def get_values(self, cols: _Iterable[str]) -> _Tuple[any]:
+        """ Gets a tuple of the value of multiple cols in a single call. """
+        return tuple(self[c] for c in cols)
 
     def append_warning(self, new_warn_msg: str):
         """ Appends a unique message to the warnings col. Non-unique messages are discarded. """
