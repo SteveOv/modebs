@@ -213,7 +213,7 @@ if __name__ == "__main__":
     # Now build up a dictionary from which we'll generate the target config json
     targets_config = {
         "explicit": True,                       # We are explicitly specifying the target systems
-        "dal_type": "QTableFileDal3",
+        "dal_type": "QTableFileDal",
         "dal_kwargs": { },
         "target_config_defaults": {
             # Cut well-known sections of LC which are commonly distorted.

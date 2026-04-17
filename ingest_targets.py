@@ -20,7 +20,7 @@ import numpy as np
 from libs import pipeline
 from libs.iohelpers import Tee
 from libs.targets import Targets
-from libs.pipeline_dal3 import create_dal
+from libs.pipeline_dal import create_dal
 
 THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 
@@ -59,7 +59,7 @@ if __name__ == "__main__":
 
         dal_kwargs = targets_config.get("dal_kwargs", {})
         dal_kwargs.setdefault("file", working_set_file)
-        dal = create_dal(targets_config.get("dal_type", "QTableFileDal3"), True, **dal_kwargs)
+        dal = create_dal(targets_config.get("dal_type", "QTableFileDal"), True, **dal_kwargs)
 
         print("\nSetting up a storage row and search_term for each target.")
         search_term_index = { }

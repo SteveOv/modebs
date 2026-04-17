@@ -1,6 +1,6 @@
 {
     "explicit": true,
-    "dal_type": "QTableFileDal3",
+    "dal_type": "QTableFileDal",
     "dal_kwargs": { },
     "target_config_defaults": {
         "quality_bitmask": null,

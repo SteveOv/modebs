@@ -26,7 +26,7 @@ from libs import pipeline, lightcurves, plots
 from libs.pipeline import PipelineError
 from libs.iohelpers import Tee
 from libs.targets import Targets
-from libs.pipeline_dal3 import create_dal
+from libs.pipeline_dal import create_dal
 
 
 THIS_STEM = Path(getsourcefile(lambda: 0)).stem
@@ -96,7 +96,7 @@ if __name__ == "__main__":
         # Open the targets table and the configs
         dal_kwargs = targets_config.get("dal_kwargs", {})
         dal_kwargs.setdefault("file", drop_dir / "working-set.table")
-        dal = create_dal(targets_config.get("dal_type", "QTableFileDal3"), True, **dal_kwargs)
+        dal = create_dal(targets_config.get("dal_type", "QTableFileDal"), True, **dal_kwargs)
         to_fit_criteria = { "fitted_lcs": False }
         to_fit_count = dal.count_where(**to_fit_criteria)
         print(f"The working-set indicates there are {to_fit_count} target(s) to be fitted.")

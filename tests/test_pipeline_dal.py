@@ -6,16 +6,17 @@ from pathlib import Path
 from uncertainties import ufloat
 import mariadb
 
-from libs.pipeline_dal3 import create_dal
+from libs.pipeline_dal import create_dal
 
-class TestSubclassesOfDal3(unittest.TestCase):
-    """ Unit test for the QTableFileDal3 class. """
+class TestDalSubclasses(unittest.TestCase):
+    """ Unit test for the QTableFileDal class. """
 
     def test_consistency_general_happy_path(self):
         """ End to end test """
+        print()
         for typename,           kwargs in [
-            ("QTableDal3",      {}),
-            ("QTableFileDal3",  { "file": Path.cwd() / ".cache/.test_data/test-qtable-file-dal3.qtable" }),
+            ("QTableDal",       {}),
+            ("QTableFileDal",   { "file": Path.cwd() / ".cache/.test_data/test-qtable-file-dal.qtable" }),
             ("MariaDbTableDal", {
                 "db_config": { "host": "localhost", "port": 3306, "user": "modebs", "password": "modebs", "database": "modebs" },
                 "table_name": "unit_test" }),
