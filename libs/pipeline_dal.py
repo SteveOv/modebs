@@ -779,5 +779,12 @@ def create_dal(typename: _Union[str, type[Dal]], verbose: bool=False, **kwargs):
     argspec = _getfullargspec(dal_type.__init__)
     expected_kwargs = { k: v for k, v in kwargs.items() if k in argspec.args and k not in ["self"] }
     if verbose:
-        print(f"Creating a {dal_type.__name__} with kwargs={expected_kwargs}")
+        print(f"Creating a {dal_type.__name__} with kwargs={_dict_to_str(kwargs)}")
     return dal_type(**expected_kwargs)
+
+def _dict_to_str(val: _Dict):
+    """ Generate pretty string for passed dictionary while censoring any password items. """
+    nope = ("password", "pwd")
+    return "{ " + ", ".join(f"{k}: " + \
+            (_dict_to_str(v) if isinstance(v, _Dict) else "****" if k.lower() in nope else str(v))
+        for k, v in val.items()) + " }"

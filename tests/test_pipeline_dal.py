@@ -35,7 +35,7 @@ class TestDalSubclasses(unittest.TestCase):
                         conn.commit()
 
                 print(f"\nTesting {typename} for consistency")
-                dal = create_dal(typename, **kwargs)
+                dal = create_dal(typename, verbose=True, **kwargs)
 
                 # Atomic adds don't require lock semantics.
 
