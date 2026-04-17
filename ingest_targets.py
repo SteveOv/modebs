@@ -154,7 +154,7 @@ if __name__ == "__main__":
             if missing_ephem_keys := [k for k in ephem_keys if k not in cols_and_values]:
                 print(f"** Warning the following ephemeris values were not in {target_id} config:",
                       ",".join(k for k in missing_ephem_keys))
-                row.append_warning("ephemeris incomplete")
+                row.append_warning("incomplete ephemeris")
 
             row.set_values(**cols_and_values)
 

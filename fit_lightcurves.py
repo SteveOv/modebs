@@ -91,7 +91,7 @@ if __name__ == "__main__":
 
         targets_config = Targets(args.targets_file)
         print(f"\nRead in the configuration from '{args.targets_file.name}'",
-              f"which contains {targets_config.count()} target(s) that have not been exluded.")
+              f"which contains {targets_config.count()} target(s) that have not been excluded.")
 
         # Open the targets table and the configs
         dal_kwargs = targets_config.get("dal_kwargs", {})
