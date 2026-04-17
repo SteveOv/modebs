@@ -14,7 +14,8 @@ from astropy.constants.iau2015 import L_sun, R_sun
 
 from libs import plots
 from libs.iohelpers import Tee
-from libs.pipeline_dal import QTableFileDal
+from libs.targets import Targets
+from libs.pipeline_dal3 import create_dal
 
 THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 
@@ -41,21 +42,26 @@ if __name__ == "__main__":
 
         figs_dir = drop_dir / "figs"
         figs_dir.mkdir(parents=True, exist_ok=True)
-        wset = QTableFileDal(args.working_set_file)
 
+        targets_config = Targets(args.targets_file)
+        print(f"\nRead in the configuration from '{args.targets_file.name}'",
+              f"which contains {targets_config.count()} target(s) that have not been exluded.")
+
+        # Open the targets table and the configs
+        dal_kwargs = targets_config.get("dal_kwargs", {})
+        dal_kwargs.setdefault("file", drop_dir / "working-set.table")
+        dal = create_dal(targets_config.get("dal_type", "QTableFileDal3"), True, **dal_kwargs)
 
         # These plots require the pipeline to fitted SEDs for Teffs & Radii
         # ----------------------------------------------------------------------
-        to_plot_target_ids = list(wset.yield_keys("fitted_sed", where=lambda fs: fs == True))
-        to_plot_count = len(to_plot_target_ids)
+        where = { "fitted_sed": True }
+        to_plot_count = dal.count_where(**where)
         print(f"\nThe working-set has {to_plot_count} targets that have fitted for Teffs & radii.")
         if to_plot_count:
 
             print("Plotting a Hertzsprung-Russell diagram")
-            rows = wset.yield_values("target_id", "TeffA", "TeffB", "RA", "RB")
-            Teffs_and_radii = np.array([row[1:] for row in rows if row[0] in to_plot_target_ids]).T
-            Teffs = Teffs_and_radii[:2]
-            radii = Teffs_and_radii[2:]
+            rows = np.array([(r.TeffA, r.TeffB, r.RA, r.RB) for r in dal.iterate_rows(**where)]).T
+            Teffs, radii = rows[:2], rows[2:]
             lums = ((4 * np.pi * (radii * R_sun)**2 * sigma_sb * Teffs**4) / L_sun).value
 
             fig = plots.plot_hr_diagram(Teffs, lums, labels=["star A", "star B"],
@@ -66,19 +72,16 @@ if __name__ == "__main__":
 
         # These plots require the pipeline to have fitted for radii (SED) & masses
         # ----------------------------------------------------------------------
-        to_plot_target_ids = list(wset.yield_keys("fitted_sed", "fitted_masses",
-                                                  where=lambda fs, fm: fs == fm == True))
-        to_plot_count = len(to_plot_target_ids)
+        where["fitted_masses"] = True
+        to_plot_count = dal.count_where(**where)
         print(f"\nThe working-set has {to_plot_count} targets that have fitted for radii & masses.")
         if to_plot_count:
 
             print("Plotting a Mass-Radius log-log diagram")
-            rows = wset.yield_values("target_id", "MA", "MB", "RA", "RB")
-            masses_and_radii = np.array([row[1:] for row in rows if row[0] in to_plot_target_ids]).T
-            masses = masses_and_radii[:2]
-            radii = masses_and_radii[2:]
+            rows = np.array([(r.MA, r.MB, r.RA, r.RB) for r in dal.iterate_rows(**where)]).T
+            masses, radii = rows[:2], rows[2:]
             fig = plots.plot_mass_radius_diagram(masses, radii, labels=["star A", "star B"],
-                                                plot_zams=True, legend_loc="best", invertx=True)
+                                                 plot_zams=True, legend_loc="best", invertx=True)
             fig.savefig(figs_dir / f"mass-radius.{args.figs_type}", dpi=args.figs_dpi)
             plt.close(fig)
 
