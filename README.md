@@ -5,7 +5,7 @@ A tool for characterising even mo'dEBs.
 ## Setup of runtime environment
 This code base was developed within the context of a Python3 virtual environment which
 supports Python 3.9-3.12, numpy, scipy, uncertainties, matplotlib,
-astropy, lightkurve, dust_extinction, mocpy, emcee, corner and the custom
+astropy, lightkurve, dust_extinction, mocpy, emcee, corner, mariadb and the custom
 [ebopmaven](https://github.com/SteveOv/ebop_maven),
 [sed fit](https://github.com/SteveOv/sed_fit) &
 [deblib](https://github.com/SteveOv/deblib) packages upon which the code is dependent.
@@ -27,6 +27,27 @@ You may need to install the jupyter kernel in the new venv:
 ```sh
 $ ipython kernel install --user --name=.modebs
 ```
+
+#### MariaDB and the data aceess layers
+The MariaDB requirement is a dependency of the MariaDbTableDal data access layer class.
+This is one of a number of options for storing target working data as it is populated and
+updated by the various stages of the pipeline. The other Dal classes, the QTableDal and
+QTableFileDal, store the working data in astropy QTables, with the latter saving this to
+a file as updates are made. The significance of the MariaDbTableDal is that, by using a
+database table as its underlying storage mechanism, it can safely support multiple
+concurrent client processes. This QTable Dals are suited to small datasets and with a
+single running client, whereas the MariaDBTableDal is intended for large datasets and
+scaling out the fitting processes with the use of multiple concurrent clients.
+
+Clearly there is a dependency of a working installation of MariaDB, either locally or
+accessible over a network connection. Installation instructions can be found
+[here](https://mariadb.com/docs/server/mariadb-quickstart-guides/installing-mariadb-server-guide).
+There may be client side dependencies, depending on the operating system in use.
+Documentation covering the setup of the python MariaDB connector and configuring database
+connections can be found [here](https://mariadb.com/docs/connectors/connectors-quickstart-guides/connector-python-guide).
+
+The `mariadb` requirement may be omitted (commented out in requirements.txt) if you
+do not intend on using the MariaDbTableDal.
 
 #### JKTEBOP
 These codes have a dependency on the JKTEBOP tool for generating and fitting lightcurves. The
