@@ -646,7 +646,7 @@ def fit_target_lightcurves(lcs: LightCurveCollection,
                     read_keys,
                     fit_stem,
                     lc.meta.get("clip_mask", None),
-                    _create_lc_std_further_process_cmds(lc),
+                    _create_lc_std_further_process_cmds(lc, lc.meta.get("clip_mask", None)),
                     max_attempts,
                     timeout,
                     hold_stdout) \
@@ -682,15 +682,20 @@ def force_seed_on_dropout_layers(estimator: Estimator, seed: int=42):
         sg.state.assign(new_seed)
 
 
-def _create_lc_std_further_process_cmds(lc: LightCurve) -> List[str]:
+def _create_lc_std_further_process_cmds(lc: LightCurve, clip_mask: np.ndarray[bool]) -> List[str]:
     """
     Creates a standard set of JKTEBOP processing instructions for appending to an in file.
     The instructions set up poly fits for scale factor and chi^sq adjustment
 
     :lc: the source LightCurve
+    :clip_mask: any clipping mask used to select & omit observations from analysis
     :returns: the list of processing instructions
     """
-    sf_segs = lc.meta.get("sector_times", [(lc.time.min(), lc.time.max())])
+    # Filter segments to those with observations to prevent jktebop error (no datapoints for poly)
+    clip_lc = lc if clip_mask is None else lc[clip_mask]
+    sf_segs =[s for s in lc.meta.get("sector_times", [(clip_lc.time.min(), clip_lc.time.max())])
+                        if len(clip_lc[(min(s) <= clip_lc.time) & (clip_lc.time <= max(s))]) > 0]
+
     return [""] + jktebop.build_poly_instructions(sf_segs, "sf", 1) + ["", "chif", ""]
 
 
