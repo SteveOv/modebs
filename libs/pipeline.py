@@ -576,6 +576,23 @@ def median_params(input_params: ArrayLike,
     return agg_params[0]
 
 
+def force_seed_on_dropout_layers(estimator: Estimator, seed: int=42):
+    """
+    Forces a seed onto the dropout layers of the model wrapped by the passed Estimator.
+    Setting this is a way of making subsequent MC Dropout predictions repeatable.
+    Definitely not for "live" but may be useful for testing where repeatability is required.
+    
+    :estimator: the estimator to modify
+    :seed: the new seed value to assign
+    """
+    # pylint: disable=protected-access
+    dropout_layers = (l for l in estimator._model.layers if isinstance(l, layers.Dropout))
+    for ix, layer in enumerate(dropout_layers, start=1):
+        sg = layer.seed_generator
+        new_seed = sg.backend.convert_to_tensor(np.array([0, seed*ix], dtype=sg.state.dtype))
+        sg.state.assign(new_seed)
+
+
 def fit_target_lightcurves(lcs: LightCurveCollection,
                            input_params: Union[dict[str], List[dict[str]]],
                            read_keys: List[str],
@@ -618,6 +635,8 @@ def fit_target_lightcurves(lcs: LightCurveCollection,
         raise ValueError("Expected either one shared set of input params, or one set per LC. " +
                          f"Got {len(lcs)} LightCurve(s) and {len(input_params)} set(s) of params.")
 
+    clip_masks = (lc.meta.get("clip_mask", np.ones((len(lc),), bool)) for lc in lcs)
+
     # These params are known to vary by LC and have values stored in LC meta dicts,
     # so we can set them if they have no already be set in client code.
     for in_params, lc in zip(input_params, lcs):
@@ -626,7 +645,7 @@ def fit_target_lightcurves(lcs: LightCurveCollection,
         in_params.setdefault("primary_epoch", t0)
         in_params.setdefault("L3", max(0, 1-lc.meta.get("CROWDSAP", 1)))
 
-    all_fit_stems = [file_prefix + "-" + lc.meta["LABEL"].replace(" ", "-").lower() for lc in lcs]
+    fit_stems = (file_prefix + "-" + lc.meta["LABEL"].replace(" ", "-").lower() for lc in lcs)
 
     task_params = { "task": task, "simulations": iterations if task == 8 else "" }
     if task != 3:
@@ -639,18 +658,18 @@ def fit_target_lightcurves(lcs: LightCurveCollection,
 
     # Create the args for each lc/call to _fit_target.
     # Can't have func take an lc or masked columns as they do not pickle.
-    iter_params = ((lc["time"].unmasked.value,
-                    lc["delta_mag"].unmasked.value,
-                    lc["delta_mag_err"].unmasked.value,
+    iter_params = ((lc["time"][clip_mask].unmasked.value,
+                    lc["delta_mag"][clip_mask].unmasked.value,
+                    lc["delta_mag_err"][clip_mask].unmasked.value,
                     in_params | task_params,
                     read_keys,
                     fit_stem,
-                    lc.meta.get("clip_mask", None),
-                    _create_lc_std_further_process_cmds(lc, lc.meta.get("clip_mask", None)),
+                    _create_lc_std_further_process_cmds(lc[clip_mask]),
                     max_attempts,
                     timeout,
                     hold_stdout) \
-                    for lc, in_params, fit_stem in zip(lcs, input_params, all_fit_stems))
+                    for lc, clip_mask, in_params, fit_stem
+                                                in zip(lcs, clip_masks, input_params, fit_stems))
 
     if max_workers <= 1:
         # Could use a pool of 1, but it's useful to keep execution on the interactive proc for debug
@@ -665,37 +684,17 @@ def fit_target_lightcurves(lcs: LightCurveCollection,
     return fitted_params
 
 
-def force_seed_on_dropout_layers(estimator: Estimator, seed: int=42):
-    """
-    Forces a seed onto the dropout layers of the model wrapped by the passed Estimator.
-    Setting this is a way of making subsequent MC Dropout predictions repeatable.
-    Definitely not for "live" but may be useful for testing where repeatability is required.
-    
-    :estimator: the estimator to modify
-    :seed: the new seed value to assign
-    """
-    # pylint: disable=protected-access
-    dropout_layers = (l for l in estimator._model.layers if isinstance(l, layers.Dropout))
-    for ix, layer in enumerate(dropout_layers, start=1):
-        sg = layer.seed_generator
-        new_seed = sg.backend.convert_to_tensor(np.array([0, seed*ix], dtype=sg.state.dtype))
-        sg.state.assign(new_seed)
-
-
-def _create_lc_std_further_process_cmds(lc: LightCurve, clip_mask: np.ndarray[bool]) -> List[str]:
+def _create_lc_std_further_process_cmds(lc: LightCurve) -> List[str]:
     """
     Creates a standard set of JKTEBOP processing instructions for appending to an in file.
     The instructions set up poly fits for scale factor and chi^sq adjustment
 
     :lc: the source LightCurve
-    :clip_mask: any clipping mask used to select & omit observations from analysis
     :returns: the list of processing instructions
     """
     # Filter segments to those with observations to prevent jktebop error (no datapoints for poly)
-    clip_lc = lc if clip_mask is None else lc[clip_mask]
-    sf_segs =[s for s in lc.meta.get("sector_times", [(clip_lc.time.min(), clip_lc.time.max())])
-                        if len(clip_lc[(min(s) <= clip_lc.time) & (clip_lc.time <= max(s))]) > 0]
-
+    sf_segs =[s for s in lc.meta.get("sector_times", [(lc.time.min(), lc.time.max())])
+                        if len(lc[(min(s) <= lc.time) & (lc.time <= max(s))]) > 0]
     return [""] + jktebop.build_poly_instructions(sf_segs, "sf", 1) + ["", "chif", ""]
 
 
@@ -705,7 +704,6 @@ def _fit_target(time: ArrayLike,
                 input_params: dict[str, UFloat],
                 read_keys: List[str],
                 file_stem: str,
-                clip_mask: np.ndarray[bool]=None,
                 append_lines: List[str]=None,
                 max_attempts: int=1,
                 timeout: int=None,
@@ -722,7 +720,6 @@ def _fit_target(time: ArrayLike,
     :input_params: the input params dictionary used to populate the fitting 'in' file
     :read_keys: the set of fitted output params to read and return for each fit
     :file_stem: the body of the filenames to write/read excluding the attempt counter & extention
-    :clip_mask: optional mask to apply to time, delta_mag and delta_mag_err data prior to writing
     :append_lines: optional processing instructions to append to the fitting 'in' file
     :max_attempts: the maximum number of attempts to make
     :timeout: the timeout for any individual fit - will raise a TimeoutExpired if not completed
@@ -756,11 +753,7 @@ def _fit_target(time: ArrayLike,
     # The contents of the lightcurve data file are fixed across fitting attempts.
     # jktebop.write_light_curve_to_dat_file(lc, dat_fname)
     dat_fname = fit_dir / (file_stem + ".dat")
-    if clip_mask is not None:
-        table = [time[clip_mask], delta_mag[clip_mask], delta_mag_err[clip_mask]]
-    else:
-        table = [time, delta_mag, delta_mag_err]
-    io_ascii.write(table,
+    io_ascii.write([time, delta_mag, delta_mag_err],
                    output=dat_fname,
                    format="no_header",
                    names=["time", "delta_mag", "delta_mag_err"],
