@@ -692,7 +692,7 @@ def _create_lc_std_further_process_cmds(lc: LightCurve) -> List[str]:
     """
     # Filter segments to those with observations to prevent jktebop error (no datapoints for poly)
     sf_segs =[s for s in lc.meta.get("sector_times", [(lc.time.min(), lc.time.max())])
-                        if len(lc[(min(s) <= lc.time) & (lc.time <= max(s))]) > 0]
+                        if any((min(s) <= lc.time) & (lc.time <= max(s)))]
     return [""] + jktebop.build_poly_instructions(sf_segs, "sf", 1) + ["", "chif", ""]
 
 
