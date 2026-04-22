@@ -635,22 +635,21 @@ def fit_target_lightcurves(lcs: LightCurveCollection,
         raise ValueError("Expected either one shared set of input params, or one set per LC. " +
                          f"Got {len(lcs)} LightCurve(s) and {len(input_params)} set(s) of params.")
 
-    clip_masks = (lc.meta.get("clip_mask", np.ones((len(lc),), bool)) for lc in lcs)
-
     # These params are known to vary by LC and have values stored in LC meta dicts,
-    # so we can set them if they have no already be set in client code.
+    # so we can set them as params if they have not already be set in client code.
     for in_params, lc in zip(input_params, lcs):
         t0 = lc.meta.get("t0", lc.meta.get("primary_epoch", in_params.get("t0", None)))
         in_params.setdefault("t0", t0)
         in_params.setdefault("primary_epoch", t0)
         in_params.setdefault("L3", max(0, 1-lc.meta.get("CROWDSAP", 1)))
 
-    fit_stems = (file_prefix + "-" + lc.meta["LABEL"].replace(" ", "-").lower() for lc in lcs)
-
     task_params = { "task": task, "simulations": iterations if task == 8 else "" }
     if task != 3:
         max_attempts = 1
     max_workers = min(len(lcs), max_workers or 1)
+
+    lcs_gen = (lc[lc.meta.get("clip_mask", np.ones((len(lc),), bool))] for lc in lcs)
+    fit_stems_gen = (file_prefix + "-" + lc.meta["LABEL"].replace(" ", "-").lower() for lc in lcs)
 
     # If we're to run in parallel this indicates to _fit_target to write JKTEBOP console output to
     # stdout less frequently, so it is less likely that the fitting narrative will be interleaved.
@@ -658,18 +657,17 @@ def fit_target_lightcurves(lcs: LightCurveCollection,
 
     # Create the args for each lc/call to _fit_target.
     # Can't have func take an lc or masked columns as they do not pickle.
-    iter_params = ((lc["time"][clip_mask].unmasked.value,
-                    lc["delta_mag"][clip_mask].unmasked.value,
-                    lc["delta_mag_err"][clip_mask].unmasked.value,
+    iter_params = ((lc["time"].unmasked.value,
+                    lc["delta_mag"].unmasked.value,
+                    lc["delta_mag_err"].unmasked.value,
                     in_params | task_params,
                     read_keys,
                     fit_stem,
-                    _create_lc_std_further_process_cmds(lc[clip_mask]),
+                    _create_lc_std_further_process_cmds(lc),
                     max_attempts,
                     timeout,
                     hold_stdout) \
-                    for lc, clip_mask, in_params, fit_stem
-                                                in zip(lcs, clip_masks, input_params, fit_stems))
+                    for lc, in_params, fit_stem in zip(lcs_gen, input_params, fit_stems_gen))
 
     if max_workers <= 1:
         # Could use a pool of 1, but it's useful to keep execution on the interactive proc for debug
