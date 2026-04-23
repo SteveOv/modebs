@@ -37,8 +37,8 @@ from libs.pipeline_dal import create_dal
 
 THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 
-NUM_STARS = 2
-subs = ["ABCDEFGHIJKLM"[n] for n in range(NUM_STARS)]
+NSTARS = 2
+subs = ["ABCDEFGHIJKLM"[n] for n in range(NSTARS)]
 theta_labels = np.array([f"$T_{{\\rm eff,{sub}}} / {{\\rm K}}$" for sub in subs]
                       + [f"$\\log{{g}}_{{\\rm {sub}}}$" for sub in subs]
                       + [f"$R_{{\\rm {sub}}} / {{\\rm R_{{\\odot}}}}$" for sub in subs]
@@ -50,9 +50,9 @@ theta_params_and_units = np.array([(f"Teff{sub}", u.K) for sub in subs]
                                 + [("dist", u.pc), ("Av", u.dimensionless_unscaled)])
 
 # Dictates which params in theta are fitted (True) and which are held fixed (False)
-fit_mask = np.array([True] * NUM_STARS      # Teff
-                  + [False] * NUM_STARS     # logg
-                  + [True] * NUM_STARS      # radius
+fit_mask = np.array([True] * NSTARS      # Teff
+                  + [False] * NSTARS     # logg
+                  + [True] * NSTARS      # radius
                   + [True]                  # dist
                   + [False])                # Av (we handle av by derredening the SED)
 
@@ -198,37 +198,40 @@ if __name__ == "__main__":
                 # The ratios are wrt the primary components - the prior_func ignores the 0th item
                 print("\nSetting up the fitting priors and the ln_prior_func() callback.")
                 TeffR, radR = trow.TeffR, trow.k
-                TeffR_priors = [ufloat(TeffR.n, max(TeffR.s, TeffR.n * 0.1))] * NUM_STARS
-                radR_priors = [ufloat(radR.n, max(radR.s, radR.n * 0.1))] * NUM_STARS
+                TeffR_priors = tuple([1]+ [ufloat(TeffR.n, max(TeffR.s, TeffR.n * .10))]*(NSTARS-1))
+                radR_priors = tuple([1] + [ufloat(radR.n, max(radR.s, radR.n * .10))]*(NSTARS-1))
                 dist_prior = ufloat(coords.distance.value, coords.distance.value * 0.05)
-                print(f"Priors: Teff ratios={', '.join(f'{r:.3f}' for r in TeffR_priors[1:])},",
-                      f"radius ratios={', '.join(f'{r:.3f}' for r in radR_priors[1:])},",
+                print(f"Priors: Teff ratios=({', '.join(f'{r:.3f}' for r in TeffR_priors)}),",
+                      f"radius ratios=({', '.join(f'{r:.3f}' for r in radR_priors)}),",
                       f"dist={dist_prior:.3f},",
                       f"Teff_limits={teff_limits}, radius_limits={radius_limits}")
 
                 def ln_prior_func(theta: np.ndarray[float]) -> float:
                     """
                     The fitting prior callback function to evaluate the current set of candidate
-                    parameters (theta), returning a single ln(value) indicating their "goodness".
+                    parameters, returning a single negative ln(value) indicating their "goodness".
+
+                    Return negative value as emcee will maximize the sum of this & the negative val
+                    of its ln_prob_func. The fitter knows to flip the sign if running a minimize fit
                     """
                     # pylint: disable=cell-var-from-loop
-                    teffs = theta[0:NUM_STARS]
-                    radii = theta[NUM_STARS*2:NUM_STARS*3]
+                    teffs = theta[0:NSTARS]
+                    radii = theta[NSTARS*2:NSTARS*3]
                     dist = theta[-2]
 
                     # Limit criteria checks - hard pass/fail on these
                     if not all(teff_limits[0] <= t <= teff_limits[1] for t in teffs) or \
                         not all(radius_limits[0] <= r <= radius_limits[1] for r in radii):
-                        return np.inf
+                        return -np.inf
 
                     # Gaussian prior criteria: g(x) = 1/(σ*sqrt(2*pi)) * exp(-1/2 * (x-µ)^2/σ^2)
-                    # Omitting scaling expressions and note the implicit ln() cancelling the exp
+                    # Omitting scaling expressions and note the implicit ln() cancelling the exp()
                     rval = 0
-                    for ix in range(1, NUM_STARS):
+                    for ix in range(1, NSTARS): # pylint: disable=line-too-long
                         rval += ((teffs[ix]/teffs[0] - TeffR_priors[ix].n) / TeffR_priors[ix].s)**2
                         rval += ((radii[ix]/radii[0] - radR_priors[ix].n) / radR_priors[ix].s)**2
                     rval += ((dist - dist_prior.n) / dist_prior.s)**2
-                    return 0.5 * rval
+                    return -0.5 * rval
 
 
                 print("\nSetting up the starting position (theta0) for fitting.")
@@ -241,7 +244,7 @@ if __name__ == "__main__":
                                       radii=1.0,
                                       dist=coords.distance.to(u.pc).value,
                                       av=0,
-                                      nstars=NUM_STARS,
+                                      nstars=NSTARS,
                                       verbose=True)
                 x = model_grid.get_filter_indices(sed["sed_filter"])
                 y = (sed["sed_der_flux"].quantity * sed["sed_freq"].quantity)\
