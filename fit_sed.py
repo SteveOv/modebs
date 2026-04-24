@@ -198,8 +198,8 @@ if __name__ == "__main__":
                 # The ratios are wrt the primary components - the prior_func ignores the 0th item
                 print("\nSetting up the fitting priors and the ln_prior_func() callback.")
                 TeffR, radR = trow.TeffR, trow.k
-                TeffR_priors = tuple([1]+ [ufloat(TeffR.n, max(TeffR.s, TeffR.n * .10))]*(NSTARS-1))
-                radR_priors = tuple([1] + [ufloat(radR.n, max(radR.s, radR.n * .10))]*(NSTARS-1))
+                TeffR_priors = tuple([1]+ [ufloat(TeffR.n, max(TeffR.s, TeffR.n * .05))]*(NSTARS-1))
+                radR_priors = tuple([1] + [ufloat(radR.n, max(radR.s, radR.n * .05))]*(NSTARS-1))
                 dist_prior = ufloat(coords.distance.value, coords.distance.value * 0.05)
                 print(f"Priors: Teff ratios=({', '.join(f'{r:.3f}' for r in TeffR_priors)}),",
                       f"radius ratios=({', '.join(f'{r:.3f}' for r in radR_priors)}),",
