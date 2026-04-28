@@ -234,24 +234,37 @@ class Testsed(unittest.TestCase):
     #
     def test_create_outliers_mask_simple_happy_path(self):
         """ Test create_outliers_mask(sed) various scenarios - check verbose output against msg """
-        for target,                         temps0,         min_unmasked,   msg in [
-            (Testsed._cw_eri_test_target,   [6800, 6500],       15,     "test stops at no improvement"),
-            (Testsed._zz_boo_test_target,   [6700, 6700],       70,     "test stops at explicit (>=1) min"),
-            (Testsed._zz_boo_test_target,   [6700, 6700],       0.95,   "test stops at fractional (<1) min"),
-            (Testsed._cm_dra_test_target,   [3100, 3100],       50,     "test stops as already at min"),
-            (Testsed._cm_dra_test_target,   [4200, 4200],       10,     "test stop for fitted temp unlikely"),
-            (Testsed._cm_dra_test_target,   [1200, 2900],       10,     "test stop, minimize failed (iter limit)"),
-            (Testsed._cm_dra_test_target,   4200,               10,     "test supports single value in temps0"),
-            (Testsed._cm_dra_test_target,   [3100, 3100, 2200], 10,     "test supports triple value in temps0"),
-        ]:
-            with self.subTest(msg=msg):
-                sed = get_sed_for_target(target, remove_duplicates= True)
-                print(f"\n{target} / '{msg}': Number of fluxes to start: {len(sed)}")
+        for target,                         temps0,     min_unmasked,   min_ratio, exp_unmasked,    msg in [
+            # CW Eri based on copy of SED vot stored with tests which has 52 SED observations
+            (Testsed._cw_eri_test_target,   [6800, 6500],       52,     0.25,       52,     "leave 52 unmasked as already at min"),
+            (Testsed._cw_eri_test_target,   [6800, 6500],       53,     0.25,       52,     "leave 52 unmasked as already below min"),
+            (Testsed._cw_eri_test_target,   [6800, 6500],       51,     0.25,       51,     "min_unmasked=51 & leaves this number unmasked"),
+            (Testsed._cw_eri_test_target,   [6800, 6500],       0.98,   0.25,       51,     "min_unmasked=0.98 & leaves 98% unmasked"),
+            (Testsed._cw_eri_test_target,   [6800, 6500],       -2,     0.25,       50,     "min_unmasked=-2 & leaves original #SED-2 unmasked"),
 
-                mask = create_outliers_mask(sed, temps0, min_unmasked=min_unmasked, verbose=True)
+            (Testsed._cw_eri_test_target,   [6800, 6500],       15,     0.25,       49,     "min_unmasked=15 & stops at no improvement with 49 left unmasked"),
+            (Testsed._cw_eri_test_target,   [6800, 6500],       0.7,    0.25,       49,     "min_unmasked=0.7 & stops at no improvement with 49 left unmasked"),
+            (Testsed._cw_eri_test_target,   [6800, 6500],       15,     0.0,        42,     "min_improvement_ratio=0 & stops at stat == 1 with 42 left unmasked"),
+
+            (Testsed._cw_eri_test_target,   [6800, 6500],       15,     0.10,       42,     "min_improvement_ratio=0.10 & stops at no improvement with 42 left unmasked"),
+            (Testsed._cw_eri_test_target,   [6800, 6500],       15,     0.33,       51,     "min_improvement_ratio=0.33 & stops at no improvement with 51 left unmasked"),
+
+            # # ZZ Boo copy of SED vot stored with tests has 74 observations
+            (Testsed._zz_boo_test_target,   [6700, 6700],       100,    0.10,       74,     "leave 74 unmasked as already at min"),
+            (Testsed._zz_boo_test_target,   [6700, 6700],       73,     0.10,       73,     "min_unmasked=73 & leaves this number unmasked"),
+            (Testsed._zz_boo_test_target,   [6700, 6700],       0.9,    0.10,       67,     "min_unmasked=0.90 & leaves 90% unmasked"),
+            (Testsed._zz_boo_test_target,   [6700, 6700],       -5,     0.10,       69,     "min_unmasked=-5 & leaves original #SED-5 unmasked"),
+        ]:
+            print()
+            with self.subTest(msg=f"{target.replace('testsed', '').strip()}: {msg}"):
+                sed = get_sed_for_target(target, remove_duplicates= True)
+                print(f"\n{target} / '{msg}': temps={temps0}, min_unmasked={min_unmasked}, min_improvement_ratio={min_ratio}")
+                mask = create_outliers_mask(sed, temps0, min_unmasked=min_unmasked,
+                                            min_improvement_ratio=min_ratio, verbose=True)
                 self.assertTrue(isinstance(mask, np.ndarray))
                 self.assertTrue(mask.dtype == np.dtype(bool))
                 self.assertEqual(len(sed), len(mask))
+                self.assertEqual(sum(~mask), exp_unmasked)
 
                 if min_unmasked < 1:
                     min_unmasked = np.floor(len(sed) * min_unmasked)

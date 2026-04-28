@@ -150,7 +150,7 @@ if __name__ == "__main__":
                             & (sed["sed_wl"] <= max(model_grid.wavelength_range))
                 sed = sed[model_mask]
 
-                out_mask = create_outliers_mask(sed, trow.Teff_sys, [trow.TeffR], 15, verbose=True)
+                out_mask = create_outliers_mask(sed, trow.Teff_sys, [trow.TeffR], 12, verbose=True)
                 sed = sed[~out_mask]
                 sed.sort(["sed_wl"])
                 print(f"{len(sed)} unique SED observation(s) retained after range & outlier",
