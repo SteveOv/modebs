@@ -2,6 +2,7 @@
     "explicit": true,
     "dal_type": "QTableFileDal",
     "dal_kwargs": { },
+    "stellar_grid": "KuruczGrid",
     "target_config_defaults": {
         "quality_bitmask": null,
         "quality_masks": [[1420.0, 1424.0 ], [1534.0, 1544.0]],

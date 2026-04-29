@@ -99,7 +99,8 @@ if __name__ == "__main__":
 
         # Model SED grid based on atmosphere models with known filters pre-applied to non-reddened
         # fluxes. Available grids: BtSettlGrid or KuruczGrid
-        model_grid = get_stellar_grid("BtSettlGrid", extinction_model=ext_model, verbose=True)
+        model_grid = get_stellar_grid(targets_config.get("stellar_grid", "BtSettlGrid"),
+                                      extinction_model=ext_model, verbose=True)
         print("Loaded grid based on synthetic models, covering the ranges:")
         print(f"wavelength {model_grid.wavelength_range * model_grid.wavelength_unit:unicode},",
               f"Teff {model_grid.teff_range * model_grid.teff_unit:unicode},",
