@@ -254,11 +254,18 @@ if __name__ == "__main__":
                 y_err = (sed["sed_eflux"].quantity * sed["sed_freq"].quantity)\
                                         .to(model_grid.flux_unit, equivalencies=u.spectral()).value
 
+                def ln_likelihood_func(y_model: np.ndarray[float]) -> float:
+                    """
+                    Likelihood func: simple mean of chi^2
+                    (tends to 1 for best fit, when residuals are consistent with uncertainties).
+                    """
+                    # pylint: disable=cell-var-from-loop
+                    return -0.5 * abs(1 - (np.sum(((y - y_model) / y_err)**2) / y_model.shape[0]))
 
                 print("\nPerforming an initial 'quick' minimize fit. Values marked * are fitted.")
                 theta_fit, _ = minimize_fit(x, y, y_err, theta0=theta0, fit_mask=fit_mask,
-                                            ln_prior_func=ln_prior_func,
-                                            stellar_grid=model_grid, verbose=True)
+                                            stellar_grid=model_grid, ln_prior_func=ln_prior_func,
+                                            ln_likelihood_func=ln_likelihood_func, verbose=True)
 
 
                 if args.do_mcmc_fit:
@@ -267,8 +274,9 @@ if __name__ == "__main__":
                     theta_fit, sampler = mcmc_fit(x, y, y_err,
                                                 theta0=theta_fit,
                                                 fit_mask=fit_mask,
-                                                ln_prior_func=ln_prior_func,
                                                 stellar_grid=model_grid,
+                                                ln_prior_func=ln_prior_func,
+                                                ln_likelihood_func=ln_likelihood_func,
                                                 nwalkers=args.mcmc_walkers,
                                                 nsteps=args.max_mcmc_steps,
                                                 thin_by=args.mcmc_thin_by,
