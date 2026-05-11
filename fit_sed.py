@@ -110,7 +110,7 @@ if __name__ == "__main__":
 
         # Fixed priors limits for MCMC fit
         teff_limits = model_grid.teff_range
-        radius_limits = (0.1, 100)
+        radius_limits = (0.05, 100)
 
         for fit_counter, trow in enumerate(dal.acquire_next_row(**to_fit_criteria), start=1):
             if fit_counter > 1:
