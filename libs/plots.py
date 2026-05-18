@@ -250,7 +250,7 @@ def plot_lightcurve_fits_and_residuals(out_files: List[Path],
                 plt.setp(ax_res.get_yticklabels(), visible=False)
             format_axes(ax_lc, title=ax_titles[ix],
                         ylabel="" if ix % cols else "Relative magnitude [mag]")
-            format_axes(ax_res, ylabel="" if ix % cols else "Residual")
+            format_axes(ax_res, xlabel="Orbital phase", ylabel="" if ix % cols else "Residual")
         else:
             ax_lc.axis("off")
             ax_res.axis("off")
