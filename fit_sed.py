@@ -302,6 +302,18 @@ if __name__ == "__main__":
                         fig.savefig(figs_dir / f"sed-mcmc-fit.{args.figs_type}", dpi=args.figs_dpi)
                         plt.close(fig)
 
+                        _chain = sampler.get_chain(flat=False)
+                        _burn_in_samples = _chain.shape[0] - (_data.shape[0] / args.mcmc_walkers)
+                        fig, axes = plt.subplots(nrows=sum(fit_mask), figsize=(9, 2*sum(fit_mask)),
+                                                 sharex=True)
+                        for ix, ax in enumerate(axes.flat):
+                            ax.plot(_chain[:, :, ix], "tab:blue", alpha=0.05)
+                            ax.axvspan(0, _burn_in_samples, color="silver")
+                            ax.set(xlim=(0, len(_chain)), ylabel=theta_labels[fit_mask][ix])
+                        axes[-1].set(xlabel=f"step / {args.mcmc_thin_by}")
+                        fig.savefig(figs_dir/f"sed-mcmc-trails.{args.figs_type}", dpi=args.figs_dpi)
+                        plt.close(fig)
+
 
                 print(f"\nFinal fitted parameters for {target_id} ([known value])")
                 write_params = {}
