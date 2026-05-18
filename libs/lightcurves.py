@@ -2,7 +2,7 @@
 Low level utility functions for light curve ingest, pre-processing, estimation and fitting.
 """
 # pylint: disable=no-member
-from typing import Union, List, Iterable, Tuple, Generator
+from typing import Union, List, Iterable, Tuple, Generator, Callable
 from pathlib import Path
 import re
 from sys import stdout
@@ -168,7 +168,7 @@ def append_magnitude_columns(lc: LightCurve,
 
 def find_lightcurve_sections(lc: LightCurve,
                              min_gap_duration: TimeDelta,
-                             min_section_duration: TimeDelta=None,
+                             eval_section_func: Callable[[Tuple[int, int]], bool]=None,
                              max_sections: int=None,
                              yield_times: bool=False) \
                                 -> Generator[Union[slice, Tuple[Time, Time]], any, None]:
@@ -180,7 +180,7 @@ def find_lightcurve_sections(lc: LightCurve,
 
     :lc: the source LightCurve to parse for gaps/sections.
     :min_gap_duration: the minimum gap time to break on
-    :min_section_duration: optional minimum duration for the sections resulting from a split
+    :eval_section_func: optional bool func to validate the from/to indices of each proposed section
     :max_sections: optional maximum number of sections restriction, subject to other criteria
     :yield_times: if true section start/end times will be yielded, otherwise slices
     :returns: generator of slice(start, end, 1) or tuple(start Time, end Time) if yield_times==True
@@ -189,22 +189,20 @@ def find_lightcurve_sections(lc: LightCurve,
     times = lc.time.value
     if isinstance(min_gap_duration, TimeDelta|u.Quantity):
         min_gap_duration = min_gap_duration.to(u.d).value
-    if isinstance(min_section_duration, TimeDelta|u.Quantity):
-        min_section_duration = min_section_duration.to(u.d).value
 
     # Heirarchically split the LC on the largest gap, until none are left >= min_gap_duration
     gap_durs = np.diff(times)
     def yield_sections(sec_first_ix=0, sec_last_ix=len(gap_durs), num_secs=1):
         # The gap ix can handily be used as the ix of the last time in the new 1st section
         longest_gap_ix = sec_first_ix + np.argmax(gap_durs[sec_first_ix:sec_last_ix])
-        sec_ixs = [(sec_first_ix, longest_gap_ix), (longest_gap_ix+1, sec_last_ix)]
+        sub_secs_ixs = [(sec_first_ix, longest_gap_ix), (longest_gap_ix+1, sec_last_ix)]
         if (gap_durs[longest_gap_ix] >= min_gap_duration) \
                 and (max_sections is None or num_secs < max_sections) \
-                and (min_section_duration is None \
-                     or not any(times[i[1]] - times[i[0]] < min_section_duration for i in sec_ixs)):
+                and (eval_section_func is None \
+                        or all(eval_section_func(*ssi) for ssi in sub_secs_ixs)):
             num_secs += 1
-            for ixs in sec_ixs:
-                yield from yield_sections(*ixs, num_secs=num_secs)
+            for ssi in sub_secs_ixs:
+                yield from yield_sections(*ssi, num_secs=num_secs)
         elif yield_times:
             yield lc.time[sec_first_ix], lc.time[sec_last_ix]
         else:

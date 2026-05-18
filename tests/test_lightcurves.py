@@ -114,7 +114,6 @@ class Testlightcurves(unittest.TestCase):
             # Test the effect of min_sector_duration; expect to affect the number of sections & their duration
             ("CW Eri",  4,  1 * u.d,        1 * u.d,    None,   False,  [slice(0, 5291, 1), slice(5291, 6274, 1), slice(6274, 14824, 1)]),
             ("CW Eri",  4,  1 * u.d, TimeDelta(1 * u.d),None,   False,  [slice(0, 5291, 1), slice(5291, 6274, 1), slice(6274, 14824, 1)]),
-            ("CW Eri",  4,  1 * u.d,        1,          None,   False,  [slice(0, 5291, 1), slice(5291, 6274, 1), slice(6274, 14824, 1)]),
             ("CW Eri",  4,  1 * u.d,        2 * u.d,    None,   False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
             ("CW Eri",  4,  1 * u.d,        15 * u.d,   None,   False,  [slice(0, 14824, 1)]),
             ("CW Eri",  4,  1 * u.d,        2 * u.d,    None,   True,   [(1410.907, 1418.492), (1421.219, 1436.517)]),
@@ -133,9 +132,13 @@ class Testlightcurves(unittest.TestCase):
             with self.subTest(msg):
                 lc = lightcurve_helpers.load_lightcurves(target, [sector])[0]
 
+                def eval_section_func(from_ix, to_ix) -> bool:
+                    # pylint: disable=cell-var-from-loop
+                    return min_sec_dur is None or lc.time[to_ix] - lc.time[from_ix] >= min_sec_dur
+
                 segs = list(lightcurves.find_lightcurve_sections(lc=lc,
                                                                  min_gap_duration=min_gap_dur,
-                                                                 min_section_duration=min_sec_dur,
+                                                                 eval_section_func=eval_section_func,
                                                                  max_sections=max_secs,
                                                                  yield_times=times))
 
