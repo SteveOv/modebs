@@ -42,7 +42,7 @@ subs = ["ABCDEFGHIJKLM"[n] for n in range(NSTARS)]
 theta_labels = np.array([f"$T_{{\\rm eff,{sub}}} / {{\\rm K}}$" for sub in subs]
                       + [f"$\\log{{g}}_{{\\rm {sub}}}$" for sub in subs]
                       + [f"$R_{{\\rm {sub}}} / {{\\rm R_{{\\odot}}}}$" for sub in subs]
-                      + ["${\\rm D} / {\\rm pc}$", "${\\rm A_{V}}$"])
+                      + ["$D / {\\rm pc}$", "${\\rm A_{V}}$"])
 
 theta_params_and_units = np.array([(f"Teff{sub}", u.K) for sub in subs]
                                 + [(f"logg{sub}", u.dimensionless_unscaled) for sub in subs]
