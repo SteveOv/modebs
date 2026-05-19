@@ -215,11 +215,11 @@ def join_lightcurves(src_lcs: Union[LightCurveCollection, List[LightCurve]]) -> 
         # lightkurve's stitch appears smart enough to concat ndarray & list meta values.
         # However, some of the singular values seem to be from the last sector, when it is
         # useful if it were from the first sector (i.e.: t0, TSTART). Fix where necessary.
-        for k in ["t0", "TSTART", "DATE-OBS", "SECTOR"]:
+        for k in ["TSTART", "DATE-OBS", "SECTOR"]:
             if k in src_lcs[0].meta:
                 join_lc.meta[k] = src_lcs[0].meta[k]
 
-        for k in ["LIVETIME", "TELAPSE"]:
+        for k in ["TELAPSE"]:
             if all(k in lc.meta for lc in src_lcs):
                 join_lc.meta[k] = np.sum([lc.meta[k] for lc in src_lcs])
 
@@ -235,6 +235,49 @@ def join_lightcurves(src_lcs: Union[LightCurveCollection, List[LightCurve]]) -> 
             else:
                 join_lc.meta["t0"] = src_lcs[0].meta["t0"]
     return join_lc
+
+
+def slice_lightcurve(src_lc: LightCurve, slices: List[slice]) -> LightCurveCollection:
+    """
+    Splits the source LightCurve into a new LightCurveCollection based on the passed slices.
+    Handles re-labeling the sector (as .1, .2, ..., .n) and re-assigning the metadata.
+
+    :src_lc: the original LightCurve which will be split
+    :slices: the slices, appropriate to src_lc, indicating where the sub LightCurves are taken
+    :returns: a new LightCurveCollection containing the newly split LightCurves
+    """
+    new_lcs = []
+    if slices is not None:
+        if isinstance(slices, slice):
+            slices = [slices]
+
+        for ix, sl in enumerate(slices, start=1):
+            lc = src_lc.copy(True)[sl]
+            lc.sector += ix/10
+
+            if len(lc) != len(src_lc):
+                tstart, tend = min(lc.time), max(lc.time)
+                lc.meta["TELAPSE"] = (tend - tstart).to(u.d).value
+                if ix > 1:
+                    lc.meta["TSTART"] = tstart.value
+
+                # The hard work, splitting the eclipse data
+                for ecl_type in ["primary", "secondary"]:
+                    key_times = f"{ecl_type}_times"
+                    if key_times in lc.meta:
+                        mask = (src_lc.meta[key_times] >= tstart.value) \
+                            & (src_lc.meta[key_times] <= tend.value)
+                        lc.meta[key_times] = src_lc.meta[key_times][mask]
+                        for key in [f"{ecl_type}_depths", f"{ecl_type}_completeness"]:
+                            if key in lc.meta:
+                                lc.meta[key] = src_lc.meta[key][mask]
+
+                if "t0" in src_lc.meta and not tstart.value <= src_lc.meta["t0"] <= tend.value:
+                    new_t0_ix = np.argmax(lc.meta["primary_completeness"])
+                    lc.meta["t0"] = lc.meta["primary_times"][new_t0_ix]
+
+            new_lcs += [lc]
+    return LightCurveCollection(new_lcs)
 
 
 def arrange_sector_groups(lcs: LightCurveCollection,

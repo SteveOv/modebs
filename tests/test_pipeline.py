@@ -6,7 +6,7 @@ import numpy as np
 import astropy.units as u
 from astropy.coordinates import SkyCoord
 from uncertainties import nominal_value, std_dev
-from lightkurve import LightCurve
+from lightkurve import LightCurve, LightCurveCollection
 
 from tests.helpers.lightcurve_helpers import load_lightcurves, KNOWN_TARGETS
 from libs.catalogues import query_tess_ebs_ephemeris
@@ -14,7 +14,7 @@ from libs.lightcurves import find_lightcurve_sections, fit_polynomial
 
 from libs.pipeline import get_teff_from_spt, _spt_to_teff_map # pylint: disable=protected-access
 from libs.pipeline import add_eclipse_meta_to_lightcurves
-from libs.pipeline import arrange_sector_groups, join_lightcurves
+from libs.pipeline import arrange_sector_groups, join_lightcurves, slice_lightcurve
 from libs.pipeline import append_mags_to_lightcurves_and_detrend
 from libs.pipeline import fit_target_lightcurves
 
@@ -129,6 +129,56 @@ class Testpipeline(unittest.TestCase):
                 self.assertEqual(sum(len(lc.meta["primary_times"]) for lc in lcs),
                                  len(join_lc.meta["primary_times"]))
 
+
+    #
+    # slice_lightcurve(lc: LightCurve, slices: [slice]) -> LightCurve
+    #
+    def test_slice_lightcurve_happy_path(self):
+        """ Test choose_lightcurve_groups_for_fitting() assert it produces expected arrangement """
+        # slices can either be a List[slice] or a set of kwargs for find_lightcurve_sections
+        for (target,    sectors,    slices) in [
+            # No slices
+            ("CW Eri",  [31],       []),
+            # Just the one slice, the whole sector
+            ("CW Eri",  [31],       { "min_gap_duration": 100 * u.d, "max_sections": 1 }),
+            # Two slices splitting the sector at the mid-sector gap
+            ("CW Eri",  [31],       { "min_gap_duration": 0.25 * u.d, "max_sections": 2 }),
+        ]:
+            with self.subTest(f" {target}; {sectors}, slices={slices}"):
+                config = KNOWN_TARGETS[target]
+
+                # Read the ephemeris. We need this to find eclipses and set completeness metrics
+                eph = query_tess_ebs_ephemeris(config["tic"]) or {}
+                t0 = eph.get("t0", config.get("t0", config.get("t0", None)))
+                period = eph.get("period", config.get("period", None))
+                widthp = eph.get("widthP", config.get("widthP", None))
+                widths = eph.get("widthS", config.get("widthS", None))
+                depthp = eph.get("depthP", config.get("depthP", None))
+                depths = eph.get("depthS", config.get("depthS", None))
+                phis = eph.get("phiS", config.get("phiS", None))
+                lcs = load_lightcurves(target, sectors)
+
+                # Prior steps in the pipeline where we have a dependency
+                # Sets primary|secondary _times & _completeness arrays and t0 ('best' primary) to lcs' meta
+                add_eclipse_meta_to_lightcurves(lcs, t0, period, widthp, widths, depthp, depths, phis)
+
+                lc = lcs[0]
+                if isinstance(slices, dict):
+                    slices = list(find_lightcurve_sections(lc, **slices))
+
+                out_lcs = slice_lightcurve(lc, slices)
+
+                self.assertIsInstance(out_lcs, LightCurveCollection)
+                self.assertEqual(len(out_lcs), len(slices))
+                for ix, out_lc in enumerate(out_lcs):
+                    self.assertEqual(lc.sector + (ix+1)/10, out_lc.sector)
+
+                    from_time, to_time = min(out_lc.time), max(out_lc.time)
+                    self.assertEqual(min(lc.time[slices[ix]]), from_time)
+                    self.assertEqual(max(lc.time[slices[ix]]), to_time)
+
+                    self.assertTrue(all(from_time.value <= pt <= to_time.value for pt in out_lc.meta["primary_times"]))
+                    self.assertTrue(from_time.value <= out_lc.meta["t0"] <= to_time.value)
 
 
     #
