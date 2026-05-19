@@ -185,6 +185,7 @@ def add_eclipse_meta_to_lightcurves(lcs: LightCurveCollection,
 
         # We will use the revised/refined reference time as a starting position for the next sector
         ref_t0 = lc.meta["t0"] = ecl_data[0] or ref_t0
+        lc.meta["sectors"] = [lc.sector]
         lc.meta |= dict(zip(
             ["primary_times", "primary_depths", "primary_completeness",
              "secondary_times", "secondary_depths", "secondary_completeness"],
@@ -251,9 +252,12 @@ def slice_lightcurve(src_lc: LightCurve, slices: List[slice]) -> LightCurveColle
         if isinstance(slices, slice):
             slices = [slices]
 
-        for ix, sl in enumerate(slices, start=1):
-            lc = src_lc.copy(True)[sl]
+        target = src_lc.meta.get("target", src_lc.meta["OBJECT"])
+        for ix, sec_slice in enumerate(slices, start=1):
+            lc = src_lc.copy(True)[sec_slice]
             lc.sector += ix/10
+            lc.meta["sectors"] = [lc.sector]
+            lc.meta["LABEL"] = f"{target} S{lc.sector}"
 
             if len(lc) != len(src_lc):
                 tstart, tend = min(lc.time), max(lc.time)
@@ -285,6 +289,7 @@ def arrange_sector_groups(lcs: LightCurveCollection,
                           min_eclipses: Tuple[int, int]=(2, 1),
                           max_group_size: int=None,
                           groups_override: List[List[int]]=None,
+                          allow_slice: bool=False,
                           verbose: bool=False) -> List[List[int]]:
     """
     Will make the most effective arrangement of LightCurves to support JKTEBOP fitting. This will
@@ -297,6 +302,7 @@ def arrange_sector_groups(lcs: LightCurveCollection,
     :min_eclipses: the minimum eclipse count criteria for a usable group or subsector
     :max_group_size: the maximum number of sectors to combine for a group, or no max if None
     :groups_override: if set, the grouping logic will be bypassed, and these used (to be deprecated)
+    :allow_slice: whether to allow sectors to be sliced into sections, subject to eclipse criteria
     :verbose: whether or not to send messages to stdout with details of the group decisions made
     :returns: a new LightCurveCollection containing the newly grouped/split LightCurves
     """
@@ -316,12 +322,32 @@ def arrange_sector_groups(lcs: LightCurveCollection,
             groups += _best_fit_groups_in_sector_block(lcs[mask], completeness_th,
                                                        min_eclipses, max_group_size, verbose)
 
-    # Now we have the best groups we can apply them.
+    def is_usable_section(from_ix, to_ix, lc) -> bool:
+        from_time, to_time = lc.time[from_ix].value, lc.time[to_ix].value
+        ecl_sums = []
+        for ecl_type in ["primary", "secondary"]:
+            key_time, key_compl = f"{ecl_type}_times", f"{ecl_type}_completeness"
+            mask = (lc.meta[key_time] >= from_time) & (lc.meta[key_time] <= to_time)
+            ecl_sums += [sum(lc.meta[key_compl][mask] >= completeness_th)]
+        return max(ecl_sums) >= max(min_eclipses) and min(ecl_sums) >= min(min_eclipses)
+
+    # Now we have the best groups we can apply them. Will attempt to split singleton sectors.
     out_lcs = []
+    min_gap_dur = 0.25 * u.d
     for group in groups:
         mask = np.isin(lcs.sector, group)
-        # Call even if only one member as this will also update its meta dict
-        out_lcs += [join_lightcurves(lcs[mask])]
+        if allow_slice and groups_override is None and sum(mask) == 1 and \
+                len(ss_sls := list(lightcurves.find_lightcurve_sections(lcs[mask][0], min_gap_dur,
+                                                                        is_usable_section))) > 1:
+            # Normalize the LC so it's consistent with any that are joined
+            sec_lcs = slice_lightcurve(lcs[mask][0].normalize(), ss_sls).data
+            out_lcs += sec_lcs
+            if verbose:
+                for sec_lc in sec_lcs:
+                    print(f"Created a group of sector {sec_lc.meta['sectors']}.")
+        else:
+            # Call even if only one member as this will also update its meta dict
+            out_lcs += [join_lightcurves(lcs[mask])]
     return LightCurveCollection(out_lcs)
 
 
@@ -348,11 +374,15 @@ def _best_fit_groups_in_sector_block(lcs: LightCurveCollection,
     if (max_ecl_count := np.max(eclipse_counts)) == 0:
         return # No eclipses within the block
 
+    def is_usable_group(grp_ecl_counts: List[Tuple[int, int]]):
+        ecl_sums = np.sum(grp_ecl_counts, axis=0)
+        return max(ecl_sums) >= max(min_eclipses) and min(ecl_sums) >= min(min_eclipses)
+
     # A minimum group size based on the eclipse counts compared with the min_eclipse criterion
     min_group_size = max(1, int(np.floor(max(min_eclipses) / max_ecl_count)))
 
     sectors_len = len(lcs)
-    if sectors_len == 1 and not _is_usable_group(eclipse_counts, min_eclipses):
+    if sectors_len == 1 and not is_usable_group(eclipse_counts):
         if verbose:
             print(f"Dropped solitary sector {sectors[0]} as it has insufficient orbital coverage.")
     else:
@@ -365,10 +395,10 @@ def _best_fit_groups_in_sector_block(lcs: LightCurveCollection,
             max_grp_to_ix = min(grp_from_ix + max_group_size, sectors_len)
             for grp_to_ix in range(grp_from_ix + min_group_size, max_grp_to_ix + 1):
                 grp_slice = slice(grp_from_ix, grp_to_ix)
-                if _is_usable_group(eclipse_counts[grp_slice], min_eclipses):
+                if is_usable_group(eclipse_counts[grp_slice]):
                     if grp_to_ix < max_grp_to_ix \
                             and (sectors_len - grp_to_ix < min_group_size \
-                                or not _is_usable_group(eclipse_counts[grp_to_ix:], min_eclipses)):
+                                or not is_usable_group(eclipse_counts[grp_to_ix:])):
                         # Special case: if group is not of max size & the remainder of the block
                         # isn't usable to form another group, extend this group to max possible.
                         grp_slice = slice(grp_from_ix, grp_to_ix := max_grp_to_ix)
@@ -390,12 +420,6 @@ def _best_fit_groups_in_sector_block(lcs: LightCurveCollection,
                 break
 
     return fit_groups
-
-
-def _is_usable_group(grp_ecl_counts: List[Tuple[int, int]], min_eclipses: Tuple[int, int]=(2, 1)):
-    """ Is the proposed grp of sectors suitable for fitting, based on eclipse counts? """
-    ecl_sums = np.sum(grp_ecl_counts, axis=0)
-    return max(ecl_sums) >= max(min_eclipses) and min(ecl_sums) >= min(min_eclipses)
 
 
 def append_mags_to_lightcurves_and_detrend(lcs: LightCurveCollection,

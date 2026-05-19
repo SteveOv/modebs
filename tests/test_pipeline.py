@@ -124,8 +124,8 @@ class Testpipeline(unittest.TestCase):
                 self.assertEqual(lcs[-1].time[-1], join_lc.time[-1])
 
                 self.assertListEqual(sectors, list(join_lc.meta["sectors"]))
-                self.assertEqual(sum(lc.meta["LIVETIME"] for lc in lcs),
-                                 join_lc.meta["LIVETIME"])
+                self.assertEqual(sum(lc.meta["TELAPSE"] for lc in lcs),
+                                 join_lc.meta["TELAPSE"])
                 self.assertEqual(sum(len(lc.meta["primary_times"]) for lc in lcs),
                                  len(join_lc.meta["primary_times"]))
 
@@ -186,16 +186,17 @@ class Testpipeline(unittest.TestCase):
     #
     def test_arrange_sector_groups_with_known_targets(self):
         """ Test choose_lightcurve_groups_for_fitting() assert it produces expected arrangement """
-        for target,             sectors,                min_eclipses,   max_group_size, exp_groups in[
+        for target,         sectors,    min_eclipses,   max_group_size, allow_slice,exp_groups in[
             # Sectors not contiguous (so no join) but are fine to use individually do 7+ of each ecl per sector
-            ("CW Eri",          [4, 31],                3,              None,           [[4], [31]]),
-            ("CW Eri",          [4, 31],                3,              1,              [[4], [31]]),
+            ("CW Eri",      [4, 31],        3,          None,           False,      [[4], [31]]),
+            ("CW Eri",      [4, 31],        3,          1,              False,      [[4], [31]]),
+            ("CW Eri",      [4, 31],        3,          1,              True,       [[4.1], [4.2], [31.1], [31.2]]),
             # Sector are contiguous, but joining not necessary as there are many of each eclipse per sectors
-            ("CM Dra",          [24, 25, 26],           3,              None,           [[24], [25], [26]]),
-            ("CM Dra",          [24, 25, 26],           3,              1,              [[24], [25], [26]]),
+            ("CM Dra",      [24, 25, 26],   3,          None,           False,      [[24], [25], [26]]),
+            ("CM Dra",      [24, 25, 26],   3,          1,              False,      [[24], [25], [26]]),
             # The only usable combo is 52+53 as eclipses too infrequent to fit any sector individually
-            ("AN Cam",          [53, 59, 52],           3,              None,           [[52, 53]]),
-            ("AN Cam",          [53, 59, 52],           3,              1,              []),
+            ("AN Cam",      [53, 59, 52],   3,          None,           False,      [[52, 53]]),
+            ("AN Cam",      [53, 59, 52],   3,          1,              False,      []),
         ]:
             with self.subTest(f" {target}; {sectors}, max_group_size={max_group_size} -> {exp_groups} "):
                 config = KNOWN_TARGETS[target]
@@ -221,6 +222,7 @@ class Testpipeline(unittest.TestCase):
                                                 min_eclipses=min_eclipses,
                                                 max_group_size=max_group_size,
                                                 groups_override=None,
+                                                allow_slice=allow_slice,
                                                 verbose=True)
 
                 for ix, exp_group_sectors in enumerate(exp_groups):
