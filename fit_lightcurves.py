@@ -182,7 +182,7 @@ if __name__ == "__main__":
                     new_lcs, min_gap, min_sec = [], 0.25 * u.d, nom_val(trow.period) * 3.0 * u.d
                     for lc in lcs:
                         sls = [*lightcurves.find_lightcurve_sections(lc, min_gap,
-                                            lambda fix, tix: lc.time[tix]-lc.time[fix] >= min_sec)]
+                                        lambda fix, tix, lc: lc.time[tix]-lc.time[fix] >= min_sec)]
                         if len(sls) > 1:
                             for ix, sl in enumerate(sls, start=1):
                                 new_lcs += [lc.copy(True)[sl]]

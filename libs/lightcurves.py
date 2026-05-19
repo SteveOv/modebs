@@ -168,7 +168,7 @@ def append_magnitude_columns(lc: LightCurve,
 
 def find_lightcurve_sections(lc: LightCurve,
                              min_gap_duration: TimeDelta,
-                             eval_section_func: Callable[[Tuple[int, int]], bool]=None,
+                             eval_section_func: Callable[[int, int, LightCurve], bool]=None,
                              max_sections: int=None,
                              yield_times: bool=False) \
                                 -> Generator[Union[slice, Tuple[Time, Time]], any, None]:
@@ -199,7 +199,7 @@ def find_lightcurve_sections(lc: LightCurve,
         if (gap_durs[longest_gap_ix] >= min_gap_duration) \
                 and (max_sections is None or num_secs < max_sections) \
                 and (eval_section_func is None \
-                        or all(eval_section_func(*ssi) for ssi in sub_secs_ixs)):
+                        or all(eval_section_func(*ssi, lc) for ssi in sub_secs_ixs)):
             num_secs += 1
             for ssi in sub_secs_ixs:
                 yield from yield_sections(*ssi, num_secs=num_secs)

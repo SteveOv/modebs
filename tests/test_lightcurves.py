@@ -130,12 +130,11 @@ class Testlightcurves(unittest.TestCase):
         ]:
             msg = f"{target}-S{sector:02d}, min_gap={min_gap_dur}, min_sec={min_sec_dur}, max_secs={max_secs}, yield_times={times}"
             with self.subTest(msg):
-                lc = lightcurve_helpers.load_lightcurves(target, [sector])[0]
-
-                def eval_section_func(from_ix, to_ix) -> bool:
+                def eval_section_func(from_ix, to_ix, lc) -> bool:
                     # pylint: disable=cell-var-from-loop
                     return min_sec_dur is None or lc.time[to_ix] - lc.time[from_ix] >= min_sec_dur
 
+                lc = lightcurve_helpers.load_lightcurves(target, [sector])[0]
                 segs = list(lightcurves.find_lightcurve_sections(lc=lc,
                                                                  min_gap_duration=min_gap_dur,
                                                                  eval_section_func=eval_section_func,
