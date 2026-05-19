@@ -3,6 +3,7 @@ Low level utility functions for light curve ingest, pre-processing, estimation a
 """
 # pylint: disable=no-member, too-many-arguments, too-many-positional-arguments
 from typing import Union, Tuple, Dict, List, Iterable
+from numbers import Number
 from io import TextIOBase, StringIO
 from sys import stdout
 import warnings
@@ -191,171 +192,167 @@ def add_eclipse_meta_to_lightcurves(lcs: LightCurveCollection,
         ))
 
 
-def choose_lightcurve_groups_for_fitting(lcs: LightCurveCollection,
-                                         completeness_th: float=0.8,
-                                         max_group_size: int=None,
-                                         verbose: bool=False) -> List[List[int]]:
+def join_lightcurves(src_lcs: Union[LightCurveCollection, List[LightCurve]]) -> LightCurve:
     """
-    Will work out the most effective arrangement of LightCurves to support JKTEBOP fitting. This
-    will need to balance need for sufficient coverage for each fitting to achieve a reliable output,
-    while running as many fits as possible across the breadth of time in which we have observations.
+    Join the source LightCurves into a single normalized and 'stitched' LightCurve.
+    Builds on lightkurve's stitch() with better handling of the meta dictionary.
+
+    :src_lcs: the original LightCurves from which to create the stitched copy
+    :returns: a new LightCurve containing the newly grouped/stitched LightCurves
+    """
+    target = src_lcs[0].meta.get("target", src_lcs[0].meta["OBJECT"])
+
+    # Normalize + combine the sectors in the grouping (also if there's only 1)
+    join_lc = src_lcs.stitch(lambda lc: lc.normalize())
+
+    # Update/combine metadata where appropriate. From fits file tend to be UCASE & ours are lcase.
+    join_lc.meta["sectors"] = src_lcs.sector
+    sec_list = [f"{s:02d}" if int(s) == s else f"{s:02.1f}" for s in src_lcs.sector]
+    join_lc.meta["LABEL"] = f"{target} S{sec_list[0]}"
+    if len(src_lcs) > 1:
+        join_lc.meta["LABEL"] += (" to" if len(src_lcs) > 2 else " and") + f" S{sec_list[-1]}"
+
+        # lightkurve's stitch appears smart enough to concat ndarray & list meta values.
+        # However, some of the singular values seem to be from the last sector, when it is
+        # useful if it were from the first sector (i.e.: t0, TSTART). Fix where necessary.
+        for k in ["t0", "TSTART", "DATE-OBS", "SECTOR"]:
+            if k in src_lcs[0].meta:
+                join_lc.meta[k] = src_lcs[0].meta[k]
+
+        for k in ["LIVETIME", "TELAPSE"]:
+            if all(k in lc.meta for lc in src_lcs):
+                join_lc.meta[k] = np.sum([lc.meta[k] for lc in src_lcs])
+
+        for (k, d) in [("CROWDSAP", 1)]:
+            join_lc.meta[k] = np.mean([lc.meta.get(k, d) for lc in src_lcs])
+
+        # Revise the t0 time to that of the best/most complete in the combined LC
+        if all(k in join_lc.meta for k in ["t0", "primary_times", "primary_completeness"]):
+            t0_mask = np.isin(join_lc.meta["primary_times"], [l.meta["t0"] for l in src_lcs])
+            if any(t0_mask):
+                best_t0_ix = np.argmax(join_lc.meta["primary_completeness"][t0_mask])
+                join_lc.meta["t0"] = join_lc.meta["primary_times"][t0_mask][best_t0_ix]
+            else:
+                join_lc.meta["t0"] = src_lcs[0].meta["t0"]
+    return join_lc
+
+
+def arrange_sector_groups(lcs: LightCurveCollection,
+                          completeness_th: float=0.8,
+                          min_eclipses: Tuple[int, int]=(2, 1),
+                          max_group_size: int=None,
+                          groups_override: List[List[int]]=None,
+                          verbose: bool=False) -> List[List[int]]:
+    """
+    Will make the most effective arrangement of LightCurves to support JKTEBOP fitting. This will
+    balance need for sufficient coverage for each fitting to achieve a reliable output, while
+    running as many fits as possible across the breadth of time in which we have observations.
     This uses the eclipse timing & completeness metadata added by add_eclipse_meta_to_lightcurves().
 
     :lcs: the LightCurveCollection containing our potential fitting targets
     :completness_th: threshold percentage of an eclipse we require to consider it complete/usable
+    :min_eclipses: the minimum eclipse count criteria for a usable group or subsector
     :max_group_size: the maximum number of sectors to combine for a group, or no max if None
+    :groups_override: if set, the grouping logic will be bypassed, and these used (to be deprecated)
     :verbose: whether or not to send messages to stdout with details of the group decisions made
-    :returns: the groups to fit, as a list of lists of sector numbers. i.e.: [[13, 14], [15, 16]]
-    indicates the LightCurves for sectors 13 & 14 should be grouped for fitting, as should 15 & 16.
+    :returns: a new LightCurveCollection containing the newly grouped/split LightCurves
+    """
+    if isinstance(min_eclipses, Number):
+        min_eclipses = (int(np.ceil(min_eclipses / 2)), int(np.floor(min_eclipses / 2)))
+
+    # Make sure the sectors are sorted by sector number for grouping to work
+    lcs = LightCurveCollection(sorted(lcs, key=lambda l: l.sector))
+    groups = groups_override
+    if groups is None:
+        # Isolate the sectors into contiguous blocks; so [1,2,4,5,6,8] becomes [[1,2], [4,5,6], [8]]
+        # By making a key of the sector number minus its list index, we have a value which we can
+        # group by as it remains unchanged within each block of contiguously incrementing values.
+        groups = []
+        for _, block in groupby(enumerate(lcs.sector), key=lambda ix_sec: ix_sec[1] - ix_sec[0]):
+            mask = np.isin(lcs.sector, list(b for _, b in block))
+            groups += _best_fit_groups_in_sector_block(lcs[mask], completeness_th,
+                                                       min_eclipses, max_group_size, verbose)
+
+    # Now we have the best groups we can apply them.
+    out_lcs = []
+    for group in groups:
+        mask = np.isin(lcs.sector, group)
+        # Call even if only one member as this will also update its meta dict
+        out_lcs += [join_lightcurves(lcs[mask])]
+    return LightCurveCollection(out_lcs)
+
+
+def _best_fit_groups_in_sector_block(lcs: LightCurveCollection,
+                                     completeness_th: float=0.8,
+                                     min_eclipses: Tuple[int]=(2, 1),
+                                     max_group_size: int=None,
+                                     verbose: bool=False) -> List[List[int]]:
+    """
+    Will work out the most effective arrangement of sectors within the passed contiguous block to
+    support JKTEBOP fitting. This must balance need for sufficient coverage for each fitting to
+    achieve a reliable output, as indicated by min_eclipses, while running as many fits as possible.
+    This uses the eclipse timing & completeness metadata added by add_eclipse_meta_to_lightcurves().
+    Returns the groups in the form [[group0], [group1], ... , [groupN]] where each group is a list
+    of the constituent sector numbers.
     """
     if max_group_size is None:
         max_group_size = len(lcs)
+    fit_groups = []
+    sectors = list(lc.sector for lc in lcs)
+    eclipse_counts = np.array([
+        tuple(sum(lc.meta[f"{k}_completeness"] > completeness_th) for k in ["primary", "secondary"])
+            for lc in lcs])
+    if (max_ecl_count := np.max(eclipse_counts)) == 0:
+        return # No eclipses within the block
 
-    def is_usable_group(seg_ecl_counts) -> bool:
-        """ On the eclipse counts, is the corresponding grp of LCs/sectors suitable for fitting? """
-        ecl_sums = np.sum(seg_ecl_counts, axis=0)
-        return max(ecl_sums) > 2 * completeness_th and min(ecl_sums) > 1 * completeness_th
+    # A minimum group size based on the eclipse counts compared with the min_eclipse criterion
+    min_group_size = max(1, int(np.floor(max(min_eclipses) / max_ecl_count)))
 
-    # Make sure the sectors are sorted by sector number.
-    lcs = LightCurveCollection(sorted(lcs, key=lambda l: l.sector))
+    sectors_len = len(lcs)
+    if sectors_len == 1 and not _is_usable_group(eclipse_counts, min_eclipses):
+        if verbose:
+            print(f"Dropped solitary sector {sectors[0]} as it has insufficient orbital coverage.")
+    else:
+        grp_from_ix = 0
+        while grp_from_ix < sectors_len:
+            created_group = False
 
-    # Isolating the sectors into contiguous blocks, so [1,2,4,5,6,8] becomes [[1,2], [4,5,6], [8]]
-    # By using a key of the sector number minus its list index we have a value which we can
-    # group by, as it will remain unchanged within a block of contiguously incrementing values.
-    sector_groups = []
-    for _, block in groupby(enumerate(lcs.sector),
-                            key=lambda ix_sec: ix_sec[1] - ix_sec[0]):
-        # Now work out how best to use this block of contiguous sectors/LCs for JKTEBOP fitting.
-        blk_sectors = list(g for _, g in block)
+            # Grow group within this block until it has sufficient coverage,
+            # we run out of sectors or we reach the maximum group size allowed.
+            max_grp_to_ix = min(grp_from_ix + max_group_size, sectors_len)
+            for grp_to_ix in range(grp_from_ix + min_group_size, max_grp_to_ix + 1):
+                grp_slice = slice(grp_from_ix, grp_to_ix)
+                if _is_usable_group(eclipse_counts[grp_slice], min_eclipses):
+                    if grp_to_ix < max_grp_to_ix \
+                            and (sectors_len - grp_to_ix < min_group_size \
+                                or not _is_usable_group(eclipse_counts[grp_to_ix:], min_eclipses)):
+                        # Special case: if group is not of max size & the remainder of the block
+                        # isn't usable to form another group, extend this group to max possible.
+                        grp_slice = slice(grp_from_ix, grp_to_ix := max_grp_to_ix)
 
-        # Eclipse counts for each block member as an array([[#prim0, #sec0], ..., [#primN, #secN]])
-        blk_ecl_counts = np.array([
-            list(sum(l.meta[k][l.meta[k] > completeness_th])
-                    for k in ["primary_completeness", "secondary_completeness"])
-                        for l in lcs[np.in1d(lcs.sector, blk_sectors)]
-        ])
-
-        blk_size = len(blk_sectors)
-        max_ecl_count = np.max(blk_ecl_counts) # either primary or secondary
-        min_grp_size = max(1, int(np.floor(2*completeness_th / (max_ecl_count+1e-10))))
-
-        if blk_size >= min_grp_size:
-            if blk_size == 1:
-                if is_usable_group(blk_ecl_counts):
-                    sector_groups.append(blk_sectors)
+                    # We have a usable group. Save its membership details then break out so
+                    # we start building the the next group with the next sector in the block.
+                    fit_groups.append(sectors[grp_slice])
+                    created_group = True
+                    grp_from_ix += grp_to_ix - grp_from_ix
                     if verbose:
-                        print(f"Created a group of sector(s) {blk_sectors}.")
-                elif verbose:
-                    print(f"Dropped the solitary sector {blk_sectors[0]}",
-                          "as it has insufficient orbital coverage.")
-            else:
-                # Multiple sectors/LCs within this block so build groups from combinations.
-                grp_start = 0
-                while grp_start < blk_size:
-                    next_start_inc = 1
-                    created_group = False
+                        print(f"Created a group of sector(s) {sectors[grp_slice]}.")
+                    break
 
-                    # Grow group within this block until it has sufficient coverage,
-                    # we run out of sectors or we reach the maximum group size allowed.
-                    max_grp_stop = min(grp_start + max_group_size, blk_size)
-                    for grp_stop in range(grp_start + min_grp_size, max_grp_stop + 1):
-                        grp_slice = slice(grp_start, grp_stop)
-                        if is_usable_group(blk_ecl_counts[grp_slice]):
-                            # Special case: if group is not of max size & the remainder of the block
-                            # isn't usable to form another group, extend this group to max possible.
-                            if grp_stop < max_grp_stop \
-                                    and (blk_size - grp_stop < min_grp_size \
-                                        or not is_usable_group(blk_ecl_counts[grp_stop:])):
-                                grp_slice = slice(grp_start, grp_stop := max_grp_stop)
+            if not created_group:
+                # If were unable to create a group then there's no point trying for more
+                if verbose:
+                    print(f"Dropped the sector(s) {sectors[grp_from_ix:]} as, even when grouped,"
+                          "there is likely insufficent orbital coverage for a good fit.")
+                break
 
-                            # We have a usable group. Save its membership details then break out so
-                            # we start building the the next group with the next sector or block.
-                            sector_groups.append(blk_sectors[grp_slice])
-                            created_group = True
-                            next_start_inc = grp_stop - grp_start
-                            if verbose:
-                                print(f"Created a group of sector(s) {blk_sectors[grp_slice]}.")
-                            break
-
-                    if not created_group and verbose:
-                        print(f"Dropped sector {blk_sectors[grp_start]} as it has insufficient",
-                              "orbital coverage, even when grouped with any following sectors.")
-
-                    grp_start += next_start_inc
-        elif verbose:
-            print(f"Dropped the whole block of contiguous sectors {blk_sectors} as they have",
-                  "insufficient orbital coverage, either singularly or when combined.")
-
-    return sector_groups
+    return fit_groups
 
 
-def stitch_lightcurve_groups(lcs: LightCurveCollection,
-                             sector_groups: List[List[int]],
-                             verbose: bool=False) -> LightCurveCollection:
-    """
-    Will create a new LightCurveCollection containing single and/or stitched LightCurves from the
-    source collection passed in, based on the groups listed in the sector_groups argument.
-
-    The sector_groups argument will have the form [[group0], [group1], ... , [groupN]] where each
-    group is a list of one or more sector numbers which indicate the source LightCurves which are
-    to be stitched to form the group's LightCurve in the output collection. This list can be
-    generated with the group_sectors_for_fitting() func, also in this module.
-    
-    :lcs: the original LightCurveCollection from which to create the stitched copies
-    :sector_groups: the list of groups which controls the stitching to be carried out
-    :verbose: whether or not to send messages to stdout with details of the actions taken
-    :returns: a new LightCurveCollection containing the newly grouped/stitched LightCurves
-    """
-    grp_lcs = []
-    for sector_group in (s for s in sector_groups if len(s) > 0):
-        mask = np.in1d(lcs.sector, sector_group)
-        if sum(mask) == 0:
-            warnings.warn(f"No LCs found for the grouped sector(s) {sector_group}")
-        else:
-            if sum(mask) != len(sector_group):
-                missing = [s for s in sector_group if s not in lcs.sector]
-                msg = f"The LC(s) {missing} not found for the grouped sector(s) {sector_group}"
-                warnings.warn(msg)
-
-            src_lcs = lcs[mask]
-            target = src_lcs[0].meta.get("target", src_lcs[0].meta["OBJECT"])
-            if verbose and sum(mask) > 1:
-                print(f"The {target} LCs for grouped sectors {src_lcs.sector} will be stitched.")
-
-            # Normalize + combine the sectors in the grouping (also if there's only 1)
-            grp_lcs += [src_lcs.stitch(lambda lc: lc.normalize())]
-            new_grp_lc = grp_lcs[-1]
-
-            # Update/combine metadata where appropriate. From fits tends to be UCASE, ours are lcase
-            new_grp_lc.meta["sectors"] = src_lcs.sector
-            sec_list = [f"{s:02d}" if int(s) == s else f"{s:02.1f}" for s in src_lcs.sector]
-            new_grp_lc.meta["LABEL"] = f"{target} S{sec_list[0]}"
-            if sum(mask) > 1:
-                new_grp_lc.meta["LABEL"] += (" to" if sum(mask)>2 else " and") + f" S{sec_list[-1]}"
-
-                # lightkurve's stitch appears smart enough to concat ndarray & list meta values.
-                # However, some of the singular values seem to be from the last sector, when it is
-                # useful if it were from the first sector (i.e.: t0, TSTART). Fix where necessary.
-                for k in ["t0", "TSTART", "DATE-OBS", "SECTOR"]:
-                    if k in src_lcs[0].meta:
-                        new_grp_lc.meta[k] = src_lcs[0].meta[k]
-
-                for k in ["LIVETIME", "TELAPSE"]:
-                    if all(k in lc.meta for lc in src_lcs):
-                        new_grp_lc.meta[k] = np.sum([lc.meta[k] for lc in src_lcs])
-
-                for (k, d) in [("CROWDSAP", 1)]:
-                    new_grp_lc.meta[k] = np.mean([lc.meta.get(k, d) for lc in src_lcs])
-
-                # Revise the t0 time to that of the best/most complete in the combined LC
-                t0_mask = np.in1d(new_grp_lc.meta["primary_times"], [l.meta["t0"] for l in src_lcs])
-                if any(t0_mask):
-                    best_t0_ix = np.argmax(new_grp_lc.meta["primary_completeness"][t0_mask])
-                    new_grp_lc.meta["t0"] = new_grp_lc.meta["primary_times"][t0_mask][best_t0_ix]
-                else:
-                    new_grp_lc.meta["t0"] = src_lcs[0].meta["t0"]
-
-    return LightCurveCollection(grp_lcs)
+def _is_usable_group(grp_ecl_counts: List[Tuple[int, int]], min_eclipses: Tuple[int, int]=(2, 1)):
+    """ Is the proposed grp of sectors suitable for fitting, based on eclipse counts? """
+    ecl_sums = np.sum(grp_ecl_counts, axis=0)
+    return max(ecl_sums) >= max(min_eclipses) and min(ecl_sums) >= min(min_eclipses)
 
 
 def append_mags_to_lightcurves_and_detrend(lcs: LightCurveCollection,

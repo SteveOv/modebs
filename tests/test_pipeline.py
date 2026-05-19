@@ -6,6 +6,7 @@ import numpy as np
 import astropy.units as u
 from astropy.coordinates import SkyCoord
 from uncertainties import nominal_value, std_dev
+from lightkurve import LightCurve
 
 from tests.helpers.lightcurve_helpers import load_lightcurves, KNOWN_TARGETS
 from libs.catalogues import query_tess_ebs_ephemeris
@@ -13,8 +14,7 @@ from libs.lightcurves import find_lightcurve_sections, fit_polynomial
 
 from libs.pipeline import get_teff_from_spt, _spt_to_teff_map # pylint: disable=protected-access
 from libs.pipeline import add_eclipse_meta_to_lightcurves
-from libs.pipeline import choose_lightcurve_groups_for_fitting
-from libs.pipeline import stitch_lightcurve_groups
+from libs.pipeline import arrange_sector_groups, join_lightcurves
 from libs.pipeline import append_mags_to_lightcurves_and_detrend
 from libs.pipeline import fit_target_lightcurves
 
@@ -88,22 +88,64 @@ class Testpipeline(unittest.TestCase):
             self.assertIn("secondary_depths", lc.meta)
             self.assertIn("secondary_completeness", lc.meta)
 
-    #
-    # choose_lightcurve_groups_for_fitting(lcs: LightCurveCollection, completeness_th: float) -> List[List[ix]]
-    #
-    def test_choose_lightcurve_groups_for_fitting_known_targets(self):
-        """ Test choose_lightcurve_groups_for_fitting() assert it produces expected arrangement """
-        for target,             sectors,                max_group_size, exp_groups in[
-            # Sectors not contiguous (so no join) but are fine to use individually do 7+ of each ecl per sector
-            ("CW Eri",          [4, 31],                None,           [[4], [31]]),
-            ("CW Eri",          [4, 31],                1,              [[4], [31]]),
-            # Sector are contiguous, but joining not necessary as there are many of each eclipse per sectors
-            ("CM Dra",          [24, 25, 26],           None,           [[24], [25], [26]]),
-            ("CM Dra",          [24, 25, 26],           1,              [[24], [25], [26]]),
-            # The only usable combo is 52+53 as eclipses too infrequent to fit any sector individually
-            ("AN Cam",          [53, 59, 52],           None,           [[52, 53]]),
-            ("AN Cam",          [53, 59, 52],           1,              []),
 
+    #
+    # join_lightcurves(lcs: LightCurveCollection) -> LightCurve
+    #
+    def test_join_lightcurves_happy_path(self):
+        """ Test choose_lightcurve_groups_for_fitting() assert it produces expected arrangement """
+        for (target,    sectors) in [
+            ("CM Dra",  [24]),
+            ("CM Dra",  [24, 25, 26]),
+        ]:
+            with self.subTest(f" {target}; {sectors}"):
+                config = KNOWN_TARGETS[target]
+
+                # Read the ephemeris. We need this to find eclipses and set completeness metrics
+                eph = query_tess_ebs_ephemeris(config["tic"]) or {}
+                t0 = eph.get("t0", config.get("t0", config.get("t0", None)))
+                period = eph.get("period", config.get("period", None))
+                widthp = eph.get("widthP", config.get("widthP", None))
+                widths = eph.get("widthS", config.get("widthS", None))
+                depthp = eph.get("depthP", config.get("depthP", None))
+                depths = eph.get("depthS", config.get("depthS", None))
+                phis = eph.get("phiS", config.get("phiS", None))
+                lcs = load_lightcurves(target, sectors)
+
+                # Prior steps in the pipeline where we have a dependency
+                # Sets primary|secondary _times & _completeness arrays and t0 ('best' primary) to lcs' meta
+                add_eclipse_meta_to_lightcurves(lcs, t0, period, widthp, widths, depthp, depths, phis)
+
+                join_lc = join_lightcurves(lcs)
+                self.assertIsInstance(join_lc, LightCurve)
+
+                self.assertEqual(sum(len(lc) for lc in lcs), len(join_lc))
+                self.assertEqual(lcs[0].time[0], join_lc.time[0])
+                self.assertEqual(lcs[-1].time[-1], join_lc.time[-1])
+
+                self.assertListEqual(sectors, list(join_lc.meta["sectors"]))
+                self.assertEqual(sum(lc.meta["LIVETIME"] for lc in lcs),
+                                 join_lc.meta["LIVETIME"])
+                self.assertEqual(sum(len(lc.meta["primary_times"]) for lc in lcs),
+                                 len(join_lc.meta["primary_times"]))
+
+
+
+    #
+    # arrange_sector_groups(lcs: LightCurveCollection, completeness_th: float, min_eclipses: int) -> List[List[ix]]
+    #
+    def test_arrange_sector_groups_with_known_targets(self):
+        """ Test choose_lightcurve_groups_for_fitting() assert it produces expected arrangement """
+        for target,             sectors,                min_eclipses,   max_group_size, exp_groups in[
+            # Sectors not contiguous (so no join) but are fine to use individually do 7+ of each ecl per sector
+            ("CW Eri",          [4, 31],                3,              None,           [[4], [31]]),
+            ("CW Eri",          [4, 31],                3,              1,              [[4], [31]]),
+            # Sector are contiguous, but joining not necessary as there are many of each eclipse per sectors
+            ("CM Dra",          [24, 25, 26],           3,              None,           [[24], [25], [26]]),
+            ("CM Dra",          [24, 25, 26],           3,              1,              [[24], [25], [26]]),
+            # The only usable combo is 52+53 as eclipses too infrequent to fit any sector individually
+            ("AN Cam",          [53, 59, 52],           3,              None,           [[52, 53]]),
+            ("AN Cam",          [53, 59, 52],           3,              1,              []),
         ]:
             with self.subTest(f" {target}; {sectors}, max_group_size={max_group_size} -> {exp_groups} "):
                 config = KNOWN_TARGETS[target]
@@ -124,72 +166,16 @@ class Testpipeline(unittest.TestCase):
                 add_eclipse_meta_to_lightcurves(lcs, t0, period, widthp, widths, depthp, depths, phis)
 
                 # Test
-                sector_groups = choose_lightcurve_groups_for_fitting(lcs,
-                                                                     completeness_th=0.8,
-                                                                     max_group_size=max_group_size,
-                                                                     verbose=True)
-                self.assertListEqual(exp_groups, sector_groups)
+                out_lcs = arrange_sector_groups(lcs,
+                                                completeness_th=0.8,
+                                                min_eclipses=min_eclipses,
+                                                max_group_size=max_group_size,
+                                                groups_override=None,
+                                                verbose=True)
 
-    #
-    # stitch_lightcurve_groups(lcs: LightCurveCollection, completeness_th: float) -> LightCurveCollection:
-    #
-    def test_stitch_lightcurve_groups_known_targets(self):
-        """ Test stitch_lightcurve_groups() assert it produces expected set of output LCs """
-        for target,             sectors,                exp_groups in[
-            ("CM Dra",          [24, 25, 26],           [[24, 25, 26]]),
-            ("CM Dra",          [24, 25, 26],           [[24, 25], [26]]),
-            ("CM Dra",          [24, 25, 26],           [[24], [25, 26]]),
-            ("CM Dra",          [24, 25, 26],           [[24], [25], [26]]),
-
-            # Unused LCs are an expected scenario and no warnings/errors are expected
-            ("CM Dra",          [24, 25, 26],           [[25, 26]]),
-            ("CM Dra",          [24, 25, 26],           [[25], [26]]),
-        ]:
-            with self.subTest(f" {target}; {sectors} grouped as {exp_groups} "):
-                lcs = load_lightcurves(target, sectors)
-
-                # stitch depends on the eclipse metadata added by add_eclipse_meta_to_lightcurves
-                config = KNOWN_TARGETS[target]
-                eph = query_tess_ebs_ephemeris(config["tic"]) or {}
-                add_eclipse_meta_to_lightcurves(lcs,
-                                                ref_t0=eph.get("t0", config.get("t0", None)),
-                                                period=eph.get("period", config.get("period", None)),
-                                                widthp=eph.get("widthP", config.get("widthP", None)),
-                                                widths=eph.get("widthS", config.get("widthS", None)),
-                                                depthp=eph.get("depthP", config.get("depthP", None)),
-                                                depths=eph.get("depthS", config.get("depthS", None)),
-                                                phis=eph.get("phiS", config.get("phiS", None)))
-
-                # Test
-                grp_lcs = stitch_lightcurve_groups(lcs, exp_groups, verbose=True)
                 for ix, exp_group_sectors in enumerate(exp_groups):
-                    self.assertListEqual(list(grp_lcs[ix].meta["sectors"]), exp_group_sectors)
+                    self.assertListEqual(list(out_lcs[ix].meta["sectors"]), exp_group_sectors)
 
-    def test_stitch_lightcurve_groups_missing_group_members(self):
-        """ Test stitch_lightcurve_groups(missing LCs) assert raised appropriate warnings """
-        for (target,        sectors,        sector_groups,      exp_sectors,    warn_msg) in[
-            ("CM Dra",      [25, 26],       [[25], [26], [27]], [[25], [26]],   "No LCs found"),
-            ("CM Dra",      [25, 26],       [[25, 26, 27]],     [[25, 26]],     "The LC(s) [27] not found"),
-        ]:
-            with self.subTest(f" {target}; {sectors} grouped as {sector_groups} "):
-                lcs = load_lightcurves(target, sectors)
-
-                # stitch depends on the eclipse metadata added by add_eclipse_meta_to_lightcurves
-                config = KNOWN_TARGETS[target]
-                eph = query_tess_ebs_ephemeris(config["tic"]) or {}
-                add_eclipse_meta_to_lightcurves(lcs,
-                                                ref_t0=eph.get("t0", config.get("t0", None)),
-                                                period=eph.get("period", config.get("period", None)),
-                                                widthp=eph.get("widthP", config.get("widthP", None)),
-                                                widths=eph.get("widthS", config.get("widthS", None)),
-                                                depthp=eph.get("depthP", config.get("depthP", None)),
-                                                depths=eph.get("depthS", config.get("depthS", None)),
-                                                phis=eph.get("phiS", config.get("phiS", None)))
-
-                with self.assertWarns(UserWarning, msg=warn_msg):
-                    grp_lcs = stitch_lightcurve_groups(lcs, sector_groups, verbose=True)
-                    for ix, exp_group_sectors in enumerate(exp_sectors):
-                        self.assertListEqual(list(grp_lcs[ix].meta["sectors"]), exp_group_sectors)
 
     #
     # append_mags_to_lightcurves_and_detrend(lcs: LightCurveCollection, ...)
