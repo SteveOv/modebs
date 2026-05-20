@@ -208,7 +208,7 @@ def find_lightcurve_sections(lc: LightCurve,
         else:
             yield slice(sec_first_ix, sec_last_ix+1, 1)
 
-    return yield_sections()
+    yield from yield_sections()
 
 
 def fit_polynomial(times: Time,
