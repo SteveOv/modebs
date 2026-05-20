@@ -186,17 +186,21 @@ class Testpipeline(unittest.TestCase):
     #
     def test_arrange_sector_groups_with_known_targets(self):
         """ Test choose_lightcurve_groups_for_fitting() assert it produces expected arrangement """
-        for target,         sectors,    min_eclipses,   max_group_size, allow_slice,exp_groups in[
+        for target,             sectors,    min_eclipses,   max_group_size, allow_slice,exp_groups in[
             # Sectors not contiguous (so no join) but are fine to use individually do 7+ of each ecl per sector
-            ("CW Eri",      [4, 31],        3,          None,           False,      [[4], [31]]),
-            ("CW Eri",      [4, 31],        3,          1,              False,      [[4], [31]]),
-            ("CW Eri",      [4, 31],        3,          1,              True,       [[4.1], [4.2], [31.1], [31.2]]),
+            ("CW Eri",          [4, 31],        3,          None,           False,      [[4], [31]]),
+            ("CW Eri",          [4, 31],        3,          1,              False,      [[4], [31]]),
+            ("CW Eri",          [4, 31],        3,          1,              True,       [[4.1], [4.2], [31.1], [31.2]]),
             # Sector are contiguous, but joining not necessary as there are many of each eclipse per sectors
-            ("CM Dra",      [24, 25, 26],   3,          None,           False,      [[24], [25], [26]]),
-            ("CM Dra",      [24, 25, 26],   3,          1,              False,      [[24], [25], [26]]),
+            ("CM Dra",          [24, 25, 26],   3,          None,           False,      [[24], [25], [26]]),
+            ("CM Dra",          [24, 25, 26],   3,          1,              False,      [[24], [25], [26]]),
             # The only usable combo is 52+53 as eclipses too infrequent to fit any sector individually
-            ("AN Cam",      [53, 59, 52],   3,          None,           False,      [[52, 53]]),
-            ("AN Cam",      [53, 59, 52],   3,          1,              False,      []),
+            ("AN Cam",          [53, 59, 52],   3,          None,           False,      [[52, 53]]),
+            ("AN Cam",          [53, 59, 52],   3,          1,              False,      []),
+            # Test specific to revised grouping algo resulting from Issue #15 (TIC 382067804)
+            # Old algo would arrange this as [[3, 4], [5, 6, 7]] with the eclipses per group being 3 and 6
+            # Better algo expected to arrange as [[3, 4, 5], [6, 7]] with the eclipses more even at 5 and 4
+            ("TIC 382067804",   [3,4,5,6,7],    3,          None,           False,      [[3, 4, 5], [6, 7]]),
         ]:
             with self.subTest(f" {target}; {sectors}, max_group_size={max_group_size} -> {exp_groups} "):
                 config = KNOWN_TARGETS[target]
