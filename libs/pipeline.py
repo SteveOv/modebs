@@ -308,6 +308,8 @@ def slice_lightcurve(src_lc: LightCurve, slices: List[slice]) -> LightCurveColle
                             if key in lc.meta:
                                 lc.meta[key] = src_lc.meta[key][mask]
 
+                lc.meta["sector_times"] = [(lc.time.min(), lc.time.max())]
+
                 if "t0" in src_lc.meta and not tstart.value <= src_lc.meta["t0"] <= tend.value:
                     new_t0_ix = np.argmax(lc.meta["primary_completeness"])
                     lc.meta["t0"] = lc.meta["primary_times"][new_t0_ix]
