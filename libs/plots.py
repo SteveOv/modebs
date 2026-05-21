@@ -239,9 +239,12 @@ def plot_lightcurve_fits_and_residuals(out_files: List[Path],
             if ix == 0:
                 ax_lc.invert_yaxis()
                 ax_res.invert_yaxis()
-            else:
+            elif len(axes.shape) == 1:
                 ax_lc.sharey(axes.flat[0])
                 ax_res.sharey(axes.flat[1])
+            else:
+                ax_lc.sharey(axes[0, 0])
+                ax_res.sharey(axes[1, 0])
 
             # Hides tick labels on inner facing shared axes
             plt.setp(ax_lc.get_xticklabels(), visible=False)
