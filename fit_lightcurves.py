@@ -175,26 +175,6 @@ if __name__ == "__main__":
                                                           min_section_dur=min_section_dur)
 
 
-                # Split the LCs on significant gaps if the period is sufficiently short that we can
-                # maintain good coverage. Gives a larger sample of fits from which to derive params.
-                if not config.do_not_split:
-                    # pylint: disable=cell-var-from-loop
-                    new_lcs, min_gap, min_sec = [], 0.25 * u.d, nom_val(trow.period) * 3.0 * u.d
-                    for lc in lcs:
-                        sls = [*lightcurves.find_lightcurve_sections(lc, min_gap,
-                                        lambda fix, tix, lc: lc.time[tix]-lc.time[fix] >= min_sec)]
-                        if len(sls) > 1:
-                            for ix, sl in enumerate(sls, start=1):
-                                new_lcs += [lc.copy(True)[sl]]
-                                new_lcs[-1].sector += ix/10
-                        else:
-                            new_lcs += [lc]
-                    if len(new_lcs) > len(lcs):
-                        print(f"\nSplitting {len(lcs)} LC(s) into sections at least {min_sec:.6f}",
-                              f"(period * 3) long & separated by gaps >= {min_gap},",
-                              f"increasing those to be fitted to {len(new_lcs)}.")
-                        lcs = lightcurves.LightCurveCollection(new_lcs)
-
 
                 print("\nInspecting the lightcurves to find and characterise their eclipses")
                 pipeline.add_eclipse_meta_to_lightcurves(lcs, trow.t0, trow.period,
@@ -223,10 +203,13 @@ if __name__ == "__main__":
                           f">{ecl_complete_th:.0%} fluxes are considered complete.")
                 if max_group_size := 1 if config.do_not_stitch else None:
                     print("Stitching of adjascent sectors is disabled by target config setting")
+                if config.do_not_split:
+                    print("Slicing of sectors is disabled by target config setting")
                 lcs = pipeline.arrange_sector_groups(lcs,
                                                      completeness_th=ecl_complete_th,
                                                      max_group_size=max_group_size,
                                                      groups_override=config.sectors,
+                                                     allow_slice=not config.do_not_split,
                                                      verbose=True)
                 if len(lcs) == 0:
                     raise PipelineError(target_id, "No lightcurves retained after selection")
