@@ -28,12 +28,13 @@ import corner
 from sed_fit.stellar_grids import get_stellar_grid
 from sed_fit.fitter import create_theta, minimize_fit, mcmc_fit, samples_from_sampler
 
-from libs import pipeline, extinction, plots
+from libs import extinction, plots
 from libs.pipeline import PipelineError
 from libs.sed import get_sed_for_target, group_and_average_fluxes, create_outliers_mask
 from libs.iohelpers import Tee
 from libs.targets import Targets
 from libs.pipeline_dal import create_dal
+from libs.utils import to_file_safe_str
 
 THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 
@@ -123,7 +124,7 @@ if __name__ == "__main__":
                 print("------------------------------------------------------------")
                 config = targets_config.get_target_config(target_id)
                 if args.plot_figs:
-                    figs_dir = drop_dir / "figs" / pipeline.to_file_safe_str(target_id)
+                    figs_dir = drop_dir / "figs" / to_file_safe_str(target_id)
                     figs_dir.mkdir(parents=True, exist_ok=True)
 
                 coords = SkyCoord(ra=nom_val(trow.ra_coord) * u.deg,

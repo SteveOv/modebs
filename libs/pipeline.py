@@ -1,15 +1,13 @@
-"""
-Low level utility functions for light curve ingest, pre-processing, estimation and fitting.
-"""
+""" Functions which directly support the various pipeline steps. """
 # pylint: disable=no-member, too-many-arguments, too-many-positional-arguments
-from typing import Union, Tuple, Dict, List, Iterable
+from typing import Union, Tuple, Dict, List
 from numbers import Number
 from io import TextIOBase, StringIO
 from sys import stdout
 import warnings
 import re
 from multiprocessing import Pool
-from itertools import groupby, zip_longest, chain, combinations
+from itertools import groupby
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -28,6 +26,7 @@ from deblib.vmath import arccos, degrees
 
 from libs import jktebop, lightcurves
 from libs.iohelpers import PassthroughTextWriter
+from libs.utils import partitions_slices
 
 _TRIG_MIN = ufloat(-1, 0)
 _TRIG_MAX = ufloat(1, 0)
@@ -42,7 +41,6 @@ _spt_to_teff_map = {
     "O": ufloat(35000, 10000)
 }
 
-_to_file_safe_sub_pattern = re.compile(r"[^\w\d._-]", re.IGNORECASE)
 _spt_find_pattern = re.compile(r"([A-Z]{1}[0-9]*)")
 
 
@@ -61,67 +59,6 @@ class PipelineError(Exception):
     def __str__(self):
         return f"[{self._target_id}] " + super().__str__()
 
-
-def to_file_safe_str(text: str, replacement: str="-", lower: bool=True) -> str:
-    """
-    Parse the text and replace any potentially troublesome characters when used as a file name.
-    Do no pass in a full path as / and \\ are among the characters which will be replaced.
-
-    :text: the original text
-    :replacement: the character to substitute for any troublesome characters
-    :lower: whether or not to force the revised text to lower case [True]
-    :returns: the revised text
-    """
-    retval = _to_file_safe_sub_pattern.sub(replacement, text)
-    return retval.lower() if lower else retval
-
-
-def grouper(iterable: Iterable, size: int, fillvalue=None):
-    """
-    Iterates over iterable, yielding the contents in groups (tuples) of the requested size.
-
-    From https://docs.python.org/3/library/itertools.html#itertools-recipes
-
-    :iterable: the iterable to iterate in groups
-    :size: the size of each group
-    :fillvalue: used to fill out the final group when there are insufficient items in the iterable
-    :returns: tuples, of the requested size, of values from iterator 
-    """
-    batchable = [iter(iterable)] * size
-    return zip_longest(*batchable, fillvalue=fillvalue)
-
-def powerset(iterable: Iterable, min_len: int=0):
-    """
-    Yields every possible subset of the source sequence. 
-
-    i.e.: powerset([1,2,3]) -> () (1,) (2,) (3,) (1,2) (1,3) (2,3) (1,2,3)
-    
-    From https://docs.python.org/3/library/itertools.html#itertools-recipes
-    with a modification to specify the minimum length of the subsets.
-
-    :iterable: the iterable to yield from
-    :min_size: the minimum length of the subsets to yield
-    """
-    seq = list(iterable)
-    min_len = max(0, min_len)
-    return chain.from_iterable(combinations(seq, r) for r in range(min_len, len(seq)+1))
-
-def partitions_slices(sequence_len: int, min_slice_len: int=1, max_slice_len: int=None):
-    """
-    Yields all possible order-preserving lists of slices onto a sequence of the given length.
-
-    i.e.: partitions_slices(3) -> [[0:3]] [[0:1],[1:3]] [[0:2],[2:3]] [[0:1],[1:2],[2:3]]
-
-    Based on
-    https://more-itertools.readthedocs.io/en/stable/_modules/more_itertools/more.html#partitions
-    with a modifications to yield slices (so it doesn't need to see the sequence, with only the
-    length required) and to restrict the minimum & maximum length of any slices.
-    """
-    max_slice_len = min(sequence_len, max_slice_len or sequence_len)
-    for ix in powerset(range(1, sequence_len)):
-        slices = [slice(i, j) for i, j in zip((0,) + ix, ix + (sequence_len,))]
-        if all(min_slice_len <= sl.stop - sl.start <= max_slice_len for sl in slices):
-            yield slices
 
 def get_teff_from_spt(target_spt):
     """

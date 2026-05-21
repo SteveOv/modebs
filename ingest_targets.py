@@ -17,7 +17,7 @@ from astroquery.simbad import Simbad
 from astroquery.gaia import Gaia
 import numpy as np
 
-from libs import pipeline
+from libs.utils import grouper
 from libs.iohelpers import Tee
 from libs.targets import Targets
 from libs.pipeline_dal import create_dal
@@ -81,7 +81,7 @@ if __name__ == "__main__":
         simbad.add_votable_fields("parallax", "sp", "ids")
         id_patt = re.compile(r"(Gaia DR3|V\*|TIC|HD|HIP|2MASS)\s+(.+?(?=\||$))", re.IGNORECASE)
         gaia_id_index = { }
-        for sterms in pipeline.grouper(search_term_index.keys(), args.batch_size, fillvalue=None):
+        for sterms in grouper(search_term_index.keys(), args.batch_size, fillvalue=None):
             # zip strict so we get ValueError if not same len as the sterms
             sterms = [m for m in sterms if m is not None]
             for sterm, srow in zip(sterms, simbad.query_objects(sterms), strict=True):
@@ -108,7 +108,7 @@ if __name__ == "__main__":
         # Augment the basic information from Gaia DR3 (where target is in DR3).
         # Gaia DR3 queries are keyed on the gaia_dr3_id from above against the source_id field.
         print("\nQuerying Gaia DR3 in batches for coordinates and ruwe data.")
-        for gids in pipeline.grouper(gaia_id_index.keys(), size=args.batch_size, fillvalue=None):
+        for gids in grouper(gaia_id_index.keys(), size=args.batch_size, fillvalue=None):
             AQL = f"SELECT TOP {args.batch_size*2} source_id, ra, dec, parallax, parallax_error, " \
                 + "ruwe, teff_gspphot, logg_gspphot FROM gaiadr3.gaia_source_lite " \
                 + f"WHERE source_id in ({','.join(f'{i:d}' for i in gids if i is not None)})"

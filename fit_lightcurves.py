@@ -27,6 +27,7 @@ from libs.pipeline import PipelineError
 from libs.iohelpers import Tee
 from libs.targets import Targets
 from libs.pipeline_dal import create_dal
+from libs.utils import to_file_safe_str
 
 
 THIS_STEM = Path(getsourcefile(lambda: 0)).stem
@@ -110,7 +111,7 @@ if __name__ == "__main__":
                 print("------------------------------------------------------------")
                 config = targets_config.get_target_config(target_id)
                 if args.plot_figs:
-                    figs_dir = drop_dir / "figs" / pipeline.to_file_safe_str(target_id)
+                    figs_dir = drop_dir / "figs" / to_file_safe_str(target_id)
                     figs_dir.mkdir(parents=True, exist_ok=True)
 
                 # The quality bitmask excludes fluxes by their quality flag. If unset, choose on the
