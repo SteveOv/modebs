@@ -308,8 +308,7 @@ def slice_lightcurve(src_lc: LightCurve, slices: List[slice]) -> LightCurveColle
                             if key in lc.meta:
                                 lc.meta[key] = src_lc.meta[key][mask]
 
-                lc.meta["sector_times"] = [(lc.time.min(), lc.time.max())]
-
+                lc.meta["sector_times"] = [(tstart, tend)]
                 if "t0" in src_lc.meta and not tstart.value <= src_lc.meta["t0"] <= tend.value:
                     new_t0_ix = np.argmax(lc.meta["primary_completeness"])
                     lc.meta["t0"] = lc.meta["primary_times"][new_t0_ix]
@@ -378,9 +377,9 @@ def arrange_sector_groups(lcs: LightCurveCollection,
             blk_ecl_counts = np.array([eclipse_counts(lc) for lc in lcs[blk_mask]])
 
             if verbose:
-                bname = f"{blk_sectors[0]}" + (f"-{blk_sectors[-1]}" if len(blk_sectors)>1 else "")
-                print("From the block of sectors (" + bname + ")",
-                      "the group(s) with sufficient coverage for fitting are:", end=" ")
+                print("The best arrangement of the block of sectors",
+                     f"({blk_sectors[0]}" + (f"-{blk_sectors[-1]})" if len(blk_sectors)>1 else ")"),
+                      "for fitting is:", end=" ")
 
             # All combinations of contiguous sectors (slices) where eclipse criteria are met.
             all_sets_slices = [sls for sls in partitions_slices(len(blk_sectors), 1, max_group_size)
