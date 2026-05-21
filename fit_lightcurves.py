@@ -142,9 +142,10 @@ if __name__ == "__main__":
                     raise PipelineError(target_id, f"No lightcurves found for {trow.search_term}.")
 
                 # Then filter out any results that are for a different TIC (unlikely but possible).
-                select_mask = np.in1d([l.meta['TARGETID'] for l in lcs],
-                                    [int(t) for t in trow.tics.split("|")])
-                lcs = lcs[select_mask]
+                if trow.tics is not None and len(trow.tics) > 0:
+                    select_mask = np.in1d([l.meta['TARGETID'] for l in lcs],
+                                          [int(t) for t in trow.tics.split("|")])
+                    lcs = lcs[select_mask]
                 print(f"Found {len(lcs)} lightcurves prior to applying any configured selections.")
 
                 # Configured selections, exclusions 1st so they're overidden by mention in sectors
