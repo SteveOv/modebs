@@ -47,7 +47,11 @@ class Testlightcurves(unittest.TestCase):
         ]:
 
             with self.subTest(f"{target} {sectors}/{mission}/{author}/{exptime}"):
+
+                search_term = f"TIC {lightcurve_helpers.KNOWN_TARGETS[target]['tic']}"
+                print(f"search_term = {search_term}")
                 lcs = lightcurves.load_lightcurves(target,
+                                                   search_term,
                                                    sectors=sectors,
                                                    mission=mission,
                                                    author=author,
@@ -71,7 +75,9 @@ class Testlightcurves(unittest.TestCase):
             with self.subTest(f"{target} {sectors}/{mission}/{author}/{exptime}"):
 
                 # Ensure we have a locally cached search result
-                lcs = lightcurves.load_lightcurves(target, target,
+                search_term = f"TIC {lightcurve_helpers.KNOWN_TARGETS[target]['tic']}"
+                print(f"search_term = {search_term}")
+                lcs = lightcurves.load_lightcurves(target, search_term,
                                                    sectors, mission, author, exptime,
                                                    cache_dir=self.cache_dir)
 
