@@ -18,6 +18,7 @@
     },
     "target_configs": {
         "V539 Ara": {
+            "search_term": "TIC 396903513",
             "source": "DEBCat and Southworth & Bowman (2022) Table 3. Tess sectors 13 and 39 SAP data separately analysed with JKTEBOP (due to apsidal motion). Teffs reproduced from Clausen (1996).",
             "reference": "SouthworthBowman22mnras",
             "aka": "TIC 396903513, HD 161783",
@@ -55,6 +56,7 @@
             }
         },
         "MU Cas": {
+            "search_term": "TIC 83905462",
             "source": "DEBCat and Rediscussion 22, Tables II & III. TESS sectors 17, 18, 24, 57, 58, 77 & 78 SAP photometry (120 s) analysed with JKTEBOP version 43. Refines characterisation of LacyClaret+04aj.",
             "reference": "Southworth25obsR22",
             "aka": "TIC 83905462, HIP 1263",
@@ -98,6 +100,7 @@
             }
         },
         "IQ Per": {
+            "search_term": "TIC 265767012",
             "source": "DEBCat and Rediscussion 21 table IV. Initial JKTEBOP v43 anlysis of TESS sector 59 and full analysis of sectors 19 and 59 with WD2004 code.",
             "reference": "Southworth24obsR21, LacyFrueh85apj",
             "aka": "TIC 265767012, HD 24909",
@@ -134,9 +137,10 @@
             }
         },
         "AR Aur": {
+            "search_term": "TIC 2236015",
             "source": "DEBCAT and Rediscussion 25 Table IV. SAP flux at a cadence of 120 s from TESS sectors 19, 43, 44, 45, 59, 71, 73 & 86 separately characterized with JKTEBOP.",
             "reference": "Southworth25obsR25",
-            "aka": "TIC 144085463, HD 34364",
+            "aka": "TIC 2236015, HD 34364",
             "SpT": "B9 V + B9.5 V",
             "details": "8 short cadence sectors (19, 43-45, 59, 71, 73 & 86); a pair of late-B stars in a circular 4.135 day orbit; primary and secondary partial eclipses of depth ~0.6 and ~0.55 mag;",
             "notes": "Southworth25obsR25 uses E(B-V)=0.01+/-0.01 mag and gives dist=136.4+/-1.7 pc; Southworth25obsR25 finds agreement with PARSEC 1.2 models with Z=0.020 and age 33+/-3 Myr after ZAMS;",
@@ -171,6 +175,7 @@
             }
         },
         "V1229 Tau": {
+            "search_term": "TIC 125754991",
             "source": "DEBCat and Southworth et al. (2023), Table I. TESS sectors 42-44 SAP flux analysed with JKTEBOP version 43. SpT originally from Abt & Levato (1978)",
             "reference": "SouthworthMurphy+23mnrasl, AbtLevato78pasp",
             "aka": "TIC 125754991, HD 23642",
@@ -208,6 +213,7 @@
             }
         },
         "V889 Aql": {
+            "search_term": "TIC 300000680",
             "source": "DEBCAT and Baroch et al. (2022) Tables 9 and 10. Used SAP flux extracted from TESS sectors 14 and 40 FFIs analysed with JKTEBOP and all params published. TESS sector 40 & 54 @ 600 s and 80 & 81 @ 200s timeseries data now available.",
             "reference": "BarochGimenez+22aa",
             "aka": "TIC 300000680, HD 181166",
@@ -242,6 +248,7 @@
             }
         },
         "V596 Pup": {
+            "search_term": "TIC 144085463",
             "source": "DEBCAT and Rediscussion 24 Table III. Used SAP flux from TESS sectors 34 and 61 separately characterized with JKTEBOP v43.",
             "reference": "Southworth25obsR24",
             "aka": "TIC 144085463, HD 71581",
@@ -279,6 +286,7 @@
             }
         },
         "WW Aur": {
+            "search_term": "TIC 172171873",
             "source": "DEBCat and Southworth et al. (2005) table 12. Uses EBOP (with mods to fit rA+rB & k and to use MRQMIN) for fitting of observations from the 1970s. We use V-band fitting results (Table 10).",
             "reference": "SouthworthSmalley+05mnras",
             "aka": "TIC 172171873, HD 46052",
@@ -314,6 +322,7 @@
             }
         },
         "V788 Cen": {
+            "search_term": "TIC 258314976",
             "source": "DEBCat and Graczyk et al. (2022) (Table 8 & 9) who use WD for fitting SAP flux of 2nd half of sector 37 (as least affected by starspots), leaving sector 10 unused.",
             "reference": "GraczykPietrzynski+22aa",
             "aka": "TIC 258314976, HD 105509",
@@ -350,6 +359,7 @@
             }
         },
         "RR Lyn": {
+            "search_term": "TIC 11491822",
             "source": "Rediscussion 7, Table III. TESS sector 20 SAP photometry analysed with JKTEBOP version 41.",
             "reference": "Southworth21obsR7",
             "aka": "TIC 11491822, HD 44691",
@@ -387,6 +397,7 @@
             }
         },
         "V362 Pav": {
+            "search_term": "TIC 464422047",
             "source": "DEBCat and Graczyk et al. (2022) Table 9. They use WD for fitting of SAP fluxes of 2nd half of Sector 13.",
             "reference": "GraczykPietrzynski+22aa",
             "aka": "TIC 464422047, HD 173344",
@@ -423,6 +434,7 @@
             }
         },
         "V456 Cyg": {
+            "search_term": "TIC 15795549",
             "source": "DEBCat and Van Reeth et al. (2022) Table 1. TESS sectors 14 and 15 fitted with JKTEBOP version 42. SpT and logLA from Bakis et al. (2014).",
             "reference": "VanReethSouthworth+22aa, BakisHensberge+14aj",
             "aka": "TIC 15795549",
@@ -458,6 +470,7 @@
             }
         },
         "GW Eri": {
+            "search_term": "TIC 149861542",
             "source": "DEBCat and Graczyk et al. (2022) table 9. WD code used for fitting sector 31 (table 8).",
             "reference": "GraczykPietrzynski+22aa",
             "aka": "TIC 149861542, HD 26591",
@@ -494,6 +507,7 @@
             }
         },
         "OO Peg": {
+            "search_term": "TIC 314847177",
             "source": "DEBCat and Rediscussion 18, Table IV. TESS sector 55 TESS-SPOC/SAP photometry analysed with JKTEBOP version 43.",
             "reference": "Southworth24obsR18",
             "aka": "TIC 314847177, HS 206417",
@@ -531,6 +545,7 @@
             }
         },
         "CW Eri": {
+            "search_term": "TIC 98853987",
             "source": "DEBCat and Rediscussion 17, Table VI. TESS sectors 4 and 31 SAP photometry analysed with JKTEBOP version 43.",
             "reference": "OverallSouthworth24obsR17",
             "aka": "TIC 98853987, HD 19115",
@@ -570,6 +585,7 @@
             }
         },
         "ZZ Boo": {
+            "search_term": "TIC 357358259",
             "source": "DEBCat and Rediscussion 12, Table V. TESS sectors 23 & 50 SAP photometry analysed with JKTEBOP version 42.",
             "reference": "Southworth23obsR12",
             "aka": "TIC 357358259, HD 121648",
@@ -609,6 +625,7 @@
             }
         },
         "RZ Cha": {
+            "search_term": "TIC 394730113",
             "source": "DEBCat and Rediscussion 23, Table V. TESS sectors 65 & 66 SAP photometry analysed with JKTEBOP version 43.",
             "reference": "Southworth25obsR23",
             "aka": "TIC 394730113, HD 93486",
@@ -645,6 +662,7 @@
             }
         },
         "AN Cam": {
+            "search_term": "TIC 103098373",
             "source": "DEBCat and Rediscussion 4, Table III.  TESS sectors 19, 25, and 26 (timeseries data from FFI) analysed with JKTEBOP version 41. ",
             "reference": "Southworth21obsR4",
             "aka": "TIC 103098373, HD 24906",
@@ -681,6 +699,7 @@
             }
         },
         "IT Cas": {
+            "search_term": "TIC 26801525",
             "source": "DEBCat and Rediscussion 13, Table III. TESS sectors 17, 24 and 57 SAP photometry analysed with JKTEBOP version 43.",
             "reference": "Southworth23obsR13",
             "aka": "TIC 26801525",
@@ -720,9 +739,10 @@
             }
         },
         "UZ Dra": {
+            "search_term": "TIC 259126645",
             "source": "Rediscussion 27, Tables II and V. A total of 41 TESS sectors with 120 s cadence SAP photometry analysed with JKTEBOP version 44.",
             "reference": "Southworth25obsR27",
-            "aka": "TIC 48356677",
+            "aka": "TIC 259126645",
             "SpT": "F6 + F8",
             "details": "41 short cadence sectors (14-16, 18-26, 40-41, 47-60, 73-78 & 80-86); a pair of late-F stars in a circular 3.26 d orbit; total primary and secondary eclipses with depths of ~0.70 and ~0.55 mag;",
             "notes": "many sectors available and relatively short period which can all fit fairly easily; S78 has some distortion near start of sector; Southworth25obsR27 uses E(B-V)=0.02+/-0.01 and gives dist=185.7+/-2.4 pc; Southworth25obsR27 finds the best match with PARSEC 1.2 models for Z=0.020 and an age of 600+/-200 Myr;",
@@ -759,6 +779,7 @@
             }
         },
         "V455 Aur": {
+            "search_term": "TIC 470966839",
             "source": "DEBCat and Rediscussion 5, Table III. TESS sector 20 SAP photometry analysed with JKTEBOP version 41. TESS sectors 60 and 73 released subsequent to publication.",
             "reference": "Southworth21obsR5",
             "aka": "TIC 470966839, HD 45191",
@@ -798,6 +819,7 @@
             }
         },
         "V505 Per": {
+            "search_term": "TIC 348517784",
             "exlude": true,
             "why_exclude": "something not right with the ephemeris and/or the eclipse finding logic",
             "source": "DEBCat and Rediscussion 6, Table V. TESS sector 18 SAP photometry analysed with JKTEBOP version 41. TESS sectors 58 & 85 observations released subsequent to publication.",
@@ -839,9 +861,10 @@
             }
         },
         "HP Dra": {
+            "search_term": "TIC 48356677",
             "source": "Rediscussion 26, Table IV. The 120 s SAP photometry from 14 TESS sectors (14, 15, 26, 40, 41, 53-55, 59, 74, 75, 80, 82, 86) analysed with JKTEBOP.",
             "reference": "Southworth25obsR26",
-            "aka": "TTIC 48356677, HD 175900",
+            "aka": "TIC 48356677, HD 175900",
             "SpT": "F9 V + F9 V",
             "details": "14 short cadence sectors (14-15, 26, 40-41, 53-55, 59, 74-75, 80, 82 & 86); a pair of late-F stars in a 10.76 d orbit; primary and secondary eclipses of ~0.28 and 0.24 mag; eccentric with slightly late secondary; slow variability in the light curves is likely instrumental in origin;",
             "notes": "low TESS-ebs morph (0.142) invokes flattening+clip; S80 dropped bu sector arrange algo as too few eclipses; some scatter in k & J as both near unity but 'average' fit is good; Southworth25obsR26 uses E(B-V)=0.00+/-0.01 mag and gives dist=77.9+/-1.2 pc; Southworth25obsR26 found an 'adequate' match to PARSEC 1.2 models with solar metallicity and an age of 3.5 Gyr;",
@@ -877,6 +900,7 @@
             }
         },
         "ZZ UMa": {
+            "search_term": "TIC 138505004",
             "source": "DEBCat and Rediscussion 11, Table V. TESS sectors 14, 21, 41, 47 and 48 SAP photometry analysed with JKTEBOP version 42.",
             "reference": "Southworth22obsR11",
             "aka": "TIC 138505004",
@@ -917,6 +941,7 @@
             }
         },
         "V530 Ori": {
+            "search_term": "TIC 11961096",
             "source": "DEBCat and Torres et al. (2014) table 10. JKTEBOP was used to analyse various non-TESS photometry sources.",
             "reference": "TorresSandbergLacy+14apj",
             "aka": "TIC 11961096, HD 294598",
@@ -951,6 +976,7 @@
             }
         },
         "CM Dra": {
+            "search_term": "TIC 199574208",
             "source": "DEBCAT and Martin et al. (2024), Table I. TESS Sectors 16, 19, 22-26, 49-52 (all slow) and 56-59 (200 s) analysed with EXOPLANET. SpT, Teff & logL from Morales et al. (2009). logg values calculated from radii and masses;",
             "reference": "MartinSethi+24mnras, MoralesRibas+09apj",
             "aka": "TIC 199574208",
