@@ -166,49 +166,46 @@ def append_magnitude_columns(lc: LightCurve,
         * u.mag)
 
 
-def find_lightcurve_sections(lc: LightCurve,
-                             min_gap_duration: TimeDelta,
-                             eval_section_func: Callable[[int, int, LightCurve], bool]=None,
-                             max_sections: int=None,
-                             yield_times: bool=False) \
+def yield_lightcurve_sections(lc: LightCurve,
+                              min_gap_duration: TimeDelta,
+                              eval_section_func: Callable[[LightCurve, slice], bool]=None,
+                              max_sections: int=None,
+                              yield_times: bool=False) \
                                 -> Generator[Union[slice, Tuple[Time, Time]], any, None]:
     """
-    Finds the start and end of contiguous sections in the passed LightCurve.
-    These are sets of fluxes where the time gaps between obs are less than the passed threshold.
-    Gaps meeting the threshold are treated as boundaries between sections.
-    This will yield a single sections for the whole LightCurve if no gaps meet the threshold.
+    Yields contiguous sections of the LightCurve, split on significant time gaps in observations.
+    Will yield a single sections for the whole LightCurve if no gaps meet the duration threshold.
+    The LightCurve is split hierarchically, in descending order of gap duration.
 
     :lc: the source LightCurve to parse for gaps/sections.
     :min_gap_duration: the minimum gap time to break on
-    :eval_section_func: optional bool func to validate the from/to indices of each proposed section
+    :eval_section_func: optional bool func to validate the slice of each proposed section
     :max_sections: optional maximum number of sections restriction, subject to other criteria
     :yield_times: if true section start/end times will be yielded, otherwise slices
-    :returns: generator of slice(start, end, 1) or tuple(start Time, end Time) if yield_times==True
+    :returns: generator of slice(start, stop) or tuple(start Time, end Time) if yield_times==True
     """
     # Much quicker if we use primatives - make sure we work in days
-    times = lc.time.value
+    gap_durs = np.diff(lc.time.value)
     if isinstance(min_gap_duration, TimeDelta|u.Quantity):
         min_gap_duration = min_gap_duration.to(u.d).value
 
-    # Heirarchically split the LC on the largest gap, until none are left >= min_gap_duration
-    gap_durs = np.diff(times)
-    def yield_sections(sec_first_ix=0, sec_last_ix=len(gap_durs), num_secs=1):
-        # The gap ix can handily be used as the ix of the last time in the new 1st section
-        longest_gap_ix = sec_first_ix + np.argmax(gap_durs[sec_first_ix:sec_last_ix])
-        sub_secs_ixs = [(sec_first_ix, longest_gap_ix), (longest_gap_ix+1, sec_last_ix)]
-        if (gap_durs[longest_gap_ix] >= min_gap_duration) \
-                and (max_sections is None or num_secs < max_sections) \
-                and (eval_section_func is None \
-                        or all(eval_section_func(*ssi, lc) for ssi in sub_secs_ixs)):
-            num_secs += 1
-            for ssi in sub_secs_ixs:
-                yield from yield_sections(*ssi, num_secs=num_secs)
+    # Recursively split the LC on the largest gap until none are left >= min_gap_duration, we've
+    # reached the maximum number of sections or next proposed split yields invalid sections.
+    def yield_sections(super_slice: slice, count_sections: int):
+        super_start, super_stop = super_slice.start, super_slice.stop
+        max_gap_ix = super_start + np.argmax(gap_durs[super_start:super_stop-1])
+        slices = [slice(super_start, max_gap_ix+1), slice(max_gap_ix+1, super_stop)]
+        if (gap_durs[max_gap_ix] >= min_gap_duration) \
+                and (max_sections is None or count_sections < max_sections) \
+                and (eval_section_func is None or all(eval_section_func(lc, sl) for sl in slices)):
+            count_sections += 1
+            for sl in slices:
+                yield from yield_sections(sl, count_sections)
         elif yield_times:
-            yield lc.time[sec_first_ix], lc.time[sec_last_ix]
+            yield lc.time[super_start], lc.time[super_stop-1]
         else:
-            yield slice(sec_first_ix, sec_last_ix+1, 1)
-
-    yield from yield_sections()
+            yield super_slice
+    yield from yield_sections(slice(0, len(lc)), 1)
 
 
 def fit_polynomial(times: Time,

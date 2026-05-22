@@ -102,8 +102,8 @@ def mask_lightcurves_unusable_fluxes(lcs: LightCurveCollection,
         # We also look to clip any short isolated sections of the LCs, as they often contain little
         # useful information and yet have a detrimental affect on the effectiveness of detrending.
         sec_gap_th = min_section_gap_bins * lcs[ix].meta['FRAMETIM'] * lcs[ix].meta['NUM_FRM'] * u.s
-        for sec in lightcurves.find_lightcurve_sections(lcs[ix], min_gap_duration=sec_gap_th,
-                                                        yield_times=True):
+        for sec in lightcurves.yield_lightcurve_sections(lcs[ix], min_gap_duration=sec_gap_th,
+                                                         yield_times=True):
             if max(sec) - min(sec) < min_section_dur:
                 _mask &= (lcs[ix].time < min(sec)) | (lcs[ix].time > max(sec))
 
@@ -298,8 +298,8 @@ def arrange_sector_groups(lcs: LightCurveCollection,
         ecl_sums = np.sum(ecl_counts, axis=0)
         return (max(ecl_sums) >= max(min_eclipses) and min(ecl_sums) >= min(min_eclipses))
 
-    def is_usable_section(from_ix, to_ix, lc) -> bool:
-        return is_usable_group([count_eclipses(lc, slice(from_ix, to_ix+1))])
+    def is_usable_section(lc, section_slice) -> bool:
+        return is_usable_group([count_eclipses(lc, section_slice)])
 
     def best_slices(sectors, ecl_counts, max_slen=None) -> List[List[Number]]:
         # All combinations of slices (contiguous sectors/subsectors) where eclipse criteria are met.
@@ -343,8 +343,8 @@ def arrange_sector_groups(lcs: LightCurveCollection,
             for group in [blk_sectors[sls] for sls in group_slices]:
                 grp_lcs = lcs[np.isin(lcs.sector, group)]
                 if allow_slice and len(grp_lcs) == 1 and \
-                        len(sls := [*lightcurves.find_lightcurve_sections(grp_lcs[0], min_gap_dur,
-                                                                          is_usable_section)]) > 1:
+                        len(sls := [*lightcurves.yield_lightcurve_sections(grp_lcs[0], min_gap_dur,
+                                                                           is_usable_section)]) > 1:
                     # Normalize the LC so it's consistent with any that are joined
                     sec_lcs = slice_lightcurve(grp_lcs[0].normalize(), sls).data
                     out_lcs += sec_lcs
@@ -425,7 +425,7 @@ def append_mags_to_lightcurves_and_detrend(lcs: LightCurveCollection,
         # Create detrended & rectified delta_mag/delta_mag_err columns, by fitting & subtracting a
         # polynomial to delta_mags outside the eclipses.
         lightcurves.append_magnitude_columns(lcs[ix], "delta_mag", "delta_mag_err")
-        for sl in lightcurves.find_lightcurve_sections(lcs[ix], min_gap_duration=detrend_gap_th):
+        for sl in lightcurves.yield_lightcurve_sections(lcs[ix], min_gap_duration=detrend_gap_th):
             lcs[ix][sl]["delta_mag"] -= lightcurves.fit_polynomial(lcs[ix].time[sl],
                                                                    lcs[ix]["delta_mag"][sl],
                                                                    detrend_poly_degree,

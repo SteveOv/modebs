@@ -94,58 +94,59 @@ class Testlightcurves(unittest.TestCase):
 
 
     #
-    #   find_lightcurve_sections(LightCurve, min_gap_duration: TimeDelta, yield_times: bool) -> Generator:
+    #   yield_lightcurve_sections(LightCurve, min_gap_duration: TimeDelta, eval_func: func, yield_times: bool) -> Generator:
     #
-    def test_find_lightcurve_sections_happy(self):
-        """ Simple happy path test of find_lightcurve_sections() known LC """
+    def test_yield_lightcurve_sections_happy(self):
+        """ Simple happy path test of yield_lightcurve_sections() known LC """
         # CW Eri S4 has 3 "contiguous" sections separated by gaps of 2.7 and 1.97 days
         # (middle one is only ~1.25 d long) and S31 has 2 sections separated by a gap of 2.2 days
         print()
         for target, sector, min_gap_dur, min_sec_dur, max_secs, times,  exp_segs in [
             # Test the effect of min_gap_dur; expected to only creation sections where the split is <= this
-            ("CW Eri",  4, TimeDelta(2*u.d),None,       None,   False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
-            ("CW Eri",  4,  2 * u.d,        None,       None,   False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
-            ("CW Eri",  4,  48 * u.h,       None,       None,   False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
-            ("CW Eri",  4,  2,              None,       None,   False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
+            ("CW Eri",  4, TimeDelta(2*u.d),None,       None,   False,  [slice(0, 5291), slice(5291, 14824)]),
+            ("CW Eri",  4,  2 * u.d,        None,       None,   False,  [slice(0, 5291), slice(5291, 14824)]),
+            ("CW Eri",  4,  48 * u.h,       None,       None,   False,  [slice(0, 5291), slice(5291, 14824)]),
+            ("CW Eri",  4,  2,              None,       None,   False,  [slice(0, 5291), slice(5291, 14824)]),
 
             ("CW Eri",  4,  2 * u.d,        None,       None,   True,   [(1410.907, 1418.492), (1421.219, 1436.517)]),
             ("CW Eri",  31, 2 * u.d,        None,       None,   True,   [(2144.520, 2156.667), (2158.867, 2169.949)]),
 
-            ("CW Eri",  4,  1 * u.d,        None,       None,   False,  [slice(0, 5291, 1), slice(5291, 6274, 1), slice(6274, 14824, 1)]),
+            ("CW Eri",  4,  1 * u.d,        None,       None,   False,  [slice(0, 5291), slice(5291, 6274), slice(6274, 14824)]),
             ("CW Eri",  4,  1 * u.d,        None,       None,   True,   [(1410.907, 1418.492), (1421.219, 1422.587), (1424.560, 1436.517)]),
 
-            ("CW Eri",  4,  3 * u.d,        None,       None,   False,  [slice(0, 14824, 1)]),
+            ("CW Eri",  4,  3 * u.d,        None,       None,   False,  [slice(0, 14824)]),
             ("CW Eri",  4,  3 * u.d,        None,       None,   True,   [(1410.907, 1436.517)]),
 
             # Test the effect of min_sector_duration; expect to affect the number of sections & their duration
-            ("CW Eri",  4,  1 * u.d,        1 * u.d,    None,   False,  [slice(0, 5291, 1), slice(5291, 6274, 1), slice(6274, 14824, 1)]),
-            ("CW Eri",  4,  1 * u.d, TimeDelta(1 * u.d),None,   False,  [slice(0, 5291, 1), slice(5291, 6274, 1), slice(6274, 14824, 1)]),
-            ("CW Eri",  4,  1 * u.d,        2 * u.d,    None,   False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
-            ("CW Eri",  4,  1 * u.d,        15 * u.d,   None,   False,  [slice(0, 14824, 1)]),
+            ("CW Eri",  4,  1 * u.d,        1 * u.d,    None,   False,  [slice(0, 5291), slice(5291, 6274), slice(6274, 14824)]),
+            ("CW Eri",  4,  1 * u.d, TimeDelta(1 * u.d),None,   False,  [slice(0, 5291), slice(5291, 6274), slice(6274, 14824)]),
+            ("CW Eri",  4,  1 * u.d,        2 * u.d,    None,   False,  [slice(0, 5291), slice(5291, 14824)]),
+            ("CW Eri",  4,  1 * u.d,        15 * u.d,   None,   False,  [slice(0, 14824)]),
             ("CW Eri",  4,  1 * u.d,        2 * u.d,    None,   True,   [(1410.907, 1418.492), (1421.219, 1436.517)]),
 
             # Test the effect of max_sectors; expect no more sections but possibly fewer depending on other criteria
-            ("CW Eri",  4,  1 * u.d,        None,       4,      False,  [slice(0, 5291, 1), slice(5291, 6274, 1), slice(6274, 14824, 1)]),
-            ("CW Eri",  4,  1 * u.d,        None,       3,      False,  [slice(0, 5291, 1), slice(5291, 6274, 1), slice(6274, 14824, 1)]),
-            ("CW Eri",  4,  1 * u.d,        None,       2,      False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
-            ("CW Eri",  4,  1 * u.d,        None,       1,      False,  [slice(0, 14824, 1)]),
-            ("CW Eri",  4,  1 * u.d,        None,       0,      False,  [slice(0, 14824, 1)]),
-            ("CW Eri",  4,  1 * u.d,        2 * u.d,    4,      False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
-            ("CW Eri",  4,  2 * u.d,        None,       4,      False,  [slice(0, 5291, 1), slice(5291, 14824, 1)]),
+            ("CW Eri",  4,  1 * u.d,        None,       4,      False,  [slice(0, 5291), slice(5291, 6274), slice(6274, 14824)]),
+            ("CW Eri",  4,  1 * u.d,        None,       3,      False,  [slice(0, 5291), slice(5291, 6274), slice(6274, 14824)]),
+            ("CW Eri",  4,  1 * u.d,        None,       2,      False,  [slice(0, 5291), slice(5291, 14824)]),
+            ("CW Eri",  4,  1 * u.d,        None,       1,      False,  [slice(0, 14824)]),
+            ("CW Eri",  4,  1 * u.d,        None,       0,      False,  [slice(0, 14824)]),
+            ("CW Eri",  4,  1 * u.d,        2 * u.d,    4,      False,  [slice(0, 5291), slice(5291, 14824)]),
+            ("CW Eri",  4,  2 * u.d,        None,       4,      False,  [slice(0, 5291), slice(5291, 14824)]),
             ("CW Eri",  4,  1 * u.d,        None,       2,      True,   [(1410.907, 1418.492), (1421.219, 1436.517)]),
         ]:
             msg = f"{target}-S{sector:02d}, min_gap={min_gap_dur}, min_sec={min_sec_dur}, max_secs={max_secs}, yield_times={times}"
             with self.subTest(msg):
-                def eval_section_func(from_ix, to_ix, lc) -> bool:
+                def eval_section_func(lc, sec_slice: slice) -> bool:
                     # pylint: disable=cell-var-from-loop
-                    return min_sec_dur is None or lc.time[to_ix] - lc.time[from_ix] >= min_sec_dur
+                    times = lc.time[sec_slice]
+                    return min_sec_dur is None or (max(times) - min(times)) >= min_sec_dur
 
                 lc = lightcurve_helpers.load_lightcurves(target, [sector])[0]
-                segs = list(lightcurves.find_lightcurve_sections(lc=lc,
-                                                                 min_gap_duration=min_gap_dur,
-                                                                 eval_section_func=eval_section_func,
-                                                                 max_sections=max_secs,
-                                                                 yield_times=times))
+                segs = list(lightcurves.yield_lightcurve_sections(lc=lc,
+                                                                  min_gap_duration=min_gap_dur,
+                                                                  eval_section_func=eval_section_func,
+                                                                  max_sections=max_secs,
+                                                                  yield_times=times))
 
                 print(f"{msg} =>", ", ".join(str(s) if isinstance(s, slice) else f"[{s[0].btjd:.3f}, {s[1].btjd:.3f}]" for s in segs))
 
