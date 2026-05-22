@@ -283,7 +283,7 @@ def arrange_sector_groups(lcs: LightCurveCollection,
 
     keys_time = ("primary_times", "secondary_times")
     keys_compl = ("primary_completeness", "secondary_completeness")
-    def eclipse_counts(lc: LightCurve, section_slice: slice=None) -> Tuple[int, int]:
+    def count_eclipses(lc: LightCurve, section_slice: slice=None) -> Tuple[int, int]:
         if section_slice: # We have to count the eclipses within the times of the slice
             times = lc.time[section_slice].value
             from_time, to_time = min(times), max(times)
@@ -294,51 +294,53 @@ def arrange_sector_groups(lcs: LightCurveCollection,
             return tuple(ecl_sums)
         return tuple(sum(lc.meta[k] > completeness_th) for k in keys_compl)
 
-    def is_usable_group(grp_ecl_counts: List[Tuple[int, int]]) -> bool:
-        ecl_sums = np.sum(grp_ecl_counts, axis=0)
-        return max(ecl_sums) >= max(min_eclipses) and min(ecl_sums) >= min(min_eclipses)
+    def is_usable_group(ecl_counts: List[Tuple[int, int]]) -> bool:
+        ecl_sums = np.sum(ecl_counts, axis=0)
+        return (max(ecl_sums) >= max(min_eclipses) and min(ecl_sums) >= min(min_eclipses))
 
     def is_usable_section(from_ix, to_ix, lc) -> bool:
-        return is_usable_group([eclipse_counts(lc, slice(from_ix, to_ix+1))])
+        return is_usable_group([count_eclipses(lc, slice(from_ix, to_ix+1))])
+
+    def best_slices(sectors, ecl_counts, max_slen=None) -> List[List[Number]]:
+        # All combinations of slices (contiguous sectors/subsectors) where eclipse criteria are met.
+        valid_slices_sets = [sls for sls in partitions_slices(len(sectors), 1, max_slen)
+                                            if all(is_usable_group(ecl_counts[sl]) for sl in sls)]
+        chosen_slices = []
+        if len(valid_slices_sets) == 1:
+            chosen_slices = valid_slices_sets[0]
+        elif len(valid_slices_sets) > 1:
+            # Take set with the most slices, with least variance in eclipse counts as a tie breaker.
+            valid_sets_sizes = [len(sls) for sls in valid_slices_sets]
+            largest_sets_ixs = np.argwhere(valid_sets_sizes == np.amax(valid_sets_sizes)).flatten()
+            if len(largest_sets_ixs) == 1:
+                chosen_slices = valid_slices_sets[largest_sets_ixs[0]]
+            else:
+                ecl_vars = [np.var([sum(ecl_counts[sl]) for sl in valid_slices_sets[ix]])
+                                                                    for ix in largest_sets_ixs]
+                chosen_slices = valid_slices_sets[largest_sets_ixs[np.argmin(ecl_vars)]]
+        return chosen_slices
 
     # Make sure the sectors are sorted by sector number for grouping to work
     lcs = LightCurveCollection(sorted(lcs, key=lambda l: l.sector))
     out_lcs = []
     if groups_override is None:
         # Isolate the sectors into contiguous blocks; so [1,2,4,5,6,8] becomes [[1,2], [4,5,6], [8]]
-        # By making a key of the sector number minus its list index, we have a value which we can
-        # group by as it remains unchanged within each block of contiguously incrementing values.
+        # By making a key of the sector number minus its list index, we have a value to group by
+        # as it remains unchanged within each block of contiguously incrementing values.
         for _, block in groupby(enumerate(lcs.sector), key=lambda ix_sec: ix_sec[1] - ix_sec[0]):
             blk_mask = np.isin(lcs.sector, list(b for _, b in block))
             blk_sectors = np.array([lc.sector for lc in lcs[blk_mask]])
-            blk_ecl_counts = np.array([eclipse_counts(lc) for lc in lcs[blk_mask]])
+            blk_ecl_counts = np.array([count_eclipses(lc) for lc in lcs[blk_mask]])
 
             if verbose:
                 print("The best arrangement of the block of sectors",
                      f"({blk_sectors[0]}" + (f"-{blk_sectors[-1]})" if len(blk_sectors)>1 else ")"),
                       "for fitting is:", end=" ")
 
-            # All combinations of contiguous sectors (slices) where eclipse criteria are met.
-            all_sets_slices = [sls for sls in partitions_slices(len(blk_sectors), 1, max_group_size)
-                                        if all(is_usable_group(blk_ecl_counts[sl]) for sl in sls)]
-
-            # Choose the best set of groups for this block
-            chosen_grp_slices = []
-            if len(all_sets_slices) == 1:
-                chosen_grp_slices = all_sets_slices[0]
-            elif len(all_sets_slices) > 1:
-                # Use set with the most groups, with least variance in eclipse counts as tie breaker
-                all_sets_sizes = [len(sls) for sls in all_sets_slices]
-                largest_sets_ixs = np.argwhere(all_sets_sizes == np.amax(all_sets_sizes)).flatten()
-                if len(largest_sets_ixs) == 1:
-                    chosen_grp_slices = all_sets_slices[largest_sets_ixs[0]]
-                else:
-                    ecl_vars = [np.var([sum(blk_ecl_counts[sl]) for sl in all_sets_slices[ix]])
-                                                                        for ix in largest_sets_ixs]
-                    chosen_grp_slices = all_sets_slices[largest_sets_ixs[np.argmin(ecl_vars)]]
+            group_slices = best_slices(blk_sectors, blk_ecl_counts, max_group_size)
 
             # Create the LCs for this group. Optionally, where a group is 1 LC try to slice it.
-            for group in [blk_sectors[sls] for sls in chosen_grp_slices]:
+            for group in [blk_sectors[sls] for sls in group_slices]:
                 grp_lcs = lcs[np.isin(lcs.sector, group)]
                 if allow_slice and len(grp_lcs) == 1 and \
                         len(sls := [*lightcurves.find_lightcurve_sections(grp_lcs[0], min_gap_dur,
