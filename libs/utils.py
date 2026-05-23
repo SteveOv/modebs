@@ -66,14 +66,14 @@ def partitions_slices(sequence_len: int, min_slice_len: int=1, max_slice_len: in
 
     i.e.: partitions_slices(4, exclude_ixs=[1]) -> [[0:1],[2:4]] [[0:1],[2:3],[3:4]]
 
-    The offset is used to shift all slices, in the case where the sequence starts at one
+    The offset is used to shift all slices up or down
 
     i.e.: partitions_slices(3, offset=1) -> [[1:4]] [[1:2],[2:4]] [[1:3],[3:4]] [[1:2],[2:3],[3:4]]
     
     Based on
     https://more-itertools.readthedocs.io/en/stable/_modules/more_itertools/more.html#partitions
-    with a modifications to yield slices (so it doesn't need to see the sequence, with only the
-    length required) and to restrict the minimum & maximum length of any slices.
+    with modifications to yield slices (so it doesn't need to see the sequence, only the length),
+    to restrict the minimum & maximum length of any slices, and to handle exclusions and offsets.
 
     :sequence_len: the length of the sequence to produce slices over
     :min_slice_len: the minimum length of slices to produce

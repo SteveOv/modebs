@@ -56,7 +56,7 @@ class Testutils(unittest.TestCase):
     #                     exclude_ixs: _Iterable[int]=None, offset: int=0) -> Generator[Tuple[slice]]
     #
     def test_partitions_slices_happy_path(self):
-        """ Simple happy path tests of grouper() """
+        """ Simple happy path tests of partitions_slices() """
         for (sequence_len,  min_sl_len, max_sl_len, offset, exp_slices_lists) in [
             (3,             1,          None,       0,      [[slice(0,3)], [slice(0,1),slice(1,3)], [slice(0,2),slice(2,3)], [slice(0,1),slice(1,2),slice(2,3)]]),
             # Min slice lengths
@@ -72,14 +72,14 @@ class Testutils(unittest.TestCase):
         ]:
             with self.subTest(f"partitions_slices({sequence_len}, {min_sl_len}, {max_sl_len}, offset={offset})"):
                 slices_lists = list(partitions_slices(sequence_len, min_sl_len, max_sl_len, offset=offset))
-                # print("\nslices_lists=", slices_lists)
+                # print("slices_lists=", slices_lists)
 
                 self.assertEqual(len(exp_slices_lists), len(slices_lists))
-                for slices in slices_lists:
-                    self.assertIn(slices, exp_slices_lists)
+                for slices_list in slices_lists:
+                    self.assertIn(slices_list, exp_slices_lists)
 
     def test_partitions_slices_with_exclusions(self):
-        """ Simple happy path tests of grouper() """
+        """ Tests of partitions_slices() with exclusions """
         for (seq_len,   min_sl_len, max_sl_len, excl_ixs,   offset, exp_slices_lists) in [
             (3,         1,          None,       [],         0,      [[slice(0,3)], [slice(0,1),slice(1,3)], [slice(0,2),slice(2,3)], [slice(0,1),slice(1,2),slice(2,3)]]),
             (3,         1,          None,       None,       0,      [[slice(0,3)], [slice(0,1),slice(1,3)], [slice(0,2),slice(2,3)], [slice(0,1),slice(1,2),slice(2,3)]]),
@@ -92,7 +92,7 @@ class Testutils(unittest.TestCase):
             # Handles exclusion duplication, out of order or out of range
             (5,         1,          None,       [2,3,3],    0,      [[slice(0,2),slice(4,5)], [slice(0,1),slice(1,2),slice(4,5)]]),
             (5,         1,          None,       [3,2],      0,      [[slice(0,2),slice(4,5)], [slice(0,1),slice(1,2),slice(4,5)]]),
-            (3,         1,          None,       [-1,4],     0,      [[slice(0,3)], [slice(0,1),slice(1,3)], [slice(0,2),slice(2,3)], [slice(0,1),slice(1,2),slice(2,3)]]),
+            (3,         1,          None,       [-1,3],     0,      [[slice(0,3)], [slice(0,1),slice(1,3)], [slice(0,2),slice(2,3)], [slice(0,1),slice(1,2),slice(2,3)]]),
             # Exclusions with min len
             (5,         2,          None,       [2],        0,      [[slice(0,2),slice(3,5)]]),
             # Exclusions with max len
@@ -102,8 +102,8 @@ class Testutils(unittest.TestCase):
         ]:
             with self.subTest(f"partitions_slices({seq_len}, {min_sl_len}, {max_sl_len}, exclude_ixs={excl_ixs}, offset={offset})"):
                 slices_lists = list(partitions_slices(seq_len, min_sl_len, max_sl_len, excl_ixs, offset))
-                # print("\nslices_lists=", slices_lists)
+                # print("slices_lists=", slices_lists)
 
                 self.assertEqual(len(exp_slices_lists), len(slices_lists))
-                for slices in slices_lists:
-                    self.assertIn(slices, exp_slices_lists)
+                for slices_list in slices_lists:
+                    self.assertIn(slices_list, exp_slices_lists)
