@@ -257,6 +257,7 @@ def slice_lightcurve(src_lc: LightCurve, slices: List[slice]) -> LightCurveColle
 def arrange_sector_groups(lcs: LightCurveCollection,
                           completeness_th: float=0.8,
                           min_eclipses: Tuple[int, int]=(2, 1),
+                          max_crowdsap_var: float=1e-4,
                           max_group_size: int=None,
                           groups_override: List[List[int]]=None,
                           allow_slice: bool=False,
@@ -265,11 +266,14 @@ def arrange_sector_groups(lcs: LightCurveCollection,
     Will make the most effective arrangement of LightCurves to support JKTEBOP fitting. This will
     balance need for sufficient coverage for each fitting to achieve a reliable output, while
     running as many fits as possible across the breadth of time in which we have observations.
-    This uses the eclipse timing & completeness metadata added by add_eclipse_meta_to_lightcurves().
+
+    This uses the LightCurves' metadata, included the eclipse timing & completeness metadata as
+    added by add_eclipse_meta_to_lightcurves(), when deciding on the best arrangement of sectors.
 
     :lcs: the LightCurveCollection containing our potential fitting targets
     :completness_th: threshold percentage of an eclipse we require to consider it complete/usable
     :min_eclipses: the minimum eclipse count criteria for a usable group or subsector
+    :max_crowdsap_var: maximum variance in CROWDSAP allowed when forming a group
     :max_group_size: the maximum number of sectors to combine for a group, or no max if None
     :groups_override: if set, the grouping logic will be bypassed, and these used (to be deprecated)
     :allow_slice: whether to allow sectors to be sliced into sections, subject to eclipse criteria
@@ -294,17 +298,20 @@ def arrange_sector_groups(lcs: LightCurveCollection,
             return tuple(ecl_sums)
         return tuple(sum(lc.meta[k] > completeness_th) for k in keys_compl)
 
-    def is_usable_group(ecl_counts: List[Tuple[int, int]]) -> bool:
+    def is_usable_group(ecl_counts: List[Tuple[int, int]], crowdsaps: List[float]) -> bool:
         ecl_sums = np.sum(ecl_counts, axis=0)
-        return (max(ecl_sums) >= max(min_eclipses) and min(ecl_sums) >= min(min_eclipses))
+        return (max(ecl_sums) >= max(min_eclipses) and min(ecl_sums) >= min(min_eclipses)) \
+                and (len(crowdsaps) < 2 or np.var(crowdsaps) <= max_crowdsap_var)
 
     def is_usable_section(lc, section_slice) -> bool:
-        return is_usable_group([count_eclipses(lc, section_slice)])
+        return is_usable_group([count_eclipses(lc, section_slice)], [])
 
-    def best_slices(sectors, ecl_counts, max_slen=None) -> List[List[Number]]:
+    def best_slices(sectors, ecl_counts, crowdsaps, max_slen, excl_sectors) -> List[List[Number]]:
         # All combinations of slices (contiguous sectors/subsectors) where eclipse criteria are met.
-        valid_slices_sets = [sls for sls in partitions_slices(len(sectors), 1, max_slen)
-                                            if all(is_usable_group(ecl_counts[sl]) for sl in sls)]
+        excl_ixs = np.where(np.isin(sectors, excl_sectors))[0]
+        valid_slices_sets = [sls for sls in partitions_slices(len(sectors), 1, max_slen, excl_ixs)
+                                if all(is_usable_group(ecl_counts[sl],crowdsaps[sl]) for sl in sls)]
+
         chosen_slices = []
         if len(valid_slices_sets) == 1:
             chosen_slices = valid_slices_sets[0]
@@ -328,19 +335,30 @@ def arrange_sector_groups(lcs: LightCurveCollection,
         # By making a key of the sector number minus its list index, we have a value to group by
         # as it remains unchanged within each block of contiguously incrementing values.
         for _, block in groupby(enumerate(lcs.sector), key=lambda ix_sec: ix_sec[1] - ix_sec[0]):
-            blk_mask = np.isin(lcs.sector, list(b for _, b in block))
-            blk_sectors = np.array([lc.sector for lc in lcs[blk_mask]])
-            blk_ecl_counts = np.array([count_eclipses(lc) for lc in lcs[blk_mask]])
+            bl_mask = np.isin(lcs.sector, list(b for _, b in block))
+            bl_sectors = np.array([lc.sector for lc in lcs[bl_mask]])
+            bl_ecl_counts = np.array([count_eclipses(lc) for lc in lcs[bl_mask]])
+            bl_crowdsaps = np.array([lc.meta.get("CROWDSAP", 1.) for lc in lcs[bl_mask]])
 
             if verbose:
                 print("The best arrangement of the block of sectors",
-                     f"({blk_sectors[0]}" + (f"-{blk_sectors[-1]})" if len(blk_sectors)>1 else ")"),
+                     f"({bl_sectors[0]}" + (f"-{bl_sectors[-1]})" if len(bl_sectors)>1 else ")"),
                       "for fitting is:", end=" ")
 
-            group_slices = best_slices(blk_sectors, blk_ecl_counts, max_group_size)
+            group_slices = []
+            bl_exclusions = []
+            while len(bl_exclusions) < len(bl_sectors):
+                group_slices = best_slices(bl_sectors, bl_ecl_counts, bl_crowdsaps,
+                                           max_group_size, excl_sectors=bl_exclusions)
+                if len(group_slices) > 0:
+                    break
+                # Unable to make any combination which uses all available sectors. The sector with
+                # least eclipses is most likely at fault as it most likely needs to be joined.
+                if np.any(_mask := np.isin(bl_sectors, bl_exclusions, invert=True)):
+                    bl_exclusions += [bl_sectors[_mask][np.argmin(np.sum(bl_ecl_counts[_mask], 1))]]
 
             # Create the LCs for this group. Optionally, where a group is 1 LC try to slice it.
-            for group in [blk_sectors[sls] for sls in group_slices]:
+            for group in [bl_sectors[sls] for sls in group_slices]:
                 grp_lcs = lcs[np.isin(lcs.sector, group)]
                 if allow_slice and len(grp_lcs) == 1 and \
                         len(sls := [*lightcurves.yield_lightcurve_sections(grp_lcs[0], min_gap_dur,
@@ -357,7 +375,7 @@ def arrange_sector_groups(lcs: LightCurveCollection,
                         print(group, end=" ")
 
             if verbose:
-                print()
+                print(f"(with {sorted(bl_exclusions)} unusable)" if len(bl_exclusions) > 0 else "")
 
     return LightCurveCollection(out_lcs)
 
