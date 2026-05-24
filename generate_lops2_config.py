@@ -90,7 +90,7 @@ known_overrides = {
     31054255: { "period": 1.747743979, "period_err": 0.000000513, "widthP": 0.021, "widthS": 0.021, "depthP": 0.021, "depthS": 0.021, "phiS": 0.500, "detrend_poly_degree": 3 },
     # Variance in CROWDSAP/L3 in later sectors so we cannot let them be grouped.
     # Double the TESS-ebs period (not corroborated), copy the primary eclipse data to secondary and halve the widths
-    31273263: { "exclude_sectors": [96], "period": 45.145916694, "period_err": 0.002004383, "widthP": 0.010, "widthS": 0.010, "depthP": 0.220, "depthS": 0.220, "phiS": 0.500 },
+    31273263: { "period": 45.145916694, "period_err": 0.002004383, "widthP": 0.010, "widthS": 0.010, "depthP": 0.220, "depthS": 0.220, "phiS": 0.500 },
     # Very short period, phiS=0.5 and LC fit made more durable/reliable by fixing eccentricity at zero
     52280468: { "jktebop_overrides": { "ecosw": 0, "esinw": 0, "ecosw_fit": 0, "esinw_fit": 0 }, },
     # Switch t0, double the TESS-ebs period (corroborated with TBOSB), copy the primary eclipse data to secondary and halve the widths
@@ -99,6 +99,7 @@ known_overrides = {
     55497281: { "jktebop_overrides": { "LDA1_fit": 0, "LDB1_fit": 0, }, },
     # Gaia DR3 with no parallax; dist from Gaia DR2 ~500 pc so set parallax to 2.0;
     55659311: { "parallax": 2.0, },
+    # TIC 63579446 sector 87 heavily distorted. Either exclude the sector or force flatten for this target (morph=0.382)
     63579446: { "exclude_sectors": [87], },
     80650858: { "Teff_sys": 20000, },
     # MAVEN predicts inc ~ 78 which leads to many failed fits. Override uses value from J+A as initial value.
