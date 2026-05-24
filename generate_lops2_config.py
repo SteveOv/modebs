@@ -226,7 +226,6 @@ if __name__ == "__main__":
             "detrend_poly_degree": 2,
             "detrend_iterations": 3,
             "default_ld_algo": "pow2",
-            "lc_fit_max_workers": 8,
             "lc_fit_retries": 2,
             "lc_fit_timeout": 900,
         },

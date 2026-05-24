@@ -68,7 +68,7 @@ if __name__ == "__main__":
                     help="json file containing the details of the targets to fit")
     ap.add_argument("-pf", "--plot-figs", dest="plot_figs", action="store_true", required=False,
                     help="plot figs for each target as the process progresses")
-    ap.set_defaults(plot_figs=False, is_testing=True, figs_type="png", figs_dpi=100)
+    ap.set_defaults(plot_figs=False, is_testing=True, max_workers=8, figs_type="png", figs_dpi=100)
     args = ap.parse_args()
     drop_dir = Path.cwd() / f"drop/{args.targets_file.stem}"
 
@@ -357,7 +357,7 @@ if __name__ == "__main__":
                 # If set to 1, tasks are serialized but more frequent progress updates will occur.
                 print(f"\nFitting {len(lcs)} lightcurves with JKTEBOP task 3")
                 fitted_param_dicts = pipeline.fit_target_lightcurves(lcs, in_params, read_keys, 3,
-                                                max_workers=config.get("lc_fit_max_workers", 8),
+                                                max_workers=args.max_workers,
                                                 max_attempts=1 + config.get("lc_fit_retries", 2),
                                                 timeout=config.get("lc_fit_timeout", 900))
 
