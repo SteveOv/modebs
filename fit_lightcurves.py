@@ -199,19 +199,19 @@ if __name__ == "__main__":
                 # drop lightcurves with insufficient coverage and which cannot be combined
                 print("\nSelecting lightcurves for orbital coverage required for fitting.")
                 groups_override = config.sectors
-                ecl_complete_th = config.get("eclipse_complete_threshold", 0.9)
+                ecl_complete_th = config.eclipse_complete_threshold
                 if config.sectors is None:
                     print("Sectors will chosen by analysis of eclipses, with those having",
-                          f">{ecl_complete_th:.0%} fluxes are considered complete.")
-                if max_group_size := 1 if config.do_not_stitch else None:
-                    print("Stitching of adjascent sectors is disabled by target config setting")
-                if config.do_not_split:
+                          f">={ecl_complete_th:.0%} fluxes being considered complete.")
+                if max_group_size := 1 if config.do_not_join_lcs else None:
+                    print("Joining of adjascent sectors is disabled by target config setting")
+                if not (allow_slice := not config.do_not_slice_lcs):
                     print("Slicing of sectors is disabled by target config setting")
                 lcs = pipeline.arrange_sector_groups(lcs,
                                                      completeness_th=ecl_complete_th,
                                                      max_group_size=max_group_size,
-                                                     groups_override=config.sectors,
-                                                     allow_slice=not config.do_not_split,
+                                                     groups_override=groups_override,
+                                                     allow_slice=allow_slice,
                                                      verbose=True)
                 if len(lcs) == 0:
                     raise PipelineError(target_id, "No lightcurves retained after selection")

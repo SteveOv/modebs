@@ -9,7 +9,7 @@
 
         "TIC 167795859": {
             "details": "",
-            "notes": "with overrides to do_not_stitch; high variance in CROWDSAP makes joining sectors an issue;",
+            "notes": "high variance in CROWDSAP makes joining sectors an issue;",
             "why_include": "morph=0.196 & ecl_depths>=0.091",
             "t0": 1599.424803,
             "t0_err": 0.0004858878,

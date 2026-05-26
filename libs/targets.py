@@ -4,6 +4,7 @@ from pathlib import Path as _Path
 import json as _json
 
 _default_target_config_defaults = {
+    # default to None where we expect logic to decide the value with the option of config override
     "exclude": False,
     "details": "",
     "notes": "",
@@ -15,8 +16,9 @@ _default_target_config_defaults = {
     "sectors": None,
     "exclude_sectors": None,
     "quality_masks": [],
-    "do_not_split": None,
-    "do_not_stitch": None,
+    "eclipse_complete_threshold": 0.9,
+    "do_not_slice_lcs": None,
+    "do_not_join_lcs": None,
     "detrend_gap_threshold": 0.5,
     "detrend_poly_degree": 1,
     "detrend_iterations": 3,

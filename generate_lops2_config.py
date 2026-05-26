@@ -113,7 +113,7 @@ known_overrides = {
     # overriding the TESS-ebs period with value from inspecting S32+33 (left the rest of the ephemeris unchanged)
     167756615: { "exptime": [120, 600], "period": 19.179, },
     # Wide variance in CROWDSAP/L3 between sectors leading to varying eclipse depths, so it's best to fit singularly
-    167795859: { "do_not_stitch": True, },
+    167795859: { "do_not_join_lcs": True, },
     # Double the TESS-ebs period, copy the primary eclipse data to secondary and halve the widths. J+A characterisation affected by 1/2 period shift.
     200440175: { "period": 3.652007766, "period_err": 0.000010387, "widthP": 0.062, "widthS": 0.062, "depthP": 0.433, "depthS": 0.433, "phiS": 0.500 },
     # highly eccentric and gives nonsense fit without assistance; force the grouping for better coverage and esinw input value
