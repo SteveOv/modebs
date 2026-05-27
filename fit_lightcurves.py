@@ -252,17 +252,26 @@ if __name__ == "__main__":
                 print("\nPreparing phase-folded & binned copies of the lightcurves for EBOP MAVEN.")
                 bins = estimator.mags_feature_bins
                 wrap_phase = u.Quantity(estimator.mags_feature_wrap_phase or (0.5 + trow.phiS / 2))
-                binned_fold = np.zeros(shape=(len(lcs), 2, bins), dtype=np.float32)
+                bin_folds = np.zeros(shape=(len(lcs), 2, bins), dtype=np.float32)
+                flcs = [None] * len(lcs) 
                 for ix, lc in enumerate(lcs):
-                    flc = lc.fold(trow.period.n * u.d, lc.meta["t0"],
-                                  wrap_phase=wrap_phase, normalize_phase=True)
-                    binned_fold[ix] = lightcurves.get_binned_phase_mags_data(flc, bins, wrap_phase)
+                    flcs[ix] = lc.fold(nom_val(trow.period)*u.d, lc.meta["t0"], 0, wrap_phase, True)
+                    bin_folds[ix] = lightcurves.get_binned_phase_mags_data(flcs[ix],bins,wrap_phase)
 
-                print("\nEstimating fitting input parameters with EBOP MAVEN.")
+                if args.plot_figs:
+                    print("Creating plot of the phase-folded & binned EBOP MAVEN input features.")
+                    def _plot_feature_and_mid(ix, ax, _):
+                        ax.scatter(bin_folds[ix, 0], bin_folds[ix, 1], s=0.33, c="k", marker=".")
+                        ax.vlines(.5, 0, 1, "silver", "--", lw=1, zorder=-5, transform=ax.transAxes)
+                    fig = plots.plot_lightcurves(flcs, "delta_mag", ax_func=_plot_feature_and_mid)
+                    fig.savefig(figs_dir / f"lcs-mag-feature.{args.figs_type}", dpi=args.figs_dpi)
+                    plt.close(fig)
+
+                print("Estimating fitting input parameters with EBOP MAVEN.")
                 if args.is_testing:
                     print("Testing flagged. Fixing the estimator's seed for repeatable predictions")
                     pipeline.force_seed_on_dropout_layers(estimator, 42)
-                preds = estimator.predict(binned_fold[:, 1], iterations=1000)
+                preds = estimator.predict(bin_folds[:, 1], iterations=1000)
                 preds_dict = pipeline.predictions_to_mean_dict(preds, True, "inc")
                 print(("Mean predicted" if preds.size > 1 else "Predicted"), "parameters",
                       f"from {len(lcs)} LC group(s), including the value calculated for inc.")
