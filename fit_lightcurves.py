@@ -53,8 +53,8 @@ def indicate_eclipses(_, ax, lc): # pylint: disable=redefined-outer-name
     ax.plot(lc.meta["t0"], 1.08, "rv", markersize=6, alpha=0.5, zorder=-20)
 
 def highlight_mask(_, ax, lc): # pylint: disable=redefined-outer-name
-    """ Grey background for timespans in the lcs' meta[flat_mask] """
-    if (_mask := lc.meta.get("flat_mask", None)) is not None:
+    """ Grey background for timespans in the lcs' meta[eclipse_mask] """
+    if (_mask := lc.meta.get("eclipse_mask", None)) is not None:
         for sl in np.ma.clump_masked(np.ma.masked_where(_mask, lc.time.value)):
             ax.axvspan(lc.time[sl.start].value, lc.time[sl.stop-1].value,
                        color="lightgray", zorder=-50, transform=ax.get_xaxis_transform())
@@ -201,7 +201,7 @@ if __name__ == "__main__":
                 groups_override = config.sectors
                 ecl_complete_th = config.eclipse_complete_threshold
                 if config.sectors is None:
-                    print("Sectors will chosen by analysis of eclipses, with those having",
+                    print("Sectors will be chosen by analysis of eclipses, with those having",
                           f">={ecl_complete_th:.0%} fluxes being considered complete.")
                 if max_group_size := 1 if config.do_not_join_lcs else None:
                     print("Joining of adjascent sectors is disabled by target config setting")
@@ -241,7 +241,7 @@ if __name__ == "__main__":
 
                 if args.plot_figs:
                     print("\nCreating plot of the prepared and grouped lightcurves" +
-                          (" showing the eclipse masks used in flattening." if do_flatten else "."))
+                          (" showing the eclipse mask used." if do_flatten else "."))
                     fig = plots.plot_lightcurves(lcs, "delta_mag", cols=lc_plot_cols,
                                                  ax_func=highlight_mask)
                     fig.savefig(figs_dir / f"lcs-prepared.{args.figs_type}", dpi=args.figs_dpi)

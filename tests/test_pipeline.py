@@ -115,6 +115,8 @@ class Testpipeline(unittest.TestCase):
                 # Prior steps in the pipeline where we have a dependency
                 # Sets primary|secondary _times & _completeness arrays and t0 ('best' primary) to lcs' meta
                 add_eclipse_meta_to_lightcurves(lcs, t0, period, widthp, widths, depthp, depths, phis)
+                for lc in lcs:
+                    lc.meta["eclipse_mask"] = np.zeros_like(lc.time, dtype=bool)
 
                 join_lc = join_lightcurves(lcs)
                 self.assertIsInstance(join_lc, LightCurve)
@@ -128,6 +130,8 @@ class Testpipeline(unittest.TestCase):
                                  join_lc.meta["TELAPSE"])
                 self.assertEqual(sum(len(lc.meta["primary_times"]) for lc in lcs),
                                  len(join_lc.meta["primary_times"]))
+
+                self.assertEqual(len(join_lc), len(join_lc.meta["eclipse_mask"]))
 
 
     #
@@ -161,6 +165,9 @@ class Testpipeline(unittest.TestCase):
                 # Prior steps in the pipeline where we have a dependency
                 # Sets primary|secondary _times & _completeness arrays and t0 ('best' primary) to lcs' meta
                 add_eclipse_meta_to_lightcurves(lcs, t0, period, widthp, widths, depthp, depths, phis)
+                for lc in lcs:
+                    lc.meta["eclipse_mask"] = np.zeros_like(lc.time, dtype=bool)
+                    lc.meta["clip_mask"] = np.zeros_like(lc.time, dtype=bool)
 
                 lc = lcs[0]
                 if isinstance(slices, dict):
@@ -180,6 +187,8 @@ class Testpipeline(unittest.TestCase):
                     self.assertTrue(all(from_time.value <= pt <= to_time.value for pt in out_lc.meta["primary_times"]))
                     self.assertTrue(from_time.value <= out_lc.meta["t0"] <= to_time.value)
 
+                    self.assertEqual(len(out_lc), len(out_lc.meta["eclipse_mask"]))
+                    self.assertEqual(len(out_lc), len(out_lc.meta["clip_mask"]))
 
     #
     # arrange_sector_groups(lcs: LightCurveCollection, completeness_th: float, min_eclipses: int) -> List[List[ix]]
@@ -276,6 +285,8 @@ class Testpipeline(unittest.TestCase):
             # See test_lightcurves for tests covering the calculations
             self.assertIn("delta_mag", lc.colnames)
             self.assertIn("delta_mag_err", lc.colnames)
+
+            self.assertIn("eclipse_mask", lc.meta)
 
 
     #

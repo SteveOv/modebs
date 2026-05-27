@@ -234,6 +234,12 @@ def slice_lightcurve(src_lc: LightCurve, slices: List[slice]) -> LightCurveColle
                 if ix > 1:
                     lc.meta["TSTART"] = tstart.value
 
+                # We don't update QUALITY_MASK as it may have different length
+                # to the source light curve as we see it now.
+                for mask_key in ["eclipse_mask", "clip_mask"]:
+                    if mask_key in src_lc.meta:
+                        lc.meta[mask_key] = src_lc.meta[mask_key][sec_slice]
+
                 # The hard work, splitting the eclipse data
                 for ecl_type in ["primary", "secondary"]:
                     key_times = f"{ecl_type}_times"
@@ -395,7 +401,7 @@ def append_mags_to_lightcurves_and_detrend(lcs: LightCurveCollection,
     Optionally the fluxes may be flattened outside of any previously detected eclipses,
     prior to calculating the magnitude columns.
 
-    LightCurves that have been flattened will have a flat_mask array added to their meta dict.
+    LightCurves will have a eclipse_mask array added to their meta dict.
 
     The detrending poly will be overriden to zero if flattening is requested, unless the
     override_poly_on_flatten argument is set to False.
@@ -432,13 +438,13 @@ def append_mags_to_lightcurves_and_detrend(lcs: LightCurveCollection,
         pri_times = lcs[ix].meta.get("primary_times", [])
         sec_times = lcs[ix].meta.get("secondary_times", [])
         eclipse_mask = lightcurves.create_eclipse_mask(lcs[ix], pri_times, sec_times, durp, durs)
+        lcs[ix].meta["eclipse_mask"] = eclipse_mask
 
         if flatten:
             if verbose:
                 num_ecl = len(np.ma.clump_masked(np.ma.masked_where(eclipse_mask, eclipse_mask)))
                 print(f"Flattening the {label} LC fluxes outside of {num_ecl} masked eclipse(s).")
             lcs[ix] = lcs[ix].flatten(mask=eclipse_mask)
-            lcs[ix].meta["flat_mask"] = eclipse_mask
 
         # Create detrended & rectified delta_mag/delta_mag_err columns, by fitting & subtracting a
         # polynomial to delta_mags outside the eclipses.
