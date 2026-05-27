@@ -68,7 +68,8 @@ if __name__ == "__main__":
                     help="json file containing the details of the targets to fit")
     ap.add_argument("-pf", "--plot-figs", dest="plot_figs", action="store_true", required=False,
                     help="plot figs for each target as the process progresses")
-    ap.set_defaults(plot_figs=False, is_testing=True, max_workers=8, figs_type="png", figs_dpi=100)
+    ap.set_defaults(plot_figs=False, lc_fig_cols=4, figs_type="png", figs_dpi=100,
+                    is_testing=True, max_workers=8)
     args = ap.parse_args()
     drop_dir = Path.cwd() / f"drop/{args.targets_file.stem}"
 
@@ -187,10 +188,9 @@ if __name__ == "__main__":
 
                 if args.plot_figs:
                     print("\nCreating plot of the lightcurves with the eclipses marked.")
-                    lc_plot_cols = min(len(lcs), 3) if len(lcs) < 12 else 4
                     ax_titles=[f"S{l.sector} ({l.meta['FLUX_ORIGIN']} @ {l.meta['FRAMETIM']*l.meta['NUM_FRM']} s)" for l in lcs] # pylint: disable=line-too-long
-                    fig = plots.plot_lightcurves(lcs, "flux", normalize_lcs=True, cols=lc_plot_cols,
-                                                 ax_func=indicate_eclipses, ax_titles=ax_titles)
+                    fig = plots.plot_lightcurves(lcs, "flux", ax_titles, normalize_lcs=True,
+                                                 cols=args.lc_fig_cols, ax_func=indicate_eclipses)
                     fig.savefig(figs_dir / f"lcs-parsed.{args.figs_type}", dpi=args.figs_dpi)
                     plt.close(fig)
 
@@ -242,7 +242,7 @@ if __name__ == "__main__":
                 if args.plot_figs:
                     print("\nCreating plot of the prepared and grouped lightcurves" +
                           (" showing the eclipse mask used." if do_flatten else "."))
-                    fig = plots.plot_lightcurves(lcs, "delta_mag", cols=lc_plot_cols,
+                    fig = plots.plot_lightcurves(lcs, "delta_mag",  cols=args.lc_fig_cols,
                                                  ax_func=highlight_mask)
                     fig.savefig(figs_dir / f"lcs-prepared.{args.figs_type}", dpi=args.figs_dpi)
                     plt.close(fig)
@@ -387,7 +387,7 @@ if __name__ == "__main__":
                     out_files = [fitted_param_dicts[ix]["out_fname"] for ix in range(len(lcs))]
                     ax_titles = [l.meta["LABEL"]+("" if c else "*") for l, c in zip(lcs, conv_mask)]
                     fig = plots.plot_lightcurve_fits_and_residuals(out_files, wrap_phase,
-                                                                   ax_titles, lc_plot_cols)
+                                                                   ax_titles, args.lc_fig_cols)
                     fig.savefig(figs_dir / f"lcs-fit-residual.{args.figs_type}", dpi=args.figs_dpi)
                     plt.close(fig)
 

@@ -125,7 +125,7 @@ def plot_lightcurves(lcs: Union[_LCC, _LC, _FLC],
                      column: str="flux",
                      ax_titles: Union[str, Iterable[str]]="LABEL",
                      normalize_lcs: bool=False,
-                     cols: int=2,
+                     cols: int=4,
                      ax_func: Callable[[int, _Axes, _LC], None]=None,
                      **format_kwargs) -> _Figure:
     """
@@ -196,7 +196,7 @@ def plot_lightcurve_on_axes(ax: _Axes, lc: Union[_LC, _FLC],
 def plot_lightcurve_fits_and_residuals(out_files: List[Path],
                                        wrap_phase: Union[float, u.Quantity]=1,
                                        ax_titles: Union[str, ArrayLike]=None,
-                                       cols: int=2) -> _Figure:
+                                       cols: int=4) -> _Figure:
     """
     Will plot a matplotlib fig with pairs of axes showing the fits above and residuals below based
     on reading the data from the JKTEBOP "out" file given by each of the out_files passed in.
