@@ -44,7 +44,7 @@ def indicate_eclipses(_, ax, lc): # pylint: disable=redefined-outer-name
         ("secondary", "--", "g"),
         ("primary", "-.", "r")
     ]:
-        alphas = [.33 if cf else .1 for cf in lc.meta[f"{ecl_type}_completeness"] > ecl_complete_th]
+        alphas = [.33 if cf else .1 for cf in lc.meta[f"{ecl_type}_completeness"] >=ecl_complete_th]
         if len(times := lc.meta[f"{ecl_type}_times"]) > 0:
             ax.vlines(times, 0.5, 1.1, c, ls, label=ecl_type, alpha=alphas, zorder=-20)
             ax.plot(times, 1.0-lc.meta[f"{ecl_type}_depths"], f"{c}+",

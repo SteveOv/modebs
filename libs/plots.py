@@ -126,6 +126,8 @@ def plot_lightcurves(lcs: Union[_LCC, _LC, _FLC],
                      ax_titles: Union[str, Iterable[str]]="LABEL",
                      normalize_lcs: bool=False,
                      cols: int=4,
+                     col_width: float=4,
+                     row_height: float=3,
                      ax_func: Callable[[int, _Axes, _LC], None]=None,
                      **format_kwargs) -> _Figure:
     """
@@ -136,6 +138,8 @@ def plot_lightcurves(lcs: Union[_LCC, _LC, _FLC],
     :ax_titles: the titles to give each Axes or if a single str a meta key to read for each title
     :normalize_lcs: whether or not to normalize the y-axis data before plotting
     :cols: the number of columns on the grid of Axes
+    :col_width: the width of each column/ax
+    :row_height: the height of each row/ax
     :ax_func: callback taking (index, ax, LightCurve) called for each Axes/LC
     prior to applying format_kwargs
     :format_kwargs: kwargs to be passed on to format_axes()
@@ -153,7 +157,7 @@ def plot_lightcurves(lcs: Union[_LCC, _LC, _FLC],
     # Set up the figure and Axes
     cols = min(cols, len(lcs))
     rows = int(np.ceil(count_lcs / cols))
-    fig, axes = plt.subplots(rows, cols, figsize=(4*cols, 3*rows),
+    fig, axes = plt.subplots(rows, cols, figsize=(cols*col_width, rows*row_height),
                              sharey=True, constrained_layout=True)
     axes = [axes] if isinstance(axes, _Axes) else axes.flatten()
 
@@ -169,6 +173,9 @@ def plot_lightcurves(lcs: Union[_LCC, _LC, _FLC],
 
             # Only want the y-label on the left most column as sharey is in play
             ax.set_ylabel(None if ix % cols else ax.get_ylabel())
+            if hasattr(lc, "phase"):
+                ax.set_xlabel("Orbital phase" + \
+                              " (normalized)" if lc.phase.unit == u.dimensionless_unscaled else "")
             format_axes(ax, title=title, **format_kwargs)
         else:
             # Hide any unused axes
@@ -190,13 +197,17 @@ def plot_lightcurve_on_axes(ax: _Axes, lc: Union[_LC, _FLC],
     lc.scatter(ax=ax, column=column, s=2.0, marker=".", label=None, normalize=normalize)
     if lc[column].unit == u.mag:
         if column == "delta_mag":
-            ax.set_ylabel("differential magnitude [mag]")
+            ax.set_ylabel("Differential magnitude [mag]")
+    elif normalize:
+        ax.set_ylabel("Normalized flux")
 
 
 def plot_lightcurve_fits_and_residuals(out_files: List[Path],
                                        wrap_phase: Union[float, u.Quantity]=1,
                                        ax_titles: Union[str, ArrayLike]=None,
-                                       cols: int=4) -> _Figure:
+                                       cols: int=4,
+                                       col_width: float=4,
+                                       row_height: float=3.5) -> _Figure:
     """
     Will plot a matplotlib fig with pairs of axes showing the fits above and residuals below based
     on reading the data from the JKTEBOP "out" file given by each of the out_files passed in.
@@ -205,6 +216,8 @@ def plot_lightcurve_fits_and_residuals(out_files: List[Path],
     :wrap_phase: the phase above which to wrap the plot to control the positioning of the eclipses
     :ax_titles: the titles to apply above each pair of fit & residual axes
     :cols: the maximum number of axes columns for the figure
+    :col_width: the width of each column/ax
+    :row_height: the height of each row, consisting of a pair of light curve and residual axes
     """
     if ax_titles is None or isinstance(ax_titles, str):
         ax_titles = [ax_titles] * len(out_files)
@@ -215,7 +228,7 @@ def plot_lightcurve_fits_and_residuals(out_files: List[Path],
 
     cols = min(cols, len(out_files))
     rows = int(np.ceil(len(out_files) / cols))
-    fig, axes = plt.subplots(rows*2, cols, figsize=(4*cols, 3.5*rows),
+    fig, axes = plt.subplots(rows*2, cols, figsize=(cols*col_width, rows*row_height),
                              height_ratios=(3, 1)*rows, constrained_layout=True)
 
     for ix in range(axes.size//2):
@@ -245,6 +258,7 @@ def plot_lightcurve_fits_and_residuals(out_files: List[Path],
             else:
                 ax_lc.sharey(axes[0, 0])
                 ax_res.sharey(axes[1, 0])
+            ax_res.sharex(ax_lc)
 
             # Hides tick labels on inner facing shared axes
             plt.setp(ax_lc.get_xticklabels(), visible=False)
@@ -252,8 +266,10 @@ def plot_lightcurve_fits_and_residuals(out_files: List[Path],
                 plt.setp(ax_lc.get_yticklabels(), visible=False)
                 plt.setp(ax_res.get_yticklabels(), visible=False)
             format_axes(ax_lc, title=ax_titles[ix],
-                        ylabel="" if ix % cols else "Relative magnitude [mag]")
-            format_axes(ax_res, xlabel="Orbital phase", ylabel="" if ix % cols else "Residual")
+                        ylabel="" if ix % cols else "Differential magnitude [mag]")
+            abs_max_ylim = max(np.abs(ax_res.get_ylim()))
+            format_axes(ax_res, ylim=(abs_max_ylim, -abs_max_ylim),
+                        xlabel="Orbital phase (normalized)", ylabel="" if ix % cols else "Residual")
         else:
             ax_lc.axis("off")
             ax_res.axis("off")
