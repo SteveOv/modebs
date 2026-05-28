@@ -223,13 +223,13 @@ def slice_lightcurve(src_lc: LightCurve, slices: List[slice]) -> LightCurveColle
 
         target = src_lc.meta.get("target", src_lc.meta["OBJECT"])
         for ix, sec_slice in enumerate(slices, start=1):
-            lc = src_lc.copy(True)[sec_slice]
+            lc = src_lc[sec_slice].copy(True)
             lc.sector += ix/10
             lc.meta["sectors"] = [lc.sector]
             lc.meta["LABEL"] = f"{target} S{lc.sector}"
 
             if len(lc) != len(src_lc):
-                tstart, tend = min(lc.time), max(lc.time)
+                tstart, tend = lc.time.min(), lc.time.max()
                 lc.meta["TELAPSE"] = (tend - tstart).to(u.d).value
                 if ix > 1:
                     lc.meta["TSTART"] = tstart.value

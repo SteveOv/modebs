@@ -93,7 +93,7 @@ class Testpipeline(unittest.TestCase):
     # join_lightcurves(lcs: LightCurveCollection) -> LightCurve
     #
     def test_join_lightcurves_happy_path(self):
-        """ Test choose_lightcurve_groups_for_fitting() assert it produces expected arrangement """
+        """ Test join_lightcurves() assert it correctly joins LCs and metadata """
         for (target,    sectors) in [
             ("CM Dra",  [24]),
             ("CM Dra",  [24, 25, 26]),
@@ -138,7 +138,7 @@ class Testpipeline(unittest.TestCase):
     # slice_lightcurve(lc: LightCurve, slices: [slice]) -> LightCurve
     #
     def test_slice_lightcurve_happy_path(self):
-        """ Test choose_lightcurve_groups_for_fitting() assert it produces expected arrangement """
+        """ Test slice_lightcurve() assert it correctly slices the LC and metadata """
         # slices can either be a List[slice] or a set of kwargs for find_lightcurve_sections
         for (target,    sectors,    slices) in [
             # No slices
@@ -171,8 +171,10 @@ class Testpipeline(unittest.TestCase):
 
                 lc = lcs[0]
                 if isinstance(slices, dict):
+                    # A convenient way of generating slices for our test
                     slices = list(yield_lightcurve_sections(lc, **slices))
 
+                # The test subject
                 out_lcs = slice_lightcurve(lc, slices)
 
                 self.assertIsInstance(out_lcs, LightCurveCollection)
@@ -194,7 +196,7 @@ class Testpipeline(unittest.TestCase):
     # arrange_sector_groups(lcs: LightCurveCollection, completeness_th: float, min_eclipses: int) -> List[List[ix]]
     #
     def test_arrange_sector_groups_with_known_targets(self):
-        """ Test choose_lightcurve_groups_for_fitting() assert it produces expected arrangement """
+        """ Test arrange_sector_groups() assert it produces expected arrangement """
         for target,             sectors,    min_eclipses,   max_cs_var, max_group_size, allow_slice,exp_groups in[
             # Sectors not contiguous (so no join) but are fine to use individually do 7+ of each ecl per sector
             ("CW Eri",          [4, 31],        3,          1e-4,           None,           False,      [[4], [31]]),
