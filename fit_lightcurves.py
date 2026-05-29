@@ -306,7 +306,7 @@ if __name__ == "__main__":
 
                 # LD params based on the system temperature & log(g) (deferring to any overrides)
                 # Substiturte LR ~= J*k^2 giving TeffR ~= ((J*k^2)/k^2)^1/4 ~= J^1/4
-                def_ld_algo = config.get("default_ld_algo", "pow2")
+                def_ld_algo = config.get("default_ld_law", "quad")
                 print(f"\nSetting up LD params based on Teff_sys={Teff_sys:.0f} K, ",
                       f"logg_sys={logg_sys:.3f}, subject to any overrides from config.",
                       f"The default algorithm in {def_ld_algo}.")
