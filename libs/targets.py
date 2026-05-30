@@ -19,7 +19,7 @@ _default_target_config_defaults = {
     "eclipse_complete_threshold": 0.9,
     "do_not_slice_lcs": None,
     "do_not_join_lcs": None,
-    "detrend_gap_threshold": 0.5,
+    "detrend_gap_threshold": 0.25,
     "detrend_poly_degree": 1,
     "detrend_iterations": 3,
     "flatten": None,

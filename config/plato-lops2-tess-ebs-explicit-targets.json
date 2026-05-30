@@ -7,7 +7,7 @@
         "quality_masks": [[1420.0, 1424.0], [1534.0, 1544.0]],
         "eclipse_complete_threshold": 0.9,
         "flatten_morph_threshold": 0.25,
-        "detrend_gap_threshold": 0.1,
+        "detrend_gap_threshold": 0.25,
         "detrend_poly_degree": 2,
         "detrend_iterations": 3,
         "default_ld_law": "quad",

@@ -222,7 +222,7 @@ if __name__ == "__main__":
             "quality_bitmask": None,            # Leave choice of this to fit_lightcurves
             "eclipse_complete_threshold": 0.9,  # Eclipses > this completeness considered complete
             "flatten_morph_threshold": 0.25,    # Targets <= this morph will have LCs flattened
-            "detrend_gap_threshold": 0.1,
+            "detrend_gap_threshold": 0.25,
             "detrend_poly_degree": 2,
             "detrend_iterations": 3,
             "default_ld_law": "quad",
