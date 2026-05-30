@@ -36,7 +36,7 @@ THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 
 NUM_STARS = 2
 subs = ["ABCDEFGHIJKLM"[n] for n in range(NUM_STARS)]
-theta_labels = np.array([f"$M_{{\\rm {sub}}} / {{\\rm R_{{\\odot}}}}$" for sub in subs]
+theta_labels = np.array([f"$M_{{\\rm {sub}}} / {{\\rm M_{{\\odot}}}}$" for sub in subs]
                       + ["$\\log{{({{\\rm age}})}} / {{\\rm yr}}$"])
 
 theta_params_and_units = np.array([(f"M{sub}", u.Msun) for sub in subs] \
