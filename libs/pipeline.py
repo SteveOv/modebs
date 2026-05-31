@@ -262,11 +262,12 @@ def slice_lightcurve(src_lc: LightCurve, slices: List[slice]) -> LightCurveColle
 
 def arrange_sector_groups(lcs: LightCurveCollection,
                           completeness_th: float=0.8,
-                          min_eclipses: Tuple[int, int]=(2, 1),
+                          min_eclipses: Union[Tuple[int, int], int]=(2, 1),
                           max_crowdsap_var: float=1e-4,
                           max_group_size: int=None,
                           groups_override: List[List[int]]=None,
                           allow_slice: bool=False,
+                          min_slice_eclipses: Union[Tuple[int, int], int]=None,
                           verbose: bool=False) -> List[List[int]]:
     """
     Will make the most effective arrangement of LightCurves to support JKTEBOP fitting. This will
@@ -276,6 +277,11 @@ def arrange_sector_groups(lcs: LightCurveCollection,
     This uses the LightCurves' metadata, included the eclipse timing & completeness metadata as
     added by add_eclipse_meta_to_lightcurves(), when deciding on the best arrangement of sectors.
 
+    The min_eclipses arg specifies the minimum number of complete eclipses for group (or slice
+    unless overridden with min_slice_eclipses). These can be set as either a tuple, i.e.: (2, 1)
+    which gives the rule that there should be at least 2 of one type of eclipse and 1 of the other,
+    or as a single int which will be split to give a similar tuple (i.e.: 3 -> (2, 1)).
+
     :lcs: the LightCurveCollection containing our potential fitting targets
     :completness_th: threshold percentage of an eclipse we require to consider it complete/usable
     :min_eclipses: the minimum eclipse count criteria for a usable group or subsector
@@ -283,12 +289,18 @@ def arrange_sector_groups(lcs: LightCurveCollection,
     :max_group_size: the maximum number of sectors to combine for a group, or no max if None
     :groups_override: if set, the grouping logic will be bypassed, and these used (to be deprecated)
     :allow_slice: whether to allow sectors to be sliced into sections, subject to eclipse criteria
+    :min_slice_eclipses: minimum eclipse criteria for a usable slice, or same as for group if None
     :verbose: whether or not to send messages to stdout with details of the group decisions made
     :returns: a new LightCurveCollection containing the newly grouped/split LightCurves
     """
     if isinstance(min_eclipses, Number):
         min_eclipses = (int(np.ceil(min_eclipses / 2)), int(np.floor(min_eclipses / 2)))
     allow_slice = allow_slice and groups_override is None # override switches off slicing
+    if min_slice_eclipses is None:
+        min_slice_eclipses = min_eclipses
+    elif isinstance(min_slice_eclipses, Number):
+        min_slice_eclipses = (int(np.ceil(min_slice_eclipses / 2)),
+                              int(np.floor(min_slice_eclipses / 2)))
     min_gap_dur = 0.25 * u.d
 
     keys_time = ("primary_times", "secondary_times")
@@ -304,13 +316,13 @@ def arrange_sector_groups(lcs: LightCurveCollection,
             return tuple(ecl_sums)
         return tuple(sum(lc.meta[k] > completeness_th) for k in keys_compl)
 
-    def is_usable_group(ecl_counts: List[Tuple[int, int]], crowdsaps: List[float]) -> bool:
+    def is_usable_group(ecl_counts, crowdsaps, min_ecl=min_eclipses) -> bool:
         ecl_sums = np.sum(ecl_counts, axis=0)
-        return (max(ecl_sums) >= max(min_eclipses) and min(ecl_sums) >= min(min_eclipses)) \
+        return (max(ecl_sums) >= max(min_ecl) and min(ecl_sums) >= min(min_ecl)) \
                 and (len(crowdsaps) < 2 or np.var(crowdsaps) <= max_crowdsap_var)
 
-    def is_usable_section(lc, section_slice) -> bool:
-        return is_usable_group([count_eclipses(lc, section_slice)], [])
+    def is_usable_slice(lc, section_slice) -> bool:
+        return is_usable_group([count_eclipses(lc, section_slice)], [], min_slice_eclipses)
 
     def best_slices(sectors, ecl_counts, crowdsaps, max_slen, excl_sectors) -> List[List[Number]]:
         # All combinations of slices (contiguous sectors/subsectors) where eclipse criteria are met.
@@ -368,7 +380,7 @@ def arrange_sector_groups(lcs: LightCurveCollection,
                 grp_lcs = lcs[np.isin(lcs.sector, group)]
                 if allow_slice and len(grp_lcs) == 1 and \
                         len(sls := [*lightcurves.yield_lightcurve_sections(grp_lcs[0], min_gap_dur,
-                                                                           is_usable_section)]) > 1:
+                                                                           is_usable_slice)]) > 1:
                     # Normalize the LC so it's consistent with any that are joined
                     sec_lcs = slice_lightcurve(grp_lcs[0].normalize(), sls).data
                     out_lcs += sec_lcs

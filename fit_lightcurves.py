@@ -209,9 +209,12 @@ if __name__ == "__main__":
                     print("Slicing of sectors is disabled by target config setting")
                 lcs = pipeline.arrange_sector_groups(lcs,
                                                      completeness_th=ecl_complete_th,
+                                                     min_eclipses=(2, 1),
                                                      max_group_size=max_group_size,
                                                      groups_override=groups_override,
                                                      allow_slice=allow_slice,
+                                                     # Higher threshold for slices as fewer fluxes
+                                                     min_slice_eclipses=(3, 2),
                                                      verbose=True)
                 if len(lcs) == 0:
                     raise PipelineError(target_id, "No lightcurves retained after selection")
