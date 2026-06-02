@@ -32,7 +32,7 @@ def get_sed_for_target(target: str,
                        verbose: bool=False) -> Table:
     """
     Gets spectral energy distribution (SED) observations for the target. These data are found and
-    downloaded from the VizieR photometry tool (see http://viz-beta.u-strasbg.fr/vizier/sed/doc/).
+    downloaded from the VizieR photometry tool (see https://vizier.cds.unistra.fr/vizier/sed/doc/).
     
     The VizieR photometry tool is developed by Anne-Camille Simon and Thomas Boch.
 
