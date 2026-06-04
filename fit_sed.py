@@ -111,6 +111,7 @@ if __name__ == "__main__":
 
         # Fixed priors limits for MCMC fit
         teff_limits = model_grid.teff_range
+        logg_limits = model_grid.logg_range
         radius_limits = (0.05, 100)
 
         for fit_counter, trow in enumerate(dal.acquire_next_row(**to_fit_criteria), start=1):
@@ -214,7 +215,7 @@ if __name__ == "__main__":
                     The fitting prior callback function to evaluate the current set of candidate
                     parameters, returning a single negative ln(value) indicating their "goodness".
 
-                    Return negative value as emcee will maximize the sum of this & the negative val
+                    Return negative value as fitter will maximize the sum of this & the negative val
                     of its ln_prob_func. The fitter knows to flip the sign if running a minimize fit
                     """
                     # pylint: disable=cell-var-from-loop
@@ -230,21 +231,19 @@ if __name__ == "__main__":
                     # Gaussian prior criteria: g(x) = 1/(σ*sqrt(2*pi)) * exp(-1/2 * (x-µ)^2/σ^2)
                     # Omitting scaling expressions and note the implicit ln() cancelling the exp()
                     rval = 0
-                    for ix in range(1, NSTARS): # pylint: disable=line-too-long
-                        rval += ((teffs[ix]/teffs[0] - TeffR_priors[ix].n) / TeffR_priors[ix].s)**2
-                        rval += ((radii[ix]/radii[0] - radR_priors[ix].n) / radR_priors[ix].s)**2
+                    for c in range(1, NSTARS):
+                        rval += ((teffs[c]/teffs[0] - TeffR_priors[c].n) / TeffR_priors[c].s)**2
+                        rval += ((radii[c]/radii[0] - radR_priors[c].n) / radR_priors[c].s)**2
                     rval += ((dist - dist_prior.n) / dist_prior.s)**2
                     return -0.5 * rval
 
 
                 print("\nSetting up the starting position (theta0) for fitting.")
-                init_teff = max(min(model_grid.teff_range),
-                                min(nom_val(trow.Teff_sys), max(model_grid.teff_range)))
-                init_logg = max(min(model_grid.logg_range),
-                                min(nom_val(trow.logg_sys), max(model_grid.logg_range)))
-                theta0 = create_theta(teffs=init_teff,
-                                      loggs=init_logg,
-                                      radii=1.0,
+                init_teff = max(teff_limits[0], min(nom_val(trow.Teff_sys), teff_limits[1]))
+                init_logg = max(logg_limits[0], min(nom_val(trow.logg_sys), logg_limits[1]))
+                theta0 = create_theta(teffs=[init_teff] * NSTARS,
+                                      loggs=[init_logg] * NSTARS,
+                                      radii=[1.0] * NSTARS,
                                       dist=coords.distance.to(u.pc).value,
                                       av=0,
                                       nstars=NSTARS,
