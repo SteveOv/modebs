@@ -386,8 +386,8 @@ def plot_fitted_model_sed(sed: Table,
 
     # Plot the raw spectra for each component as a background
     spec_lams = model_grid.wavelengths * model_grid.wavelength_unit
-    mask = spec_lams >= sed[sed_lambda_colname].quantity.min()
-    mask &= spec_lams <= sed[sed_lambda_colname].quantity.max()
+    mask = spec_lams > sed[sed_lambda_colname].quantity.min() * 0.8
+    mask &= spec_lams < sed[sed_lambda_colname].quantity.max() * 1.2
     for (teff, logg, rad, dist, av), c in zip(iterate_theta(theta_noms),
                                               _cycle_for(comp_colors, nstars)):
         spec_flux = model_grid.get_fluxes(teff, logg, 0, rad, dist, av) * model_grid.flux_unit
