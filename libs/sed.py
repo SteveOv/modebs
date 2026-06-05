@@ -197,6 +197,9 @@ def create_outliers_mask(sed: Table,
                          temp_ratios: Union[Tuple[float], List[float]]=None,
                          min_unmasked: float=15,
                          min_improvement_ratio: float=0.33,
+                         flux_field: str="sed_flux",
+                         flux_err_field: str="sed_eflux",
+                         invert: bool=False,
                          verbose: bool=False) -> np.ndarray[bool]:
     """
     Will create a mask indicating the farthest outliers.
@@ -219,6 +222,9 @@ def create_outliers_mask(sed: Table,
     :min_unmasked: the minimum number of observations to leave unmasked, either as an explicit
     count (if > 1) or as a ratio of the initial number (if within (0, 1])
     :min_improvement_ratio: minimum fractional test stat improvement required to add to outlier_mask
+    :flux_field: the name of the flux field to fit to
+    :flux_err_field: the name of flux errors field to fit to
+    :invert: if True, the mask will be inverted so returning a mask for the non-outliers
     :verbose: whether to print progress messages or not
     :returns: a mask indicating those observations selected as outliers
     """
@@ -226,11 +232,10 @@ def create_outliers_mask(sed: Table,
     sed_count = len(sed)
     outlier_mask = np.zeros((sed_count), dtype=bool)
     if 0 < min_unmasked <= 1:
-        min_unmasked = sed_count * min_unmasked
+        min_unmasked = int(np.ceil(sed_count * min_unmasked))
     elif min_unmasked < 0:
         min_unmasked = sed_count + int(min_unmasked)
-    else:
-        min_unmasked = max(int(min_unmasked), 1)
+    min_unmasked = max(int(min_unmasked), 1)
     if sed_count <= min_unmasked:
         if verbose: print(f"No outliers masked as already {min_unmasked} or fewer SED rows")
         return outlier_mask
@@ -252,11 +257,12 @@ def create_outliers_mask(sed: Table,
         print("Will find outliers by based on quick BB fits with initial Teff(s) = ["
               + ", ".join(f"{t:.3f}" for t in temps0) + "] & Teff ratio priors = ["
               + ", ".join(f"{r:.3f}" for r in temp_ratios) + "]+/-5%")
+        print(f"Outliers are masked where doing so improves test fit >={min_improvement_ratio:.1%}")
 
     # Prepare the x, y & y_err data for the model & objective funcs which access these data directly
     x = sed["sed_freq"].to(u.Hz, equivalencies=u.spectral()).value
-    y = sed["sed_flux"].to(u.Jy, equivalencies=u.spectral_density(sed["sed_wl"])).value
-    y_err = sed["sed_eflux"].to(u.Jy, equivalencies=u.spectral_density(sed["sed_wl"])).value
+    y = sed[flux_field].to(u.Jy, equivalencies=u.spectral_density(sed["sed_wl"])).value
+    y_err = sed[flux_err_field].to(u.Jy, equivalencies=u.spectral_density(sed["sed_wl"])).value
 
     # The model func scaling is in log space, as the range is large, but it returns linear fluxes.
     y_log = log10(y)
@@ -324,8 +330,7 @@ def create_outliers_mask(sed: Table,
         # Note: the resids are only the size of the retain_mask == True, hence the double masking.
         retain_mask[retain_mask] = ~(chi_sq_i == chi_sq_i.max())
         prev_test_stat = test_stat
-
-    return outlier_mask
+    return ~outlier_mask if invert else outlier_mask
 
 
 def blackbody_flux(freq: Union[float, UFloat, np.ndarray[float], np.ndarray[UFloat]],
