@@ -134,6 +134,25 @@ if __name__ == "__main__":
                                   frame="icrs")
 
 
+                # Get the extinction coefficient, based on the coords
+                print()
+                if (Av := config.get("A_V", config.get("E(B-V)", 0) * ext_model.Rv)) > 0:
+                    print(f"Found extinction override in target config giving A_V={Av:.6f}")
+                else:
+                    # Get the mean of the various catalogues, prioritising reliable results
+                    print(f"Getting extinction data based on {target_id} {coords}".replace("\n",""))
+                    avs = np.array([*extinction.iterate(coords, rv=ext_model.Rv, verbose=True)]).T
+                    if any(rmask := np.array(avs[1], dtype=bool)):
+                        # We have some reliable extinction values, use only these
+                        Av = np.mean(avs[0][rmask])
+                        print(f"Using the mean of {sum(rmask)} reliable value(s): A_V={Av:.6f}")
+                    else:
+                        Av = np.mean(avs[0])
+                        print(f"Using the mean of {len(rmask)} value(s): A_V={Av:.6f}")
+                        trow.append_warning("unreliable A_V")
+                Av = Av or 0
+
+
                 # Get the SED for this target and de-duplicate (obs may appear multiple times).
                 print()
                 sed = get_sed_for_target(target_id, trow.search_term,
@@ -153,40 +172,16 @@ if __name__ == "__main__":
                             & (sed["sed_wl"] <= max(model_grid.wavelength_range))
                 sed = sed[model_mask]
 
-                out_mask = create_outliers_mask(sed, trow.Teff_sys, [trow.TeffR], 12, verbose=True)
-                sed = sed[~out_mask]
+                print("Creating de-reddened SED observations")
+                sed["sed_der_flux"] = sed["sed_flux"] \
+                                    / ext_model.extinguish(sed["sed_wl"].to(u.um), Av=Av)
+
+                sed = sed[create_outliers_mask(sed, trow.Teff_sys, [trow.TeffR], 12,
+                                            flux_field="sed_der_flux", invert=True, verbose=True)]
                 sed.sort(["sed_wl"])
                 print(f"{len(sed)} unique SED observation(s) retained after range & outlier",
                       "filtering with the units for flux, frequency and wavelength being",
                       ", ".join(f"{sed[f].unit:unicode}" for f in ["sed_flux","sed_freq","sed_wl"]))            
-
-
-                # Deredden the SED
-                print()
-                if (Av := config.get("A_V", config.get("E(B-V)", 0) * ext_model.Rv)) > 0:
-                    print(f"Found extinction override in target config giving A_V={Av:.6f}")
-                else:
-                    # Get the mean of the various catalogues, prioritising reliable results
-                    print(f"Getting extinction data based on {target_id} {coords}".replace("\n",""))
-                    avs = np.array([*extinction.iterate(coords, rv=ext_model.Rv, verbose=True)]).T
-                    if any(rmask := np.array(avs[1], dtype=bool)):
-                        # We have some reliable extinction values, use only these
-                        Av = np.mean(avs[0][rmask])
-                        print(f"Using the mean of {sum(rmask)} reliable value(s): A_V={Av:.6f}")
-                    else:
-                        Av = np.mean(avs[0])
-                        print(f"Using the mean of {len(rmask)} value(s): A_V={Av:.6f}")
-                        trow.append_warning("unreliable A_V")
-
-                if Av:
-                    print("Dereddening SED observations")
-                    sed["sed_der_flux"] = \
-                            sed["sed_flux"] / ext_model.extinguish(sed["sed_wl"].to(u.um), Av=Av)
-                else:
-                    trow.append_warning("No A_V found")
-                    sed["sed_der_flux"] = sed["sed_flux"]
-                    Av = 0
-
 
                 if args.plot_figs:
                     print("\nCreating SED observations plot")
