@@ -160,8 +160,6 @@ if __name__ == "__main__":
                 if sed is None or len(sed) == 0:
                     raise PipelineError(target_id, f"No SED observations for '{trow.search_term}'")
 
-                sed = group_and_average_fluxes(sed, verbose=True)
-
                 # Filter SED to those covered by our models and also remove any outliers
                 model_mask = np.ones((len(sed)), dtype=bool)
                 model_mask &= model_grid.has_filter(sed["sed_filter"])
@@ -176,8 +174,9 @@ if __name__ == "__main__":
                 sed["sed_der_flux"] = sed["sed_flux"] \
                                     / ext_model.extinguish(sed["sed_wl"].to(u.um), Av=Av)
 
-                sed = sed[create_outliers_mask(sed, trow.Teff_sys, [trow.TeffR], 12,
-                                            flux_field="sed_der_flux", invert=True, verbose=True)]
+                sed = sed[create_outliers_mask(sed, trow.Teff_sys, [trow.TeffR], invert=True,
+                                               min_unmasked=0.75, min_improvement_ratio=0.2,
+                                               flux_field="sed_der_flux", verbose=True)]
                 sed.sort(["sed_wl"])
                 print(f"{len(sed)} unique SED observation(s) retained after range & outlier",
                       "filtering with the units for flux, frequency and wavelength being",
