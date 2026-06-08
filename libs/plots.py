@@ -21,7 +21,7 @@ from uncertainties.unumpy import nominal_values, std_devs
 
 from lightkurve import LightCurve as _LC, FoldedLightCurve as _FLC, LightCurveCollection as _LCC
 
-from sed_fit.stellar_grids import StellarGrid
+from sed_fit.stellar_grids import SvoStellarGrid
 from sed_fit.fitter import model_func, iterate_theta
 
 from .data.mist.read_mist_models import ISO
@@ -342,7 +342,7 @@ def plot_sed(x: u.Quantity,
 
 def plot_fitted_model_sed(sed: Table,
                           theta: ArrayLike,
-                          model_grid: StellarGrid,
+                          model_grid: SvoStellarGrid,
                           sed_flux_colname: str="sed_der_flux",
                           sed_flux_err_colname: str="sed_eflux",
                           sed_filter_colname: str="sed_filter",
@@ -390,7 +390,9 @@ def plot_fitted_model_sed(sed: Table,
     mask &= spec_lams < sed[sed_lambda_colname].quantity.max() * 1.2
     for (teff, logg, rad, dist, av), c in zip(iterate_theta(theta_noms),
                                               _cycle_for(comp_colors, nstars)):
-        spec_flux = model_grid.get_fluxes(teff, logg, 0, rad, dist, av) * model_grid.flux_unit
+        spec_flux = model_grid.get_fluxes(wavelengths=model_grid.wavelengths, teff=teff, logg=logg,
+                                          metal=0, radius=rad, distance=dist, av=av)
+        spec_flux *= model_grid.flux_unit
         fig.gca().plot(spec_lams[mask], spec_flux[mask], c=c, alpha=0.15, zorder=-100)
     return fig
 
