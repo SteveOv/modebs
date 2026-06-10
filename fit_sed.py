@@ -164,6 +164,7 @@ if __name__ == "__main__":
                 model_mask = np.ones((len(sed)), dtype=bool)
                 model_mask &= model_grid.has_filter(sed["sed_filter"])
                 model_mask &= ~np.isin(sed["sed_filter"], config.get("sed_filter_exclusions", []))
+                model_mask &= ~np.isin(sed["_tabname"], config.get("sed_tabname_exclusions", []))
                 model_mask &= (sed["sed_wl"] >= min(ext_wl_range)) \
                             & (sed["sed_wl"] <= max(ext_wl_range)) \
                             & (sed["sed_wl"] >= min(model_grid.wavelength_range)) \

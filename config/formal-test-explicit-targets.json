@@ -180,7 +180,7 @@
             "aka": "TIC 125754991, HD 23642",
             "SpT": "A0 Vp(Si) + Am",
             "details": "5 short cadence sectors (42-44 & 70-71); an inclined, circular orbit with shallow primary (~0.10 mag) and secondary (~0.05 mag) partial eclipses, reflection and ellipsoidal effects;",
-            "notes": "not in TESS-ebs; SouthworthMurphy+23mnrasl use an lrat (to mitigate shallow partial eclipses) and circular orbit in LC fit; SouthworthMurphy+23mnrasl give E(B-V)=0.04+/-0.01 mag & dist(K-band)=134.7+/-2.0 pc; SouthworthMurphy+23mnrasl find agreement with PARSEC models with solar metallicity and an age 170+/-20 Myr; disable slicing LCs for fitting as this tends to increase scatter for this target;",
+            "notes": "not in TESS-ebs; unusable J/AJ/153/95/table3 SEDs make auto outlier masking difficult; SouthworthMurphy+23mnrasl use an lrat (to mitigate shallow partial eclipses) and circular orbit in LC fit; SouthworthMurphy+23mnrasl give E(B-V)=0.04+/-0.01 mag & dist(K-band)=134.7+/-2.0 pc; SouthworthMurphy+23mnrasl find agreement with PARSEC models with solar metallicity and an age 170+/-20 Myr; disable slicing LCs for fitting as this tends to increase scatter for this target;",
             "do_not_slice_lcs": true,
             "t0": 2464.981943071,
             "period": 2.461126371,
@@ -190,6 +190,7 @@
             "depthP": 0.100,
             "depthS": 0.050,
             "phiS": 0.500,
+            "sed_tabname_exclusions": ["J/AJ/153/95/table3"],
             "labels": {
                 "rA_plus_rB": 0.2664,   "rA_plus_rB_err": 0.0011,
                 "k": 0.784,             "k_err": 0.012,
