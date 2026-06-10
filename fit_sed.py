@@ -26,11 +26,12 @@ from dust_extinction.parameter_averages import G23
 
 import corner
 from sed_fit.stellar_grids import get_stellar_grid
-from sed_fit.fitter import create_theta, minimize_fit, mcmc_fit, samples_from_sampler
+from sed_fit.fitter import create_theta, minimize_fit, mcmc_fit, model_func, samples_from_sampler
+from sed_fit.fitter import _print_theta # pylint: disable=protected-access
 
 from libs import extinction, plots
 from libs.pipeline import PipelineError
-from libs.sed import get_sed_for_target, group_and_average_fluxes, create_outliers_mask
+from libs.sed import get_sed_for_target
 from libs.iohelpers import Tee
 from libs.targets import Targets
 from libs.pipeline_dal import create_dal
@@ -174,13 +175,9 @@ if __name__ == "__main__":
                 print("Creating de-reddened SED observations")
                 sed["sed_der_flux"] = sed["sed_flux"] \
                                     / ext_model.extinguish(sed["sed_wl"].to(u.um), Av=Av)
-
-                sed = sed[create_outliers_mask(sed, trow.Teff_sys, [trow.TeffR], invert=True,
-                                               min_unmasked=0.75, min_improvement_ratio=0.2,
-                                               flux_field="sed_der_flux", verbose=True)]
                 sed.sort(["sed_wl"])
-                print(f"{len(sed)} unique SED observation(s) retained after range & outlier",
-                      "filtering with the units for flux, frequency and wavelength being",
+                print(f"{len(sed)} unique SED observation(s) retained after range and exclusion",
+                      "filtering,\nwith the units for flux, frequency and wavelength being",
                       ", ".join(f"{sed[f].unit:unicode}" for f in ["sed_flux","sed_freq","sed_wl"]))            
 
                 if args.plot_figs:
@@ -249,41 +246,89 @@ if __name__ == "__main__":
                 y_err = (sed["sed_eflux"].quantity * sed["sed_freq"].quantity)\
                                         .to(model_grid.flux_unit, equivalencies=u.spectral()).value
 
-                def ln_likelihood_func(y_model: np.ndarray[float]) -> float:
-                    """
-                    Likelihood func: simple mean of chi^2
-                    (tends to 1 for best fit, when residuals are consistent with uncertainties).
-                    """
-                    # pylint: disable=cell-var-from-loop
-                    return -0.5 * abs(1 - (np.sum(((y - y_model) / y_err)**2) / y_model.shape[0]))
 
-                print("\nPerforming an initial 'quick' minimize fit. Values marked * are fitted.")
-                theta_fit, _ = minimize_fit(x, y, y_err, theta0=theta0, fit_mask=fit_mask,
-                                            stellar_grid=model_grid, ln_prior_func=ln_prior_func,
-                                            ln_likelihood_func=ln_likelihood_func, verbose=True)
+                # Minimize fits to do outlier filtering and optionally give a starting pos for MCMC
+                print("\nPerforming 'quick' minimize fits to mask outliers and set MCMC start.")
+                theta_fit = None
+                retain_mask = np.ones_like(x, dtype=bool)
+                min_to_retain, improve_th = int(np.ceil(len(sed) * 0.75)), 0.8
+                print(f"Outliers masked when doing so improves fit stat > {1-improve_th:.0%}")
+                cmask, cix, prev_stat = retain_mask.copy(), None, np.inf
+                for out_ix in range(len(sed)): # Want this to run at least once so we set theta_fit
+                    if prev_stat < 1: # implicitly out_ix > 0
+                        print("Stopping outliers search as stat < 1.0")
+                        break
+
+                    ctheta, result = minimize_fit(x=x[cmask],
+                                                  y=y[cmask],
+                                                  y_err=y_err[cmask],
+                                                  theta0=theta0,
+                                                  fit_mask=fit_mask,
+                                                  stellar_grid=model_grid,
+                                                  ln_prior_func=ln_prior_func)
+
+                    stat = result.fun
+                    print(f"[{out_ix:03d}] stat = {stat:.3e}", end="; ")
+                    if out_ix == 0:
+                        print("baseline", end="; ")
+                        theta_fit = ctheta
+
+                    if (num_retained := sum(cmask)) <= min_to_retain:
+                        print(f"stopped as SED rows are at or below the minimum of {min_to_retain}")
+                        break
+
+                    if out_ix > 0:
+                        print(f"candidate {cix}/{sed['sed_filter'][cix]}", end="; ")
+                        if stat < prev_stat * improve_th:
+                            print(f"accepted; {sum(cmask)}/{len(cmask)} fluxes remain")
+                            theta_fit, retain_mask = ctheta, cmask.copy()
+                        else:
+                            print("rejected for insufficient improvement and now stopping")
+                            break
+                    else:
+                        print()
+
+                    # The next candidate mask adds the farthest outlier from this fit.
+                    y_mdl = model_func(ctheta, x[cmask], model_grid, combine=True)
+                    cix = cmask.nonzero()[0][np.argmax(((y_mdl - y[cmask]) / y_err[cmask])**2)]
+                    cmask[cix] = False
+                    prev_stat = stat
+
+                _print_theta(theta_fit, fit_mask, "Minimize fit yielded theta=")
+
+                if args.plot_figs:
+                    print("\nCreating retained SED observations plot")
+                    fig = plots.plot_sed(sed["sed_wl"][retain_mask].quantity,
+                                    [sed["sed_flux"][retain_mask],sed["sed_der_flux"][retain_mask]],
+                                    [sed["sed_eflux"][retain_mask]]*2,
+                                    fmts=["or", ".b"], title=f"{target_id} SED",
+                                    labels=["observed",f"dereddened\n($A_{{\\rm V}}={Av:.3f})$"])
+                    fig.savefig(figs_dir / f"sed-obs-retained.{args.figs_type}", dpi=args.figs_dpi)
+                    plt.close(fig)
 
 
                 if args.do_mcmc_fit:
-                    print("\nPerforming a full MCMC fit from the output from the 'quick' fit.",
-                        "Values marked * are fitted.")
-                    theta_fit, sampler = mcmc_fit(x, y, y_err,
-                                                theta0=theta_fit,
-                                                fit_mask=fit_mask,
-                                                stellar_grid=model_grid,
-                                                ln_prior_func=ln_prior_func,
-                                                ln_likelihood_func=ln_likelihood_func,
-                                                nwalkers=args.mcmc_walkers,
-                                                nsteps=args.max_mcmc_steps,
-                                                thin_by=args.mcmc_thin_by,
-                                                seed=42,
-                                                early_stopping=True,
-                                                processes=args.mcmc_processes,
-                                                progress=True,
-                                                verbose=True)
+                    print("\nPerforming a full MCMC from the output from the 'quick' fit.",
+                          "Values marked * are free.")
+                    theta_fit, sampler = mcmc_fit(x=x[retain_mask],
+                                                  y=y[retain_mask],
+                                                  y_err=y_err[retain_mask],
+                                                  theta0=theta_fit,
+                                                  fit_mask=fit_mask,
+                                                  stellar_grid=model_grid,
+                                                  ln_prior_func=ln_prior_func,
+                                                  nwalkers=args.mcmc_walkers,
+                                                  nsteps=args.max_mcmc_steps,
+                                                  thin_by=args.mcmc_thin_by,
+                                                  seed=42,
+                                                  early_stopping=True,
+                                                  processes=args.mcmc_processes,
+                                                  progress=True,
+                                                  verbose=True)
 
 
                     if args.plot_figs:
-                        print("\nCreating MCMC corner and fitted model vs SED observations plots")
+                        print("\nCreating MCMC corner and model vs SED observations plots")
                         _data = samples_from_sampler(sampler, thin_by=args.mcmc_thin_by, flat=True)
                         fig = corner.corner(data=_data, show_titles=True, plot_datapoints=True,
                                             quantiles=[0.16, 0.5, 0.84],
@@ -292,7 +337,7 @@ if __name__ == "__main__":
                         fig.savefig(figs_dir/f"sed-mcmc-corner.{args.figs_type}", dpi=args.figs_dpi)
                         plt.close(fig)
 
-                        fig = plots.plot_fitted_model_sed(sed, theta_fit, model_grid,
+                        fig = plots.plot_fitted_model_sed(sed[retain_mask], theta_fit, model_grid,
                                                         title=f"{target_id} SED & MCMC model fit")
                         fig.savefig(figs_dir / f"sed-mcmc-fit.{args.figs_type}", dpi=args.figs_dpi)
                         plt.close(fig)
@@ -310,7 +355,7 @@ if __name__ == "__main__":
                         plt.close(fig)
 
 
-                print(f"\nFinal fitted parameters for {target_id} ([known value])")
+                print(f"\nFinal parameters for {target_id} ([known value])")
                 write_params = {}
                 high_uncert_params = []
                 for (k, unit), val, mask in zip(theta_params_and_units, theta_fit, fit_mask):
