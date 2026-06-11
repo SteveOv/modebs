@@ -9,6 +9,7 @@ from datetime import datetime
 from contextlib import redirect_stdout
 import traceback
 from time import sleep
+from textwrap import fill
 
 import numpy as np
 from matplotlib import use as mpl_use
@@ -97,6 +98,12 @@ if __name__ == "__main__":
                     figs_dir = drop_dir / "figs" / to_file_safe_str(target_id)
                     figs_dir.mkdir(parents=True, exist_ok=True)
 
+                # Output some known details of the target system
+                print()
+                print(fill(f"Details:{config.get('details', '')}", subsequent_indent="\t"))
+                print(fill(f"Notes:  {config.get('notes', '')}", subsequent_indent="\t"))
+                print(f"SpT:\t{trow.spt or config.get('SpT', '')}")
+                print(f"morph:\t{trow.morph or -1:.3f}\n")
 
                 print("Getting known values from previous steps to set up fitting priors")
                 rA = trow.rA_plus_rB / (trow.k + 1)
@@ -187,7 +194,8 @@ if __name__ == "__main__":
                     write_params[k] = val
                     if std_dev(val) > abs(nom_val(val) * 0.20):
                         high_uncert_params += [k]
-
+                if source := config.get("labels", {}).get("source", None):
+                    print(f"Source(s) of known values: {source}")
                 if len(high_uncert_params) > 0:
                     trow.append_warning(f"uncert {','.join(high_uncert_params)}>20%")
 

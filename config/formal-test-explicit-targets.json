@@ -18,8 +18,6 @@
     "target_configs": {
         "V539 Ara": {
             "search_term": "TIC 396903513",
-            "source": "DEBCat and Southworth & Bowman (2022) Table 3. Tess sectors 13 and 39 SAP data separately analysed with JKTEBOP (due to apsidal motion). Teffs reproduced from Clausen (1996).",
-            "reference": "SouthworthBowman22mnras",
             "aka": "TIC 396903513, HD 161783",
             "SpT": "B3 V + B4 V",
             "details": "4 short cadence sectors (13, 39, 66 & 93); eccentric orbit with eclipses of approximate depth 0.45 and 0.40 mag; apsidal motion results in significant phase shift for later sectors; primary fractional radius of 0.22 is beyond JKTEBOP's usually recommended maximum (0.2);",
@@ -36,6 +34,8 @@
             "depthS": 0.342,
             "phiS": 0.469,
             "labels": {
+                "citation_key": "SouthworthBowman22mnras, Clausen96aa",
+                "source": "Southworth & Bowman (2022MNRAS.513.3191S) Table 3. Teffs reproduced from Clausen (1996A&A...308..151C).",
                 "rA_plus_rB": 0.3958,   "rA_plus_rB_err": 0.0013,
                 "k": 0.786,             "k_err": 0.009,
                 "J": 0.9601,            "J_err": 0.0035,
@@ -56,8 +56,6 @@
         },
         "MU Cas": {
             "search_term": "TIC 83905462",
-            "source": "DEBCat and Rediscussion 22, Tables II & III. TESS sectors 17, 18, 24, 57, 58, 77 & 78 SAP photometry (120 s) analysed with JKTEBOP version 43. Refines characterisation of LacyClaret+04aj.",
-            "reference": "Southworth25obsR22",
             "aka": "TIC 83905462, HIP 1263",
             "SpT": "B5 V + B5 V",
             "details": "9 short cadence sectors (17-18, 24, 57-58, 77-78 & 84-85); a pair of B5 V stars in a 9.65 d elliptical orbit; eclipses are approximately 0.45 and 0.44 mag deep with the secondary at phase ~0.62;",
@@ -77,6 +75,8 @@
             "E(B-V)": 0.44,
             "jktebop_overrides": { "LDA1_fit": 0, "LDB1_fit": 0 },
             "labels": {
+                "citation_key": "Southworth25obsR22",
+                "source": "Southworth (2025Obs...145...26S) Rediscussion 22, Tables II & III.",
                 "rA_plus_rB": 0.19395,  "rA_plus_rB_err": 0.00027,
                 "k": 0.888,             "k_err": 0.016,
                 "J": 1.0178,            "J_err": 0.0008,
@@ -100,8 +100,6 @@
         },
         "IQ Per": {
             "search_term": "TIC 265767012",
-            "source": "DEBCat and Rediscussion 21 table IV. Initial JKTEBOP v43 anlysis of TESS sector 59 and full analysis of sectors 19 and 59 with WD2004 code.",
-            "reference": "Southworth24obsR21, LacyFrueh85apj",
             "aka": "TIC 265767012, HD 24909",
             "SpT": "B8 V + A6 V",
             "details": "3 short cadence sectors (19, 59 & 86); totally eclipsing system with an eccentric orbit and apsidal motion; eclipses are ~0.45 and ~0.15 mag deep with the secondary appearing before phase 0.5; an additional challange is presented by the primary B-type star which is pulsating;",
@@ -117,6 +115,8 @@
             "depthS": 0.177,
             "phiS": 0.458, 
             "labels": {
+                "citation_key": "Southworth24obsR21, LacyFrueh85apj",
+                "source": "Southworth (2024Obs...144..278S) Rediscussion 21, Tables II & IV.",
                 "rA_plus_rB": 0.3754,   "rA_plus_rB_err": 0.0017,
                 "k": 0.6070,            "k_err": 0.0064,
                 "J": 0.45,
@@ -137,8 +137,6 @@
         },
         "AR Aur": {
             "search_term": "TIC 2236015",
-            "source": "DEBCAT and Rediscussion 25 Table IV. SAP flux at a cadence of 120 s from TESS sectors 19, 43, 44, 45, 59, 71, 73 & 86 separately characterized with JKTEBOP.",
-            "reference": "Southworth25obsR25",
             "aka": "TIC 2236015, HD 34364",
             "SpT": "B9 V + B9.5 V",
             "details": "8 short cadence sectors (19, 43-45, 59, 71, 73 & 86); a pair of late-B stars in a circular 4.135 day orbit; primary and secondary partial eclipses of depth ~0.6 and ~0.55 mag;",
@@ -154,6 +152,8 @@
             "depthS": 0.407,
             "phiS": 0.500, 
             "labels": {
+                "citation_key": "Southworth25obsR25",
+                "source": "Southworth (2025Obs...145..138S) Rediscussion 25, Tables II & IV.",
                 "rA_plus_rB": 0.19596,  "rA_plus_rB_err": 0.00007,
                 "k": 0.9578,            "k_err": 0.0013,
                 "J": 0.89939,           "J_err": 0.00032,
@@ -175,8 +175,6 @@
         },
         "V1229 Tau": {
             "search_term": "TIC 125754991",
-            "source": "DEBCat and Southworth et al. (2023), Table I. TESS sectors 42-44 SAP flux analysed with JKTEBOP version 43. SpT originally from Abt & Levato (1978)",
-            "reference": "SouthworthMurphy+23mnrasl, AbtLevato78pasp",
             "aka": "TIC 125754991, HD 23642",
             "SpT": "A0 Vp(Si) + Am",
             "details": "5 short cadence sectors (42-44 & 70-71); an inclined, circular orbit with shallow primary (~0.10 mag) and secondary (~0.05 mag) partial eclipses, reflection and ellipsoidal effects;",
@@ -192,6 +190,8 @@
             "phiS": 0.500,
             "sed_tabname_exclusions": ["J/AJ/153/95/table3"],
             "labels": {
+                "citation_key": "SouthworthMurphy+23mnrasl, AbtLevato78pasp",
+                "source": "Southworth et al. (2023MNRAS.520L..53S), Table I. SpT originally from Abt & Levato (1978PASP...90..201A)",
                 "rA_plus_rB": 0.2664,   "rA_plus_rB_err": 0.0011,
                 "k": 0.784,             "k_err": 0.012,
                 "J": 0.5561,            "J_err": 0.0011,
@@ -214,8 +214,6 @@
         },
         "V889 Aql": {
             "search_term": "TIC 300000680",
-            "source": "DEBCAT and Baroch et al. (2022) Tables 9 and 10. Used SAP flux extracted from TESS sectors 14 and 40 FFIs analysed with JKTEBOP and all params published. TESS sector 40 & 54 @ 600 s and 80 & 81 @ 200s timeseries data now available.",
-            "reference": "BarochGimenez+22aa",
             "aka": "TIC 300000680, HD 181166",
             "SpT": "B9.5 V",
             "details": "sectors 40 & 54 @ 600 s cadence and sector 80 @ 200 s; a highly eccentric orbit with the secondary eclipse at phase ~0.35; eclipse depths differ despite the stars having similar radii and brightness;",
@@ -230,6 +228,8 @@
             "phiS": 0.354,
             "exptime": [200, 600],
             "labels": {
+                "citation_key": "BarochGimenez+22aa",
+                "source": "Baroch et al. (2022A&A...665A..13B) Tables 9 and 10.",
                 "rA_plus_rB": 0.10932,  "rA_plus_rB_err": 0.00005,
                 "k": 0.99,              "k_err": 0.04,
                 "J": 0.971,             "J_err": 0.002,
@@ -249,12 +249,10 @@
         },
         "V596 Pup": {
             "search_term": "TIC 144085463",
-            "source": "DEBCAT and Rediscussion 24 Table III. Used SAP flux from TESS sectors 34 and 61 separately characterized with JKTEBOP v43.",
-            "reference": "Southworth25obsR24",
             "aka": "TIC 144085463, HD 71581",
             "SpT": "A1 V + A1 V",
             "details": "3 short cadence sectors (34, 61 & 88); eccentric 4.596 day orbit with the secondary eclipse near phase 0.475; eclipse depths of ~0.45 & ~0.40 mag; the published work found evidence of delta-Scut pulsations and apsidal motion; high fitted L3=0.2026+/-0.0010;",
-            "notes": "not in TESS-ebs; Southworth25obsR24 uses E(B-V)=0.07+/-0.02 and gives dist=178.4+/-2.5 pc; Southworth25obsR24 finds a best fit with PARSEC 1.2 models is with sub-solar Z=0.010 and an of 570+/-20 Myr;",
+            "notes": "not in TESS-ebs; Gaia DR3 ruwe ~4.3 indicates potentially unreliable coords; Southworth25obsR24 uses E(B-V)=0.07+/-0.02 and gives dist=178.4+/-2.5 pc; Southworth25obsR24 finds a best fit with PARSEC 1.2 models is with sub-solar Z=0.010 and an of 570+/-20 Myr;",
             "t0": 2236.4944615,
             "period": 4.5961598,
             "morph": 0.300,
@@ -264,6 +262,8 @@
             "depthS": 0.320,
             "phiS": 0.470,
             "labels": {
+                "citation_key": "Southworth25obsR24",
+                "source": "Southworth (2025Obs...145..102S) Rediscussion 24, Tables II & III.",
                 "rA_plus_rB": 0.23018,  "rA_plus_rB_err": 0.00012,
                 "k": 0.9820,            "k_err": 0.0027,
                 "J": 0.99906,           "J_err": 0.00035,
@@ -287,8 +287,6 @@
         },
         "WW Aur": {
             "search_term": "TIC 172171873",
-            "source": "DEBCat and Southworth et al. (2005) table 12. Uses EBOP (with mods to fit rA+rB & k and to use MRQMIN) for fitting of observations from the 1970s. We use V-band fitting results (Table 10).",
-            "reference": "SouthworthSmalley+05mnras",
             "aka": "TIC 172171873, HD 46052",
             "SpT": "A4 m + A5 m",
             "details": "8 short cadence sectors (20, 43-45, 60 & 71-73); an inclined circular orbit showing partial eclipses of approximately 0.64 and 0.55 mag; secondary nr phase 0.5 yet noticable phase shift on later sectors; published work based on legacy photometry;",
@@ -304,6 +302,8 @@
             "depthS": 0.412,
             "phiS": 0.501,
             "labels": {
+                "citation_key": "SouthworthSmalley+05mnras",
+                "source": "Southworth et al. (2005MNRAS.363..529S) Tables 10 (V-band) & 12.",
                 "rA_plus_rB": 0.3118,   "rA_plus_rB_err": 0.0009,
                 "k": 0.996,             "k_err": 0.041,
                 "J": 0.869,             "J_err": 0.027,
@@ -323,8 +323,6 @@
         },
         "V788 Cen": {
             "search_term": "TIC 258314976",
-            "source": "DEBCat and Graczyk et al. (2022) (Table 8 & 9) who use WD for fitting SAP flux of 2nd half of sector 37 (as least affected by starspots), leaving sector 10 unused.",
-            "reference": "GraczykPietrzynski+22aa",
             "aka": "TIC 258314976, HD 105509",
             "SpT": "A2mA5-F2",
             "details": "3 short cadence sectors (10, 37 & 64); an inclined circular orbit with partial eclipses of ~0.19 and ~0.16 mag;",
@@ -340,6 +338,8 @@
             "depthS": 0.144,
             "phiS": 0.500,
             "labels": {
+                "citation_key": "GraczykPietrzynski+22aa",
+                "source": "Graczyk et al. (2022A&A...666A.128G) Tables 8 & 9.",
                 "rA_plus_rB": 0.235,    "rA_plus_rB_err": 0.005,
                 "k": 0.60,              "k_err": 0.02,
                 "J": 0.9,
@@ -360,8 +360,6 @@
         },
         "RR Lyn": {
             "search_term": "TIC 11491822",
-            "source": "Rediscussion 7, Table III. TESS sector 20 SAP photometry analysed with JKTEBOP version 41.",
-            "reference": "Southworth21obsR7",
             "aka": "TIC 11491822, HD 44691",
             "SpT": "A3/A7V/F2 + F0 V",
             "details": "3 short cadence sectors (20, 60 & 73); an eccentric orbit with eclipses of approximately 0.35 and 0.25 mag and the secondary near phase 0.45; significant phase shift on later sectors; evidence of delta-Scuti & gamma-Dor pulsations;",
@@ -377,6 +375,8 @@
             "depthS": 0.205,
             "phiS": 0.449,
             "labels": {
+                "citation_key": "Southworth21obsR7",
+                "source": "Southworth (2021Obs...141..282S) Rediscussion 7, Tables II (third light) & III.",
                 "rA_plus_rB": 0.14206,  "rA_plus_rB_err": 0.00082,
                 "k": 0.6292,            "k_err": 0.0069,
                 "J": 0.816,             "J_err": 0.032,
@@ -398,8 +398,6 @@
         },
         "V362 Pav": {
             "search_term": "TIC 464422047",
-            "source": "DEBCat and Graczyk et al. (2022) Table 9. They use WD for fitting of SAP fluxes of 2nd half of Sector 13.",
-            "reference": "GraczykPietrzynski+22aa",
             "aka": "TIC 464422047, HD 173344",
             "SpT": "A2mA5-A9",
             "details": "2 short cadence sectors (13 & 66); an inclined slightly eccentric orbit with eclipses of ~0.2 and ~0.03 mag; secondary eclipse is shallow but total; clear ellipsoidal effect; star B is signifantly smaller, less luminous and less massive; published parameters include a significant negative third light value;",
@@ -415,6 +413,8 @@
             "depthS": 0.041,
             "phiS": 0.500,
             "labels": {
+                "citation_key": "GraczykPietrzynski+22aa",
+                "source": "Graczyk et al. (2022A&A...666A.128G) Tables 8 & 9.",
                 "rA_plus_rB": 0.2605,   "rA_plus_rB_err": 0.0008,
                 "k": 0.384,             "k_err": 0.003,
                 "J": 0.25,
@@ -435,8 +435,6 @@
         },
         "V456 Cyg": {
             "search_term": "TIC 15795549",
-            "source": "DEBCat and Van Reeth et al. (2022) Table 1. TESS sectors 14 and 15 fitted with JKTEBOP version 42. SpT and logLA from Bakis et al. (2014).",
-            "reference": "VanReethSouthworth+22aa, BakisHensberge+14aj",
             "aka": "TIC 15795549",
             "SpT": "A2hA7mA4V + F3V",
             "details": "4 short cadence sectors (14-15, 41 & 75); a tight circular orbit of just 0.9 d with deep eclipses of ~0.6 & ~0.4 mag; variability is seen in the light curve from pulsations dicussed in the source article;",
@@ -452,6 +450,8 @@
             "depthS": 0.344,
             "phiS": 0.500,
             "labels": {
+                "citation_key": "VanReethSouthworth+22aa, BakisHensberge+14aj",
+                "source": "Van Reeth et al. (2022A&A...659A.177V) Table 1. SpT from Bakis et al. (2014AJ....147..149B).",
                 "rA_plus_rB": 0.5228,   "rA_plus_rB_err": 0.0010,
                 "k": 0.935,             "k_err": 0.012,
                 "J": 0.7701,            "J_err": 0.0063,
@@ -471,8 +471,6 @@
         },
         "GW Eri": {
             "search_term": "TIC 149861542",
-            "source": "DEBCat and Graczyk et al. (2022) table 9. WD code used for fitting sector 31 (table 8).",
-            "reference": "GraczykPietrzynski+22aa",
             "aka": "TIC 149861542, HD 26591",
             "SpT": "A1mA2-A8",
             "details": "2 short cadence sectors (5 & 31); an inclined circuler orbit with partial eclipses of ~0.27 mag; noticable ellipsoidal effect; clear trends in both sectors; the stars have similar radii and luminosities;",
@@ -488,6 +486,8 @@
             "depthS": 0.233,
             "phiS": 0.500,
             "labels": {
+                "citation_key": "GraczykPietrzynski+22aa",
+                "source": "Graczyk et al. (2022A&A...666A.128G) Tables 8 & 9.",
                 "rA_plus_rB": 0.237,    "rA_plus_rB_err": 0.001, 
                 "k": 0.98,              "k_err": 0.01,
                 "J": 0.98,
@@ -508,8 +508,6 @@
         },
         "OO Peg": {
             "search_term": "TIC 314847177",
-            "source": "DEBCat and Rediscussion 18, Table IV. TESS sector 55 TESS-SPOC/SAP photometry analysed with JKTEBOP version 43.",
-            "reference": "Southworth24obsR18",
             "aka": "TIC 314847177, HS 206417",
             "SpT": "F2 V",
             "details": "just sector 55 and only at 600 s cadence; a circular orbit with clear eclipses of ~0.38 and ~0.35 mag;",
@@ -524,6 +522,8 @@
             "depthS": 0.270,
             "phiS": 0.500,
             "labels": {
+                "citation_key": "Southworth24obsR18",
+                "source": "Southworth (2024Obs...144..133S) Rediscussion 18, Tables II & IV.",
                 "rA_plus_rB": 0.30576,  "rA_plus_rB_err": 0.00020,
                 "k": 0.8983,            "k_err": 0.0038,
                 "J": 0.96661,           "J_err": 0.00016,
@@ -546,8 +546,6 @@
         },
         "CW Eri": {
             "search_term": "TIC 98853987",
-            "source": "DEBCat and Rediscussion 17, Table VI. TESS sectors 4 and 31 SAP photometry analysed with JKTEBOP version 43.",
-            "reference": "OverallSouthworth24obsR17",
             "aka": "TIC 98853987, HD 19115",
             "SpT": "F2 V",
             "details": "2 short cadence sectors (4 & 31); a slightly eccentric orbit with eclipses of ~0.46 and ~0.40 mag; evidence of ellipsoidal variation; short, isolated distorted section within mid sector gap of S4;",
@@ -563,6 +561,8 @@
             "depthS": 0.327,
             "phiS": 0.503,
             "labels": {
+                "citation_key": "OverallSouthworth24obsR17",
+                "source": "Overall & Southworth (2024Obs...144...71O) Rediscussion 17, Tables III & VI.",
                 "rA_plus_rB": 0.30662,  "rA_plus_rB_err": 0.00015, 
                 "k": 0.7037,            "k_err": 0.0011, 
                 "J": 0.9262,            "J_err": 0.0057,
@@ -586,8 +586,6 @@
         },
         "ZZ Boo": {
             "search_term": "TIC 357358259",
-            "source": "DEBCat and Rediscussion 12, Table V. TESS sectors 23 & 50 SAP photometry analysed with JKTEBOP version 42.",
-            "reference": "Southworth23obsR12",
             "aka": "TIC 357358259, HD 121648",
             "SpT": "F3 V",
             "details": "2 short cadence sectors (23 & 50); a circular orbit with similar eclipses of ~0.65 mag each; the stars are of similar size and luminosity;",
@@ -603,6 +601,8 @@
             "depthS": 0.437,
             "phiS": 0.500,
             "labels": {
+                "citation_key": "Southworth23obsR12",
+                "source": "Southworth (2023Obs...143...19S) Rediscussion 12, Tables II & V.",
                 "rA_plus_rB": 0.23669,  "rA_plus_rB_err": 0.00008,
                 "k": 1.0691,            "k_err": 0.0014,
                 "J": 0.98003,           "J_err": 0.00033,
@@ -626,8 +626,6 @@
         },
         "RZ Cha": {
             "search_term": "TIC 394730113",
-            "source": "DEBCat and Rediscussion 23, Table V. TESS sectors 65 & 66 SAP photometry analysed with JKTEBOP version 43.",
-            "reference": "Southworth25obsR23",
             "aka": "TIC 394730113, HD 93486",
             "SpT": "F5 IV-V + F5 IV-V",
             "details": "2 short cadence sectors (65 & 66); a pair of F5 stars in a 2.83 d circular orbit; eclipses are partial with similar depths of ~0.4 mag;",
@@ -641,6 +639,8 @@
             "depthS": 0.290,
             "phiS": 0.500,
             "labels": {
+                "citation_key": "Southworth25obsR23",
+                "source": "Southworth (2025Obs...145...52S) Rediscussion 23, Tables II & V.",
                 "rA_plus_rB": 0.36509,  "rA_plus_rB_err": 0.00012,
                 "k": 1.0562,            "k_err": 0.0025,
                 "J": 0.98075,           "J_err": 0.00008,
@@ -663,8 +663,6 @@
         },
         "AN Cam": {
             "search_term": "TIC 103098373",
-            "source": "DEBCat and Rediscussion 4, Table III.  TESS sectors 19, 25, and 26 (timeseries data from FFI) analysed with JKTEBOP version 41. ",
-            "reference": "Southworth21obsR4",
             "aka": "TIC 103098373, HD 24906",
             "SpT": "F8",
             "details": "5 short cadence sectors (52-53, 59, 73 & 79); a highly eccentric 20.1 d orbit with the secondary eclipse near phase 0.8; eclipse depths of ~0.6 and ~0.5 mag; the primary eclipses are total and the secondary eclipses are partial;",
@@ -678,6 +676,8 @@
             "depthS": 0.380,
             "phiS": 0.779,
             "labels": {
+                "citation_key": "Southworth21obsR4",
+                "source": "Southworth (2021Obs...141..122S) Rediscussion 4, Tables II & IV",
                 "rA_plus_rB": 0.10665,  "rA_plus_rB_err": 0.00010,
                 "k": 1.2256,            "k_err": 0.0015,
                 "J": 0.8368,            "J_err": 0.0008,
@@ -700,8 +700,6 @@
         },
         "IT Cas": {
             "search_term": "TIC 26801525",
-            "source": "DEBCat and Rediscussion 13, Table III. TESS sectors 17, 24 and 57 SAP photometry analysed with JKTEBOP version 43.",
-            "reference": "Southworth23obsR13",
             "aka": "TIC 26801525",
             "SpT": "F3 V + F3 V",
             "details": "3 short cadence sectors (17, 24 & 57); an eccentric orbit with low inclination; similar eclipse depths of ~0.7 mag; the two components are similar;",
@@ -717,6 +715,8 @@
             "depthS": 0.480,
             "phiS": 0.552,
             "labels": {
+                "citation_key": "Southworth23obsR13",
+                "source": "Southworth (2023Obs...143..120S) Rediscussion 13, Tables II & III.",
                 "rA_plus_rB": 0.21535,  "rA_plus_rB_err": 0.00023,
                 "k": 0.9944,            "k_err": 0.0035,
                 "J": 0.99995,           "J_err": 0.00083,
@@ -740,8 +740,6 @@
         },
         "UZ Dra": {
             "search_term": "TIC 259126645",
-            "source": "Rediscussion 27, Tables II and V. A total of 41 TESS sectors with 120 s cadence SAP photometry analysed with JKTEBOP version 44.",
-            "reference": "Southworth25obsR27",
             "aka": "TIC 259126645",
             "SpT": "F6 + F8",
             "details": "41 short cadence sectors (14-16, 18-26, 40-41, 47-60, 73-78 & 80-86); a pair of late-F stars in a circular 3.26 d orbit; total primary and secondary eclipses with depths of ~0.70 and ~0.55 mag;",
@@ -757,6 +755,8 @@
             "depthS": 0.411,
             "phiS": 0.500,
             "labels": {
+                "citation_key": "Southworth25obsR27",
+                "source": "Southworth (2025Obs...145..201S) Rediscussion 27, Tables II and V.",
                 "rA_plus_rB": 0.19154,  "rA_plus_rB_err": 0.00023,
                 "k": 0.87795,           "k_err": 0.00076,
                 "J": 0.8582,            "J_err": 0.0051,
@@ -780,8 +780,6 @@
         },
         "V455 Aur": {
             "search_term": "TIC 470966839",
-            "source": "DEBCat and Rediscussion 5, Table III. TESS sector 20 SAP photometry analysed with JKTEBOP version 41. TESS sectors 60 and 73 released subsequent to publication.",
-            "reference": "Southworth21obsR5",
             "aka": "TIC 470966839, HD 45191",
             "SpT": "F5 V + F6 V",
             "details": "3 short cadence sectors (20, 60 & 73); a slightly eccentric, inclined orbit with eclipses of ~0.33 & ~0.30; a third non-eclipsing component in 4200 d orbit;",
@@ -797,6 +795,8 @@
             "depthS": 0.256,
             "phiS": 0.496,
             "labels": {
+                "citation_key": "Southworth21obsR5",
+                "source": "Southworth (2021Obs...141..190S) Rediscussion 5, Tables II & III.",
                 "rA_plus_rB": 0.22018,  "rA_plus_rB_err": 0.00024,
                 "k": 0.949,             "k_err": 0.017,
                 "J": 0.9543,            "J_err": 0.0011,
@@ -821,8 +821,6 @@
         "V505 Per": {
             "search_term": "TIC 348517784",
             "exclude": false,
-            "source": "DEBCat and Rediscussion 6, Table V. TESS sector 18 SAP photometry analysed with JKTEBOP version 41. TESS sectors 58 & 85 observations released subsequent to publication.",
-            "reference": "Southworth21obsR6",
             "aka": "TIC 348517784, HD 14384",
             "SpT": "F5 V + F5 V",
             "details": "3 short cadence sectors (18, 58 & 85); an inclined circular orbit with eclipses of ~0.5 mag; some phase shift on later sectors;",
@@ -839,6 +837,8 @@
             "phiS": 0.500,
             "sed_filter_exclusions": ["2MASS:Ks", "2MASS:H", "2MASS:J"],
             "labels": {
+                "citation_key": "Southworth21obsR6",
+                "source": "Southworth (2021Obs...141..234S) Rediscussion 6, Tables II & V.",
                 "rA_plus_rB": 0.170906, "rA_plus_rB_err": 0.000035,
                 "k": 0.9788,            "k_err": 0.0019,
                 "J": 0.97775,           "J_err": 0.00050,
@@ -862,8 +862,6 @@
         },
         "HP Dra": {
             "search_term": "TIC 48356677",
-            "source": "Rediscussion 26, Table IV. The 120 s SAP photometry from 14 TESS sectors (14, 15, 26, 40, 41, 53-55, 59, 74, 75, 80, 82, 86) analysed with JKTEBOP.",
-            "reference": "Southworth25obsR26",
             "aka": "TIC 48356677, HD 175900",
             "SpT": "F9 V + F9 V",
             "details": "14 short cadence sectors (14-15, 26, 40-41, 53-55, 59, 74-75, 80, 82 & 86); a pair of late-F stars in a 10.76 d orbit; primary and secondary eclipses of ~0.28 and 0.24 mag; eccentric with slightly late secondary; slow variability in the light curves is likely instrumental in origin;",
@@ -879,6 +877,8 @@
             "depthS": 0.206,
             "phiS": 0.517,
             "labels": {
+                "citation_key": "Southworth25obsR26",
+                "source": "Southworth (2025Obs...145..167S) Rediscussion 26, Tables II & IV.",
                 "rA_plus_rB": 0.08940,  "rA_plus_rB_err": 0.00006,
                 "k": 0.9220,            "k_err": 0.0071,
                 "J": 0.95684,           "J_err": 0.00084,
@@ -901,8 +901,6 @@
         },
         "ZZ UMa": {
             "search_term": "TIC 138505004",
-            "source": "DEBCat and Rediscussion 11, Table V. TESS sectors 14, 21, 41, 47 and 48 SAP photometry analysed with JKTEBOP version 42.",
-            "reference": "Southworth22obsR11",
             "aka": "TIC 138505004",
             "SpT": "G0 V + G8 V",
             "details": "7 short sectors (14, 21, 41, 47-48 & 74-75); circular orbit with total eclipses of ~0.65 and ~0.35 mag; significant variability due to starspot activity;",
@@ -918,6 +916,8 @@
             "depthS": 0.297,
             "phiS": 0.500,
             "labels": {
+                "citation_key": "Southworth22obsR11",
+                "source": "Southeworth (2022Obs...142..267S) Rediscussion 11, Tables II & V.",
                 "rA_plus_rB": 0.26756,  "rA_plus_rB_err": 0.00085,
                 "k": 0.7484,            "k_err": 0.0040,
                 "J": 0.552,             "J_err": 0.046,
@@ -941,8 +941,6 @@
         },
         "V530 Ori": {
             "search_term": "TIC 11961096",
-            "source": "DEBCat and Torres et al. (2014) table 10. JKTEBOP was used to analyse various non-TESS photometry sources.",
-            "reference": "TorresSandbergLacy+14apj",
             "aka": "TIC 11961096, HD 294598",
             "SpT": "G1 V + M1 V",
             "details": "1 short cadence sector (33); a G+M pair in an eccentric 6.1 d orbit; partial primary partial eclipses of ~0.5 mag and shallow secondary total eclipses of ~0.06 mag; some variability, potentially from star spots;",
@@ -958,6 +956,8 @@
             "flatten": true,
             "jktebop_overrides": { "L3": 0, "L3_fit": 0 },
             "labels": {
+                "citation_key": "TorresSandbergLacy+14apj",
+                "source": "Torres et al. (2014ApJ...797...31T) Table 10.",
                 "rA_plus_rB": 0.0953,   "rA_plus_rB_err" : 0.0010,
                 "k": 0.600,             "k_err": 0.004,
                 "J": 0.18,
@@ -978,8 +978,6 @@
         },
         "CM Dra": {
             "search_term": "TIC 199574208",
-            "source": "DEBCAT and Martin et al. (2024), Table I. TESS Sectors 16, 19, 22-26, 49-52 (all slow) and 56-59 (200 s) analysed with EXOPLANET. SpT, Teff & logL from Morales et al. (2009). logg values calculated from radii and masses;",
-            "reference": "MartinSethi+24mnras, MoralesRibas+09apj",
             "aka": "TIC 199574208",
             "SpT": "M4.5",
             "details": "25 short cadence sectors (16, 19, 22-26, 49-52, 56-59, 76-80 & 82-86); many sectors at slower cadences; a pair of M-dwarfs in a nearly circular, slightly inclined 1.27 d orbit; eclipses are ~0.76 and ~0.73 mag deep; frequent flares however these appear to have little affect on the fit;",
@@ -995,6 +993,8 @@
             "depthS": 0.452,
             "phiS": 0.499,
             "labels": {
+                "citation_key": "MartinSethi+24mnras, MoralesRibas+09apj",
+                "source": "Martin et al. (2024MNRAS.528..963M) Table I. SpT, Teff & logL from Morales et al. (2009ApJ...691.1400M).",
                 "rA_plus_rB": 0.13064,  "rA_plus_rB_err": 0.00007,
                 "k": 0.9450,            "k_err": 0.0008,
                 "J": 0.98133,           "J_err": 0.00081,

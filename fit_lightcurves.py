@@ -9,6 +9,7 @@ from datetime import datetime
 from contextlib import redirect_stdout
 import copy
 import traceback
+from textwrap import fill
 
 import numpy as np
 import astropy.units as u
@@ -114,6 +115,13 @@ if __name__ == "__main__":
                 if args.plot_figs:
                     figs_dir = drop_dir / "figs" / to_file_safe_str(target_id)
                     figs_dir.mkdir(parents=True, exist_ok=True)
+
+                # Output some known details of the target system
+                print()
+                print(fill(f"Details:{config.get('details', '')}", subsequent_indent="\t"))
+                print(fill(f"Notes:  {config.get('notes', '')}", subsequent_indent="\t"))
+                print(f"SpT:\t{trow.spt or config.get('SpT', '')}")
+                print(f"morph:\t{trow.morph or -1:.3f}\n")
 
                 # The quality bitmask excludes fluxes by their quality flag. If unset, choose on the
                 # period. For shorter periods we're more discriminating as orbital coverage is good.
@@ -421,7 +429,7 @@ if __name__ == "__main__":
                     print(f"Excluding the {len(lcs)-conv_count} of {len(lcs)} LC(s) where the fit",
                           "did not converge from the calculations for the final set of parameters.")
                     use_mask &= conv_mask
-                if sum(use_mask) > 1:
+                if sum(use_mask) > 1: # 0.9545 for 2-sig, 0.6827 for 1-sig
                     final_params = pipeline.median_params(fitted_params[use_mask], 0.9545, True)
                     print(f"Using the fits' median & 2-sigma scatter from {sum(use_mask)} LCs.")
                 else:
@@ -472,7 +480,8 @@ if __name__ == "__main__":
                         print()
                 TeffR = (final_params["LR"] / final_params["k"]**2)**0.25
                 print(f"         TeffR: {TeffR:12.6f} (calculated from LR & k)")
-
+                if source := config.get("labels", {}).get("source", None):
+                    print(f"Source(s) of known values: {source}")
 
                 # Raise warnings about anomolous parameter values
                 if len(warn_params:=[k for k in warn_keys if nom_val(final_params[k])<0]) > 0:

@@ -9,6 +9,7 @@ from datetime import datetime
 from contextlib import redirect_stdout
 import traceback
 from time import sleep
+from textwrap import fill
 
 import numpy as np
 from matplotlib import use as mpl_use
@@ -134,6 +135,13 @@ if __name__ == "__main__":
                                   distance=(1000 / nom_val(trow.parallax)) * u.pc,
                                   frame="icrs")
 
+                # Output some known details of the target system
+                print()
+                print(fill(f"Details:{config.get('details', '')}", subsequent_indent="\t"))
+                print(fill(f"Notes:  {config.get('notes', '')}", subsequent_indent="\t"))
+                print(f"SpT:\t{trow.spt or config.get('SpT', '')}")
+                print(f"morph:\t{trow.morph or -1:.3f}\nDR3 ruwe:\t{trow.ruwe or -1:.3f}")
+                print(f"Teff_sys:\t{trow.Teff_sys or -1:.0f}\nlogg_sys:\t{trow.logg_sys or -1:.3f}")
 
                 # Get the extinction coefficient, based on the coords
                 print()
@@ -372,7 +380,8 @@ if __name__ == "__main__":
                         write_params[k] = val
                         if std_dev(val) > abs(nom_val(val) * 0.20):
                             high_uncert_params += [k]
-
+                if source := config.get("labels", {}).get("source", None):
+                    print(f"Source(s) of known values: {source}")
                 if len(high_uncert_params) > 0:
                     trow.append_warning(f"uncert {','.join(k for k in high_uncert_params)}>20%")
 
