@@ -69,8 +69,14 @@ if __name__ == "__main__":
                     help="json file containing the details of the targets to fit")
     ap.add_argument("-pf", "--plot-figs", dest="plot_figs", action="store_true", required=False,
                     help="plot figs for each target as the process progresses")
-    ap.add_argument("-ms", "--max-steps", dest="max_mcmc_steps", type=int, required=False,
+    ap.add_argument("-ms", "--mcmc-steps", dest="max_mcmc_steps", type=int, required=False,
                     help="the maximum number of MCMC steps to run for [100 000]")
+    ap.add_argument("-mw", "--mcmc-walkers", dest="mcmc_walkers", type=int, required=False,
+                    help="the number of MCMC walkers to use [100]")
+    ap.add_argument("-mp", "--mcmc-processes", dest="mcmc_processes", type=int, required=False,
+                    help="the number of concurrent MCMC processes to run [8]")
+    ap.add_argument("-mo", "--mcmc-off", dest="do_mcmc_fit", action="store_false", required=False,
+                    help="suppress running of MCMC for parameters")
     ap.set_defaults(plot_figs=False, figs_type="png", figs_dpi=100, do_mcmc_fit=True,
                     max_mcmc_steps=100000, mcmc_walkers=100, mcmc_thin_by=10, mcmc_processes=8)
     args = ap.parse_args()
@@ -361,6 +367,8 @@ if __name__ == "__main__":
                         axes[-1].set(xlabel=f"step / {args.mcmc_thin_by}")
                         fig.savefig(figs_dir/f"sed-mcmc-trails.{args.figs_type}", dpi=args.figs_dpi)
                         plt.close(fig)
+                else:
+                    print("\nMCMC disabled. Will use params from minimize fit.")
 
 
                 print(f"\nFinal parameters for {target_id} ([known value])")
