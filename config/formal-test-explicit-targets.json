@@ -252,7 +252,7 @@
             "aka": "TIC 144085463, HD 71581",
             "SpT": "A1 V + A1 V",
             "details": "3 short cadence sectors (34, 61 & 88); eccentric 4.596 day orbit with the secondary eclipse near phase 0.475; eclipse depths of ~0.45 & ~0.40 mag; the published work found evidence of delta-Scut pulsations and apsidal motion; high fitted L3=0.2026+/-0.0010;",
-            "notes": "not in TESS-ebs; Gaia DR3 ruwe ~4.3 indicates potentially unreliable coords; Southworth25obsR24 uses E(B-V)=0.07+/-0.02 and gives dist=178.4+/-2.5 pc; Southworth25obsR24 finds a best fit with PARSEC 1.2 models is with sub-solar Z=0.010 and an of 570+/-20 Myr;",
+            "notes": "not in TESS-ebs; Gaia DR3 ruwe ~4.3 indicates potentially unreliable coords; incorrect SED fit with Gaia parallax so override for dist 178.4+/-2.5 pc from Southworth25obsR24; Southworth25obsR24 uses E(B-V)=0.07+/-0.02 and gives dist=178.4+/-2.5 pc; Southworth25obsR24 finds a best fit with PARSEC 1.2 models is with sub-solar Z=0.010 and an of 570+/-20 Myr;",
             "t0": 2236.4944615,
             "period": 4.5961598,
             "morph": 0.300,
@@ -261,6 +261,9 @@
             "depthP": 0.340,
             "depthS": 0.320,
             "phiS": 0.470,
+            "parallax": 5.605,
+            "parallax_err": 0.079,
+            "parallax_bibcode": "2025Obs...145..102S",
             "labels": {
                 "citation_key": "Southworth25obsR24",
                 "source": "Southworth (2025Obs...145..102S) Rediscussion 24, Tables II & III.",
