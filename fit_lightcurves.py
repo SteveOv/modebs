@@ -330,7 +330,7 @@ if __name__ == "__main__":
 
                 # Build the values and flags for the JKTEBOP in files
                 # The refl flags can be 0 (fixed), 1 (fitted) or -1 (calculated from sys geometry)
-                refl_fit = -1 if do_flatten else 1
+                refl_fit = 1
 
                 # Mass ratio can be -1 (force spherical) or specific value. Only used for LC effects
                 if do_flatten:
