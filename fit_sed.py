@@ -376,8 +376,8 @@ if __name__ == "__main__":
                 high_uncert_params = []
                 for (k, unit), val, mask in zip(theta_params_and_units, theta_fit, fit_mask):
                     label = ""
-                    if k == "dist":
-                        label = f"({coords.distance.to(u.pc).value:.3f} pc)"
+                    if k == "dist" and trow.parallax:
+                        label = f"({1000 / trow.parallax:.3f} pc)"
                     elif config.get("labels", {}).get(k, None) is not None:
                         lval = ufloat(config.labels.get(k, np.NaN), config.labels.get(k+"_err", 0))
                         label = f"({lval:.3f} {unit:unicode})"
@@ -390,6 +390,8 @@ if __name__ == "__main__":
                             high_uncert_params += [k]
                 if source := config.get("labels", {}).get("source", None):
                     print(f"Source(s) of known values: {source}")
+                if trow.parallax_bibcode:
+                    print(f"Source of the known distance (parallax): {trow.parallax_bibcode}")
                 if len(high_uncert_params) > 0:
                     trow.append_warning(f"uncert {','.join(k for k in high_uncert_params)}>20%")
 
