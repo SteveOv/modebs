@@ -19,7 +19,7 @@ from astropy.coordinates import SkyCoord
 
 # pylint: disable=line-too-long, wrong-import-position
 warnings.filterwarnings("ignore", "Using UFloat objects with std_dev==0 may give unexpected results.", category=UserWarning)
-from uncertainties import ufloat, nominal_value as nom_val, std_dev
+from uncertainties import ufloat, UFloat, nominal_value as nom_val, std_dev
 from uncertainties.unumpy import nominal_values as nom_vals
 
 # Dereddening of SEDS
@@ -213,7 +213,9 @@ if __name__ == "__main__":
                 TeffR, radR = trow.TeffR, trow.k
                 TeffR_priors = tuple([1]+ [ufloat(TeffR.n, max(TeffR.s, TeffR.n * .05))]*(NSTARS-1))
                 radR_priors = tuple([1] + [ufloat(radR.n, max(radR.s, radR.n * .05))]*(NSTARS-1))
-                dist_prior = ufloat(coords.distance.value, coords.distance.value * 0.05)
+                dist_prior = 1000 / trow.parallax
+                if not isinstance(dist_prior, UFloat) or not dist_prior.s:
+                    dist_prior = ufloat(nom_val(dist_prior), nom_val(dist_prior) * .05)
                 print(f"Priors: Teff ratios=({', '.join(f'{r:.3f}' for r in TeffR_priors)}),",
                       f"radius ratios=({', '.join(f'{r:.3f}' for r in radR_priors)}),",
                       f"dist={dist_prior:.3f},",
