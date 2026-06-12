@@ -150,7 +150,7 @@ if __name__ == "__main__":
                 print(f"Teff_sys:\t{trow.Teff_sys or -1:.0f}\nlogg_sys:\t{trow.logg_sys or -1:.3f}")
 
                 if trow.ruwe is not None and trow.ruwe > 1.4:
-                    trow.append_warning("ruwe > 1.4")
+                    trow.append_warning("ruwe>1.4")
 
                 # Get the extinction coefficient, based on the coords
                 print()
