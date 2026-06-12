@@ -217,7 +217,7 @@ if __name__ == "__main__":
         "dal_type": "QTableFileDal",
         "dal_kwargs": { },
         "target_config_defaults": {
-            # Cut well-known sections of LC which are commonly distorted.
+            # Cut well-known sections of LC which are commonly distorted. S4: 1420-24, S8: 1534-1544
             "quality_masks": [[1420.0, 1424.0], [1534.0, 1544.0]],
             "quality_bitmask": None,            # Leave choice of this to fit_lightcurves
             "eclipse_complete_threshold": 0.9,  # Eclipses > this completeness considered complete
