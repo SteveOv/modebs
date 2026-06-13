@@ -486,6 +486,8 @@ if __name__ == "__main__":
                 # Raise warnings about anomolous parameter values
                 if len(warn_params:=[k for k in warn_keys if nom_val(final_params[k])<0]) > 0:
                     trow.append_warning(f"fitted {','.join(warn_params)}<0")
+                if abs(nom_val(final_params["L3"])) > 0.1:
+                    trow.append_warning("fitted |L3|>0.1")
                 if len(warn_params:=[k for k, v in [(r, final_params[r]) for r in warn_keys]
                                                 if std_dev(v) > abs(nom_val(v)*0.20)]) > 0:
                     trow.append_warning(f"uncert {','.join(warn_params)}>20%")
