@@ -173,10 +173,11 @@ if __name__ == "__main__":
 
                 # High variance in CROWDSAP indicates wide differences in L3 across sectors. This
                 # may give differing in eclipse depths, leading to difficulties fitting & stitching.
-                var_crowdsap = np.var([lc.meta.get('CROWDSAP', 1) for lc in lcs])
+                lo, med, hi = np.quantile([l.meta.get('CROWDSAP',1) for l in lcs], q=(.16, .5, .84))
+                crowdsap = ufloat(med, np.mean([med-lo, hi-med]))
+                print(f"Over the {len(lcs)} lightcurve(s) CROWDSAP+/-std = {crowdsap:.6f}")
                 if len(lcs) > 1:
-                    print(f"Variance in CROWDSAP over {len(lcs)} LCs: {var_crowdsap:.6f}")
-                    if var_crowdsap > 1e-3:
+                    if var_crowdsap := np.var([l.meta.get('CROWDSAP',1) for l in lcs]) > 1e-3:
                         trow.append_warning("var(CROWDSAP)>1e-3")
 
                 min_section_dur = config.get("min_lc_section_days", 2) * u.d
