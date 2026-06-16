@@ -1,5 +1,5 @@
-""" Prototype for using fitting to derive masses from known sys_mass, radii & teffs """
-from typing import List, Tuple, Union
+""" Fitting library to derive masses from known sys_mass, radii & teffs """
+from typing import List, Tuple, Union, Callable
 from warnings import filterwarnings, catch_warnings
 from multiprocessing import Pool
 from pathlib import Path
@@ -7,8 +7,8 @@ from inspect import getsourcefile
 
 import numpy as np
 
-from uncertainties import UFloat, nominal_value, std_dev
-from uncertainties.unumpy import uarray, nominal_values, std_devs
+from uncertainties import UFloat
+from uncertainties.unumpy import uarray
 
 from scipy.interpolate import RBFInterpolator
 from scipy.optimize import minimize, OptimizeResult, OptimizeWarning
@@ -62,54 +62,53 @@ mass_limits = (min(masses_list), max(masses_list))
 
 del x, ages_list, masses_list, radii_list, teffs_list, eep_list, iso
 
-def _objective_func(theta: np.ndarray[float],
-                    sys_mass_nom: float,
-                    mass_weight: float,
-                    radii_noms: np.ndarray[float],
-                    radii_weights: np.ndarray[float],
-                    teffs_noms: np.ndarray[float],
-                    teffs_weights: np.ndarray[float],
-                    minimizable: bool=False) -> float:
-    """
-    Optimizable objective function combining a _ln_prior_func, model_func and _ln_likelihood_func
-    to evaluate theta values consisting of stellar masses and age by obtaining the corresponding
-    stellar radii & teffs from MIST models and fitting these to the observed values.
-    """
-    retval = 0
-    masses, age = theta[:-1], 10**theta[-1]
+def get_age_limits():
+    """ Get the lower and upper bounds of the ages within the model. """
+    return age_limits
 
-    # The "prior func": absolute yes/no handling of limits & Gaussian prior on total mass
-    if not age_limits[0] <= age <= age_limits[1] \
-        or not all(mass_limits[0] <= mass <= mass_limits[1] for mass in masses):
-        retval = np.inf
-    else:
-        retval = 0.5 * mass_weight * (sys_mass_nom - np.sum(masses))**2
+def get_mass_limits():
+    """ Get the lower and upper bounds of the massed within the model. """
+    return mass_limits
+
+def _ln_prob_func(fit_theta: np.ndarray[float],
+                  ln_prior_func: Callable[[np.ndarray[float]], float],
+                  ln_likelihood_func: Callable[[np.ndarray[float]], float]) -> float:
+    """
+    The MCMC function which returns the log posterior probability; the probability that the
+    candidate params (theta) are those responsible for the observations. This is a negative
+    value tending towards zero as the probability increases. Think of this as:
+
+    ln(P(posterior)) = ln(P(prior) * P(likelihood)) = _ln_prior_func() + _ln_likelihood_func()
+
+    This takes the current set of fitted params (fit_theta) and merges them with the fixed params.
+    The resulting param set (theta) is first evaluated by the prior function then a model is
+    generated from them, with model_func, which is then evaluated against the observations with
+    the likelihood function. The ln(product) of the two values is returned.
+
+    :fit_theta: current set of candidate fitted parameters only (those given by the _fit_mask)
+    :ln_prior_func: a callback function to evaluate the current theta against prior criteria
+    :ln_likelihood_func: a callback function to evaluate the goodness of fit of model vs observation
+    :returns: the result of evaluating the fitted model against the observations
+    """
+    retval = ln_prior_func(fit_theta)
 
     # The "model func": gets the radii & teffs from stars' masses from MIST model via interpolators
     if np.isfinite(retval):
+        masses, age = fit_theta[:-1], 10**fit_theta[-1]
         xi = np.array([(age, m) for m in masses])
         model_radii = radius_interp(xi)
         model_teffs = teff_interp(xi)
         if any(model_radii <= 0) or any(model_teffs <= 0): # Out of range
-            retval = np.inf
+            retval = -np.inf
 
     # The "likelihood func": evaluates the "goodness" of radii & teffs match with the observations
     if np.isfinite(retval):
-        degr_free = len(theta)
-        chisq = 0
-        for weights, obs_val_noms, model_vals in [(radii_weights, radii_noms, model_radii),
-                                                  (teffs_weights, teffs_noms, model_teffs)]:
-            chisq += np.sum(weights * (obs_val_noms - model_vals)**2)
-        retval += 0.5 * chisq / degr_free
-
-    if minimizable != (retval >= 0):
-        return -retval
+        retval += ln_likelihood_func(np.concatenate([model_radii, model_teffs]))
     return retval
 
 def minimize_fit(theta0: np.ndarray[float],
-                 sys_mass: UFloat,
-                 radii: np.ndarray[UFloat],
-                 teffs: np.ndarray[UFloat],
+                 ln_prior_func: Callable[[np.ndarray[float]], float],
+                 ln_likelihood_func: Callable[[np.ndarray[float]], float],
                  methods: List[str]=None,
                  verbose: bool=False) -> Tuple[np.ndarray[float], OptimizeResult]:
     """
@@ -117,9 +116,8 @@ def minimize_fit(theta0: np.ndarray[float],
     by fitting corresponding radii & teffs from MIST models to observed values.
 
     :theta0: the initial set of candidate mass (M_sun) and log10(age/yr) values
-    :sys_mass: the total mass of the system for use as a prior constraint (M_sun)
-    :radii: the observed stellar radii to fit against (R_sun)
-    :teffs: the observed stellar effective temperatures to fit against (K)
+    :ln_prior_func: a callback function to evaluate the current theta against prior criteria
+    :ln_likelihood_func: a callback function to evaluate the goodness of fit of model vs observation
     :methods: scipy optimize fitting algorithms to try, defaults to [Nelder-Mead, SLSQP, None]
     :returns: the fitted set of mass & log10(age) values and
     a scipy OptimizeResult with the full details of the fitting outcome
@@ -130,18 +128,6 @@ def minimize_fit(theta0: np.ndarray[float],
         methods = [methods]
 
     max_iters = int(1000 * len(theta0))
-
-    # Find the nominal values and chisq weights - do it outside fit loop as these don't change
-    objective_func_fixed_args = (
-        nominal_value(sys_mass),
-        1 if (mass_sigma := std_dev(sys_mass)) == 0 else (1 / mass_sigma)**2,
-        nominal_values(radii),
-        1 if any((radii_sigma := std_devs(radii)) == 0) else (1 / radii_sigma)**2,
-        nominal_values(teffs),
-        1 if any((teff_sigma := std_devs(teffs)) == 0) else (1 / teff_sigma)**2,
-        True # minimizable
-    )
-
     with catch_warnings(category=[RuntimeWarning, OptimizeWarning]):
         filterwarnings("ignore", "overflow encountered in scalar power")
         filterwarnings("ignore", "invalid value encountered in ")
@@ -150,7 +136,8 @@ def minimize_fit(theta0: np.ndarray[float],
 
         best_soln, best_meth = None, None
         for method in methods:
-            soln = minimize(_objective_func, x0=theta0, args=objective_func_fixed_args,
+            soln = minimize(lambda *args: -_ln_prob_func(*args),
+                            x0=theta0, args=(ln_prior_func, ln_likelihood_func),
                             method=method, options={ "maxiter": max_iters, "maxfev": max_iters })
             if verbose:
                 print(f"({method})", "succeeded" if soln.success else f"failed [{soln.message}]",
@@ -171,9 +158,8 @@ def minimize_fit(theta0: np.ndarray[float],
     return theta0, best_soln
 
 def mcmc_fit(theta0: np.ndarray[float],
-             sys_mass: UFloat,
-             radii: np.ndarray[UFloat],
-             teffs: np.ndarray[UFloat],
+             ln_prior_func: Callable[[np.ndarray[float]], float],
+             ln_likelihood_func: Callable[[np.ndarray[float]], float],
              nwalkers: int=100,
              nsteps: int=100000,
              thin_by: int=1,
@@ -186,13 +172,12 @@ def mcmc_fit(theta0: np.ndarray[float],
              progress: Union[bool, str]=False,
              verbose: bool=False) -> Tuple[np.ndarray[UFloat], EnsembleSampler]:
     """
-    A full MCMC fit to find stars' mass and shared log10(age) values
-    by fitting corresponding radii & teffs from MIST models to observed values.
+    A full fit to find stars' mass and shared log10(age) values from MCMC sampling
+    and fitting corresponding radii & teffs from MIST models to observed values.
 
     :theta0: the initial set of candidate mass (M_sun) and log10(age/yr) values
-    :sys_mass: the total mass of the system for use as a prior constraint (M_sun)
-    :radii: the observed stellar radii to fit against (R_sun)
-    :teffs: the observed stellar effective temperatures to fit against (K)
+    :ln_prior_func: a callback function to evaluate the current theta against prior criteria
+    :ln_likelihood_func: a callback function to evaluate the goodness of fit of model vs observation
     :nwalkers: the number of mcmc walkers to employ
     :nsteps: the maximium number of mcmc steps to make for each walker
     :thin_by: step interval to inspect fit progress and yield samples
@@ -218,8 +203,12 @@ def mcmc_fit(theta0: np.ndarray[float],
     if early_stopping_from is None or early_stopping_from <= 0:
         early_stopping_from = int(50 * ndim * autocor_tol)
 
-    # Starting positions for the walkers clustered around theta0
-    p0 = [theta0 + (theta0 * rng.normal(0, 0.05, ndim)) for _ in np.arange(int(nwalkers))]
+    # Starting positions for the walkers clustered around theta0, via priors to ensure they're valid
+    p0, test_theta = [], theta0.copy()
+    while len(p0) < int(nwalkers):
+        test_theta = theta0 + (theta0 * rng.normal(0, 0.05, ndim))
+        if np.isfinite(ln_prior_func(test_theta)):
+            p0 += [test_theta]
 
     with Pool(processes=processes) as pool, catch_warnings(category=[RuntimeWarning, UserWarning]):
         filterwarnings("ignore", message="invalid value encountered in ")
@@ -231,19 +220,9 @@ def mcmc_fit(theta0: np.ndarray[float],
             if early_stopping:
                 print(f"Early stopping will be considered after {early_stopping_from:d} steps.")
 
-        # Find the nominal values and chisq weights - do it outside fit loop as these don't change
-        objective_func_fixed_args = (
-            nominal_value(sys_mass),
-            1 if (mass_sigma := std_dev(sys_mass)) == 0 else (1 / mass_sigma)**2,
-            nominal_values(radii),
-            1 if any((radii_sigma := std_devs(radii)) == 0) else (1 / radii_sigma)**2,
-            nominal_values(teffs),
-            1 if any((teff_sigma := std_devs(teffs)) == 0) else (1 / teff_sigma)**2,
-            False # minimizable
-        )
 
-        sampler = EnsembleSampler(int(nwalkers), ndim, _objective_func,
-                                  args=objective_func_fixed_args, pool=pool)
+        sampler = EnsembleSampler(int(nwalkers), ndim, _ln_prob_func,
+                                  args=(ln_prior_func, ln_likelihood_func), pool=pool)
         step = 0
         for _ in sampler.sample(initial_state=p0, iterations=nsteps // thin_by,
                                 thin_by=thin_by, tune=True, progress=progress):

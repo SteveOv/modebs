@@ -1,6 +1,7 @@
 """ Unit tests for the fit_masses module. """
 # pylint: disable=unused-import, too-many-public-methods, line-too-long, invalid-name, no-member
 import warnings
+from multiprocessing import Lock
 import unittest
 
 import numpy as np
@@ -10,7 +11,7 @@ warnings.filterwarnings("ignore", "Using UFloat objects with std_dev==0 may give
 from uncertainties import ufloat
 from uncertainties.unumpy import uarray
 
-from libs.fit_masses import minimize_fit, mcmc_fit
+from libs.mass_fitter import minimize_fit, mcmc_fit, get_age_limits, get_mass_limits
 
 class Testsed(unittest.TestCase):
     """ Unit tests for the fit_masses module. """
@@ -49,6 +50,31 @@ class Testsed(unittest.TestCase):
         },
     }
 
+    # Cannot allow these tests to run in parallel as the following is shared state
+    test_lock = Lock()
+    age_limits = get_age_limits()
+    mass_limits = get_mass_limits()
+    M_sys = None
+    y_obs = None
+
+    @staticmethod
+    def _ln_prior_func(theta) -> float:
+        """ Ideally this would be private to each test, but emcee needs it to be picklable """
+        masses, age = theta[:-1], 10**theta[-1]
+        if not Testsed.age_limits[0] <= age <= Testsed.age_limits[1] \
+            or not all(Testsed.mass_limits[0] <= mass <= Testsed.mass_limits[1] for mass in masses):
+            return -np.inf
+        return -0.5 * ((Testsed.M_sys.n - np.sum(masses)) / Testsed.M_sys.s)**2
+
+    @staticmethod
+    def _ln_likelihood_func(y_model) -> float:
+        """ Ideally this would be private to each test, but emcee needs it to be picklable """
+        return -0.5 * np.sum([((m - o.n) / o.s)**2 for m, o in zip(y_model, Testsed.y_obs)])
+
+    @staticmethod
+    def _format_theta(theta, label: str="theta"):
+        return f"{label} = [" + ", ".join(f"{t:.3e}" for t in theta) + "]"
+
     #
     #   minimize_fit(theta0: np.ndarray[float],
     #                sys_mass: UFloat,
@@ -60,13 +86,20 @@ class Testsed(unittest.TestCase):
     def test_minimize_fit_known_targets(self):
         """ Tests minimize_fit() basic happy path test for known targets """
         for target, params in self.targets.items():
-            with self.subTest(msg=f"minimize fit on {target}"):
-                print(self._format_theta(params["theta0"], f"\ntheta0[{target}]"))
+            with self.test_lock, self.subTest(msg=f"minimize fit on {target}"):
+                # pylint: disable=cell-var-from-loop
+                print(Testsed._format_theta(params["theta0"], f"\ntheta0[{target}]"))
 
-                theta_fit, _ = minimize_fit(params["theta0"], params["sys_mass"],
-                                            params["radii"], params["teffs"], verbose=True)
+                # So they're visible to ln_prior_func & ln_likelihood_func
+                Testsed.M_sys = params["sys_mass"]
+                Testsed.y_obs = np.concatenate([params["radii"], params["teffs"]])
 
-                print(self._format_theta(theta_fit, f"theta_fit[{target}]"))
+                theta_fit, _ = minimize_fit(params["theta0"],
+                                            Testsed._ln_prior_func,
+                                            Testsed._ln_likelihood_func,
+                                            verbose=True)
+
+                print(Testsed._format_theta(theta_fit, f"theta_fit[{target}]"))
 
                 for ix, (fit_mass, exp_mass) in enumerate(zip(theta_fit[:-1], params["exp_masses"])):
                     # Expecting strong match with masses so round to 1 d.p.
@@ -90,45 +123,44 @@ class Testsed(unittest.TestCase):
     @unittest.skip("takes too long for automated runs - comment this out to run test explicitly")
     def test_mcmc_fit_known_targets(self):
         """ Tests mcmc_fit() basic happy path test for selected target """
-        target = "IQ Per"
-        # target = "CW Eri"
-        # target = "ZZ UMa"
-        # target = "AI Phe"
+        target = "CW Eri"
         params = self.targets[target]
-        nsteps = 50000
+        nsteps = 25000
 
-        print(self._format_theta(params["theta0"], f"\ntheta0[{target}]"))
+        with self.test_lock:
+            print(Testsed._format_theta(params["theta0"], f"\ntheta0[{target}]"))
 
-        thin_by = 1
-        theta_fit, sampler = mcmc_fit(params["theta0"], params["sys_mass"],
-                                      params["radii"], params["teffs"],
-                                      nwalkers=100, nsteps=nsteps, thin_by=thin_by, seed=42,
-                                      early_stopping=True, early_stopping_threshold=0.01,
-                                      processes=4, progress=True)
+            # So they're visible to ln_prior_func & ln_likelihood_func
+            Testsed.M_sys = params["sys_mass"]
+            Testsed.y_obs = np.concatenate([params["radii"], params["teffs"]])
 
-        tau = sampler.get_autocorr_time(c=5, tol=50, quiet=True) * thin_by
-        print(f"Autocorrelation steps (tau): {', '.join(f'{t:.3f}' for t in tau)}")
-        print(f"Estimated burn-in steps:     {int(max(np.nan_to_num(tau, nan=1000)) * 2):,}")
-        print(f"Mean Acceptance fraction:    {np.mean(sampler.acceptance_fraction):.3f}")
+            thin_by = 1
+            theta_fit, sampler = mcmc_fit(params["theta0"],
+                                        Testsed._ln_prior_func,
+                                        Testsed._ln_likelihood_func,
+                                        nwalkers=100, nsteps=nsteps, thin_by=thin_by, seed=42,
+                                        early_stopping=True, early_stopping_threshold=0.01,
+                                        processes=4, progress=True)
 
-        print(self._format_theta(theta_fit, f"theta_fit[{target}]"))
+            tau = sampler.get_autocorr_time(c=5, tol=50, quiet=True) * thin_by
+            print(f"Autocorrelation steps (tau): {', '.join(f'{t:.3f}' for t in tau)}")
+            print(f"Estimated burn-in steps:     {int(max(np.nan_to_num(tau, nan=1000)) * 2):,}")
+            print(f"Mean Acceptance fraction:    {np.mean(sampler.acceptance_fraction):.3f}")
 
-        for ix, (fit_mass, exp_mass) in enumerate(zip(theta_fit[:-1], params["exp_masses"])):
-            # Assert the results are consistent within errorbars.
-            # Cannot use == as even when the values appear the same they're treated as unequal.
-            msg = f"{target}: (mass[{ix}] ==) {fit_mass} != {exp_mass} (within errorbars)"
-            if fit_mass.n > exp_mass.n:
-                self.assertTrue(fit_mass.n - fit_mass.s < exp_mass.n + exp_mass.s, msg)
-            else:
-                self.assertTrue(fit_mass.n + fit_mass.s > exp_mass.n - exp_mass.s, msg)
+            print(Testsed._format_theta(theta_fit, f"theta_fit[{target}]"))
 
-        if (exp_log_age := params.get("exp_log_age", None)) is not None:
-            # Fitting age is expected to be less precise so we round to nearest whole number
-            self.assertAlmostEqual(theta_fit[-1].n, exp_log_age, 0, f"{target}: log_age")
+            for ix, (fit_mass, exp_mass) in enumerate(zip(theta_fit[:-1], params["exp_masses"])):
+                # Assert the results are consistent within errorbars.
+                # Cannot use == as even when the values appear the same they're treated as unequal.
+                msg = f"{target}: (mass[{ix}] ==) {fit_mass} != {exp_mass} (within errorbars)"
+                if fit_mass.n > exp_mass.n:
+                    self.assertTrue(fit_mass.n - fit_mass.s < exp_mass.n + exp_mass.s, msg)
+                else:
+                    self.assertTrue(fit_mass.n + fit_mass.s > exp_mass.n - exp_mass.s, msg)
 
-
-    def _format_theta(self, theta, label: str="theta"):
-        return f"{label} = [" + ", ".join(f"{t:.3e}" for t in theta) + "]"
+            if (exp_log_age := params.get("exp_log_age", None)) is not None:
+                # Fitting age is expected to be imprecise so we round to nearest whole number
+                self.assertAlmostEqual(theta_fit[-1].n, exp_log_age, 0, f"{target}: log_age")
 
 
 if __name__ == "__main__":

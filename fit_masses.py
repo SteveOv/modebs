@@ -26,7 +26,8 @@ from deblib.constants import G, R_sun, M_sun
 import corner
 from sed_fit.fitter import samples_from_sampler
 
-from libs.fit_masses import minimize_fit, mcmc_fit, log_age_for_mass_and_eep
+from libs.mass_fitter import minimize_fit, mcmc_fit
+from libs.mass_fitter import get_age_limits, get_mass_limits, log_age_for_mass_and_eep
 from libs.iohelpers import Tee
 from libs.targets import Targets
 from libs.pipeline_dal import create_dal
@@ -108,27 +109,35 @@ if __name__ == "__main__":
                 print("Getting known values from previous steps to set up fitting priors")
                 rA = trow.rA_plus_rB / (trow.k + 1)
                 rB = trow.rA_plus_rB / ((1 / trow.k) + 1)
-                print("\n".join(f"{p:>20s}: {v:12.3f}" for p, v in [("TeffA", trow.TeffA),
-                                                                    ("TeffB", trow.TeffB),
-                                                                    ("RA", trow.RA),
-                                                                    ("RB", trow.RB),
-                                                                    ("rA", rA),
-                                                                    ("rB", rB),
-                                                                    ("period", trow.period)]))
+                print("\n".join(f"{p:>20s}: {v:9.3f} {u:unicode}" for p, v, u in [
+                                                    ("TeffA", trow.TeffA, u.K),
+                                                    ("TeffB", trow.TeffB, u.K),
+                                                    ("RA", trow.RA, u.solRad),
+                                                    ("RB", trow.RB, u.solRad),
+                                                    ("rA", rA, u.dimensionless_unscaled),
+                                                    ("rB", rB, u.dimensionless_unscaled),
+                                                    ("period", trow.period, u.d)]))
 
-
+                # Set up the priors and the corresponding function to evaluate them
                 # Calculate the system's semi-major axis and system mass (with Kepler's 3rd law)
                 a = np.mean([trow.RA / rA, trow.RB / rB])
-                print(f" semi-major axis (a): {a:12.3f} {u.Rsun:unicode}",
+                print(f" semi-major axis (a): {a:9.3f} {u.Rsun:unicode}",
                       "(calculated from fitted & fractional radii)")
                 M_sys = (4 * np.pi**2 * (a * R_sun)**3) / (G * (trow.period * 86400)**2) / M_sun
-                print(f" system mass (M_sys): {M_sys:12.3f} {u.Msun:unicode}",
+                print(f" system mass (M_sys): {M_sys:9.3f} {u.Msun:unicode}",
                       "(calculated from semi-major axis & orbital period)")
+                age_limits = get_age_limits()
+                mass_limits = get_mass_limits()
 
-
-                # Priors: observations from SED fitting
-                prior_radii = np.array([trow.RA, trow.RB])
-                prior_Teffs = np.array([trow.TeffA, trow.TeffB])
+                def ln_prior_func(theta: np.ndarray) -> float:
+                    """ Evaluate current theta against prior criteria """
+                    # pylint: disable=cell-var-from-loop
+                    masses, age = theta[:-1], 10**theta[-1]
+                    if not age_limits[0] <= age <= age_limits[1] \
+                        or not all(mass_limits[0] <= mass <= mass_limits[1] for mass in masses):
+                        return -np.inf
+                    # Gaussian prior on the total mass
+                    return -0.5 * ((M_sys.n - np.sum(masses)) / M_sys.s)**2
 
 
                 # Estimate fit starting position with masses derived from M_sys & the expected mass
@@ -142,30 +151,38 @@ if __name__ == "__main__":
                 theta0 = np.concatenate([theta_masses, [theta_age]])
                 print_mass_theta(theta0, "theta0")
 
+                # Set up the likelihood function to evaluate the result of each theta against known
+                # Observations from SED fitting
+                y_obs = trow.get_values(["RA", "RB", "TeffA", "TeffB"])
+                wt = -0.5 / (len(y_obs) - len(theta0)) # likelihood = -0.5 * sum(resids) / deg_free
+                def ln_likelihood_func(y_model: np.ndarray) -> float:
+                    """ Evaluate current model against observations to give reduced chi^2 """
+                    # pylint: disable=cell-var-from-loop
+                    return wt * np.sum([((m - o.n) / o.s)**2 for m, o in zip(y_model, y_obs)])
+
 
                 print("\nPerforming an initial 'quick' minimize fit for approximate values.")
                 theta_fit, _ = minimize_fit(theta0=theta0,
-                                            sys_mass=M_sys,
-                                            radii=prior_radii,
-                                            teffs=prior_Teffs,
+                                            ln_prior_func=ln_prior_func,
+                                            ln_likelihood_func=ln_likelihood_func,
                                             verbose=True)
                 print_mass_theta(theta_fit, "theta_min")
 
+
                 if args.do_mcmc_fit:
                     print("\nPerforming a full MCMC fit for masses & log(age) with uncertainties.")
-                    theta_fit, sampler = mcmc_fit(theta0=theta_fit,
-                                                sys_mass=M_sys,
-                                                radii=prior_radii,
-                                                teffs=prior_Teffs,
-                                                nwalkers=args.mcmc_walkers,
-                                                nsteps=args.max_mcmc_steps,
-                                                thin_by=args.mcmc_thin_by,
-                                                seed=42,
-                                                early_stopping=True,
-                                                early_stopping_from=25000,
-                                                processes=args.mcmc_processes,
-                                                progress=True,
-                                                verbose=True)
+                    theta_fit, sampler = mcmc_fit(theta0=theta0,
+                                                  ln_prior_func=ln_prior_func,
+                                                  ln_likelihood_func=ln_likelihood_func,
+                                                  nwalkers=args.mcmc_walkers,
+                                                  nsteps=args.max_mcmc_steps,
+                                                  thin_by=args.mcmc_thin_by,
+                                                  seed=42,
+                                                  early_stopping=True,
+                                                  early_stopping_from=25000,
+                                                  processes=args.mcmc_processes,
+                                                  progress=True,
+                                                  verbose=True)
                     print_mass_theta(theta_fit, "theta_mcmc")
 
 
