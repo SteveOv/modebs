@@ -388,8 +388,8 @@ if __name__ == "__main__":
                         label = f"({lval:.3f} {unit:unicode})"
                     print(f"{k:>12s}{'*' if mask else ' ':s} = {val:.3f} {unit:unicode} \t", label)
 
-                    # *** also updates the target data ***
-                    if mask:
+                    # *** also update the target data except Av which was handled by dereddening ***
+                    if k not in ["Av"]:
                         write_params[k] = val
                         if std_dev(val) > abs(nom_val(val) * 0.20):
                             high_uncert_params += [k]
