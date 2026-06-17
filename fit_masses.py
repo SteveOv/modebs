@@ -156,7 +156,7 @@ if __name__ == "__main__":
                 for ix, col in enumerate(["RA", "RB", "TeffA", "TeffB", "loggA", "loggB"]):
                     val = trow[col]
                     if not isinstance(val, UFloat) or not val.s:
-                        val = ufloat(nom_val(val), 0.05 * nom_val(val))
+                        val = ufloat(nom_val(val), 0.02 * nom_val(val))
                     y_obs[ix] = val
                     print(f"{col:>20s}: {val:9.3f}")
                 wt = -0.5 / (len(y_obs) - len(theta0)) # likelihood = -0.5 * sum(resids) / deg_free
