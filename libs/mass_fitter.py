@@ -33,6 +33,7 @@ eep_list = []
 masses_list = []
 radii_list = []
 teffs_list = []
+logg_list = []
 for log_age in sorted(iso.ages):
     iso_block = iso.isos[iso.age_index(log_age)]
     iso_block = iso_block[(iso_block["phase"] >= MIN_PHASE) & (iso_block["phase"] <= MAX_PHASE)]
@@ -47,11 +48,13 @@ for log_age in sorted(iso.ages):
         # corresponding values
         radii_list += list(10**iso_block[mass_sort]["log_R"])
         teffs_list += list(10**iso_block[mass_sort]["log_Teff"])
+        logg_list += list(iso_block[mass_sort]["log_g"])
 
 # Create the interpolators for radius and teff; using RBF interpolation as we have irregular data.
 x = np.array(list(zip(ages_list, masses_list)), dtype=float)
 radius_interp = RBFInterpolator(x, radii_list, neighbors=2**x.ndim, smoothing=5, kernel="linear")
 teff_interp = RBFInterpolator(x, teffs_list, neighbors=2**x.ndim, smoothing=5, kernel="linear")
+logg_interp = RBFInterpolator(x, logg_list, neighbors=2**x.ndim, smoothing=5, kernel="linear")
 
 x = np.array(list(zip(eep_list, masses_list)), dtype=float)
 age_interp = RBFInterpolator(x, ages_list, neighbors=2**x.ndim, smoothing=5, kernel="linear")
@@ -98,12 +101,13 @@ def _ln_prob_func(fit_theta: np.ndarray[float],
         xi = np.array([(age, m) for m in masses])
         model_radii = radius_interp(xi)
         model_teffs = teff_interp(xi)
+        model_loggs = logg_interp(xi)
         if any(model_radii <= 0) or any(model_teffs <= 0): # Out of range
             retval = -np.inf
 
     # The "likelihood func": evaluates the "goodness" of radii & teffs match with the observations
     if np.isfinite(retval):
-        retval += ln_likelihood_func(np.concatenate([model_radii, model_teffs]))
+        retval += ln_likelihood_func(np.concatenate([model_radii, model_teffs, model_loggs]))
     return retval
 
 def minimize_fit(theta0: np.ndarray[float],

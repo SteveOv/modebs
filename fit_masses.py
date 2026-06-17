@@ -18,7 +18,7 @@ import astropy.units as u
 
 # pylint: disable=line-too-long, wrong-import-position
 warnings.filterwarnings("ignore", "Using UFloat objects with std_dev==0 may give unexpected results.", category=UserWarning)
-from uncertainties import ufloat, nominal_value as nom_val, std_dev
+from uncertainties import ufloat, UFloat, nominal_value as nom_val, std_dev
 from uncertainties.unumpy import nominal_values as nom_vals
 
 from deblib.constants import G, R_sun, M_sun
@@ -106,12 +106,10 @@ if __name__ == "__main__":
                 print(f"SpT:\t{trow.spt or config.get('SpT', '')}")
                 print(f"morph:\t{trow.morph or -1:.3f}\n")
 
-                print("Getting known values from previous steps to set up fitting priors")
+                print("Getting known values from previous stages to set up fitting priors")
                 rA = trow.rA_plus_rB / (trow.k + 1)
                 rB = trow.rA_plus_rB / ((1 / trow.k) + 1)
                 print("\n".join(f"{p:>20s}: {v:9.3f} {u:unicode}" for p, v, u in [
-                                                    ("TeffA", trow.TeffA, u.K),
-                                                    ("TeffB", trow.TeffB, u.K),
                                                     ("RA", trow.RA, u.solRad),
                                                     ("RB", trow.RB, u.solRad),
                                                     ("rA", rA, u.dimensionless_unscaled),
@@ -142,7 +140,7 @@ if __name__ == "__main__":
 
                 # Estimate fit starting position with masses derived from M_sys & the expected mass
                 # ratio and an approximate age for the more massive star within the main-sequence.
-                print("\nSetting up the starting position (theta0) for fitting.")
+                print("\nSetting up the starting position (theta0) for fitting [MA, MB, log(age)].")
                 if (qphot := trow.qphot) is None or nom_val(qphot) <= 0:
                     # The approx single k-q (k=q^0.715) relations of Demircan & Kahraman (1991).
                     qphot = trow.k**1.4
@@ -151,9 +149,16 @@ if __name__ == "__main__":
                 theta0 = np.concatenate([theta_masses, [theta_age]])
                 print_mass_theta(theta0, "theta0")
 
-                # Set up the likelihood function to evaluate the result of each theta against known
-                # Observations from SED fitting
-                y_obs = trow.get_values(["RA", "RB", "TeffA", "TeffB"])
+                # Set up the likelihood function to evaluate the result of each theta
+                # against known observations from SED fitting
+                print("\nGetting known values from previous stages to set up observed values")
+                y_obs = np.empty((6,), dtype=object)
+                for ix, col in enumerate(["RA", "RB", "TeffA", "TeffB", "loggA", "loggB"]):
+                    val = trow[col]
+                    if not isinstance(val, UFloat) or not val.s:
+                        val = ufloat(nom_val(val), 0.05 * nom_val(val))
+                    y_obs[ix] = val
+                    print(f"{col:>20s}: {val:9.3f}")
                 wt = -0.5 / (len(y_obs) - len(theta0)) # likelihood = -0.5 * sum(resids) / deg_free
                 def ln_likelihood_func(y_model: np.ndarray) -> float:
                     """ Evaluate current model against observations to give reduced chi^2 """
