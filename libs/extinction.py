@@ -83,12 +83,13 @@ def iterate(target_coords: SkyCoord,
 
 def get_bayestar_ebv(target_coords: SkyCoord,
                      version: str="bayestar2019",
-                     conversion_factor: float=0.996) -> Tuple[float, bool]:
+                     conversion_factor: float=0.884) -> Tuple[float, bool]:
     """
     Queries the Bayestar dereddening map for the E(B-V) value for the target coordinates.
 
     Conversion from Bayestar 17 or 19 to E(B-V) documented at http://argonaut.skymaps.info/usage
-    as E(B-V) = 0.884 x bayestar or E(B-V) = 0.996 x bayestar
+    as E(B-V) = 0.884 x bayestar (from E(g-r)) or E(B-V) = 0.996 x bayestar (from E(r-z)).
+    This covers approximately 75% of the sky north of dec -30 deg.
     
     :target_coords: the astropy SkyCoords to query for
     :version: the version of the Bayestar dust maps to use
@@ -97,8 +98,7 @@ def get_bayestar_ebv(target_coords: SkyCoord,
     """
     query = _get_bayestar_query(version)
     val, flags =  query(target_coords, mode="best", return_flags=True)
-    reliable = all(k in flags.dtype.names and flags[k] for k in ["converged", "reliable_dist"])
-    return conversion_factor * val, reliable
+    return conversion_factor * val, flags["reliable_dist"]
 
 @lru_cache
 def _get_bayestar_query(version: str) -> bayestar.BayestarQuery:

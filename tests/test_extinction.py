@@ -16,11 +16,11 @@ class Testextinction(unittest.TestCase):
         for (target, yield_ebv, exp_results, coords) in [
             # For A_V coefficients
             ("CM Dra", False, [(0.02, True), (0., False)], SkyCoord("16h34m20.3302660573", "+57d09m44.368918696", 14.844*u.pc, frame="icrs")),
-            ("MU Cas", False, [(1.20, True)], SkyCoord(3.964810786976831*u.deg, 60.43156179196987*u.deg, 1000/0.513272695221339*u.pc, frame="icrs")),
+            ("MU Cas", False, [(1.07, True)], SkyCoord(3.964810786976831*u.deg, 60.43156179196987*u.deg, 1000/0.513272695221339*u.pc, frame="icrs")),
 
             # For E(B-V) coefficients
             ("CM Dra", True, [(0.01, True), (0, False)], SkyCoord("16h34m20.3302660573", "+57d09m44.368918696", 14.844*u.pc, frame="icrs")),
-            ("MU Cas", True, [(0.39, True)], SkyCoord(3.964810786976831*u.deg, 60.43156179196987*u.deg, 1000/0.513272695221339*u.pc, frame="icrs")),
+            ("MU Cas", True, [(0.34, True)], SkyCoord(3.964810786976831*u.deg, 60.43156179196987*u.deg, 1000/0.513272695221339*u.pc, frame="icrs")),
         ]:
             with self.subTest(("E(B-V)" if yield_ebv else "A_V") + f" for {target}"):
                 funcs = ["gontcharov_av", get_bayestar_ebv]
