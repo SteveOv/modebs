@@ -127,16 +127,6 @@ if __name__ == "__main__":
                 age_limits = get_age_limits()
                 mass_limits = get_mass_limits()
 
-                def ln_prior_func(theta: np.ndarray) -> float:
-                    """ Evaluate current theta against prior criteria """
-                    # pylint: disable=cell-var-from-loop
-                    masses, age = theta[:-1], 10**theta[-1]
-                    if not age_limits[0] <= age <= age_limits[1] \
-                        or not all(mass_limits[0] <= mass <= mass_limits[1] for mass in masses):
-                        return -np.inf
-                    # Gaussian prior on the total mass
-                    return -0.5 * ((M_sys.n - np.sum(masses)) / M_sys.s)**2
-
 
                 # Estimate fit starting position with masses derived from M_sys & the expected mass
                 # ratio and an approximate age for the more massive star within the main-sequence.
@@ -148,6 +138,21 @@ if __name__ == "__main__":
                 theta_age = log_age_for_mass_and_eep(np.max(theta_masses))
                 theta0 = np.concatenate([theta_masses, [theta_age]])
                 print_mass_theta(theta0, "theta0")
+
+
+                def ln_prior_func(theta: np.ndarray) -> float:
+                    """ Evaluate current theta against prior criteria """
+                    # pylint: disable=cell-var-from-loop
+                    masses, log_age = theta[:-1], theta[-1]
+                    if not age_limits[0] <= 10**log_age <= age_limits[1] \
+                        or not all(mass_limits[0] <= mass <= mass_limits[1] for mass in masses):
+                        return -np.inf
+                    # Gaussian prior on the total mass
+                    retval = -0.5 * ((M_sys.n - np.sum(masses)) / M_sys.s)**2
+                    # Straw man Gaussian prior on age as the fit usually benefits from constraint.
+                    # TODO: need to find something more appropriate.
+                    retval -= 0.5 * ((theta_age - log_age) / 0.3)**2
+                    return retval
 
                 # Set up the likelihood function to evaluate the result of each theta
                 # against known observations from SED fitting
