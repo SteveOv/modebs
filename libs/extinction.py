@@ -14,7 +14,7 @@ import astropy.units as u
 from astropy.coordinates import SkyCoord
 from astroquery.vizier import Vizier
 
-from dustmaps import config, bayestar           # Bayestar dustmaps/dereddening map
+from dustmaps import bayestar, decaps           # Bayestar dustmaps/dereddening map
 from pyvo import registry, DALServiceError      # Vergeley at al. extinction catalogue
 
 
@@ -39,7 +39,7 @@ def iterate(target_coords: SkyCoord,
     :returns: Generator yielding the chosen value (when found) and a flag indicating its reliability
     """
     if funcs is None:
-        funcs = [get_gontcharov_av, get_bayestar_ebv] #, get_vergely_av]
+        funcs = [get_gontcharov_av, get_decaps_av, get_bayestar_ebv] #, get_vergely_av]
     if isinstance(funcs, str | Callable):
         funcs = [funcs]
 
@@ -104,11 +104,39 @@ def get_bayestar_ebv(target_coords: SkyCoord,
 def _get_bayestar_query(version: str) -> bayestar.BayestarQuery:
     """ Gets a Bayestar query object. This function is cached as it's an expensive setup. """
     # Creates/confirms local cache of Bayestar data within the .cache directory
-    config.config['data_dir'] = '.cache/.dustmapsrc'
+    bayestar.config['data_dir'] = '.cache/.dustmapsrc'
     bayestar.fetch(version=version)
 
     # Now we can use the local cache for the lookup - this takes some time to set up
     return bayestar.BayestarQuery(version=version)
+
+
+def get_decaps_av(target_coords: SkyCoord, rv: float=3.32) -> Tuple[float, bool]:
+    """
+    Queries the DECaPS dereddening map for the E(B-V) value for the target coordinates.
+    This complements the Bayestar maps, being concentrated in the southern hemisphere
+    suitable for when the Galactic dec is south of -30 deg.
+   
+    :target_coords: the astropy SkyCoords to query for
+    :rv: the R_V value for the map, with the dustmaps docs recommending 3.32
+    :returns: tuple of the Av value and a flags indicating whether it is reliable
+    """
+    # Cannot use both mean_only and contiguous, as doing so appears to always cause an IndexError.
+    # mean_only has lower memory usage & doesn't require as large a download (8 instead of 33 GB!).
+    query = _get_decaps_query(mean_only=True, contiguous=False)
+    val, flags =  query(target_coords, mode="mean", return_flags=True)
+    return rv * val, flags["reliable_dist"]
+
+@lru_cache
+def _get_decaps_query(mean_only: bool, contiguous: bool) -> decaps.DECaPSQueryLite:
+    """ Gets a Bayestar query object. This function is cached as it's an expensive setup. """
+    # Creates/confirms local cache of DECaPS data within the .cache directory
+    # silence_warnings prevents the fetch from asking user to confirm download
+    decaps.config['data_dir'] = '.cache/.dustmapsrc'
+    decaps.fetch(mean_only=mean_only, silence_warnings=True)
+
+    # Now we can use the local cache for the lookup - this takes some time to set up
+    return decaps.DECaPSQueryLite(mean_only=mean_only, contiguous=contiguous)
 
 
 def get_gontcharov_av(target_coords: SkyCoord) -> Tuple[float, bool]:
