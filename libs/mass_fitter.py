@@ -52,12 +52,13 @@ for log_age in sorted(iso.ages):
 
 # Create the interpolators for radius and teff; using RBF interpolation as we have irregular data.
 x = np.array(list(zip(ages_list, masses_list)), dtype=float)
-radius_interp = RBFInterpolator(x, radii_list, neighbors=2**x.ndim, smoothing=5, kernel="linear")
-teff_interp = RBFInterpolator(x, teffs_list, neighbors=2**x.ndim, smoothing=5, kernel="linear")
-logg_interp = RBFInterpolator(x, logg_list, neighbors=2**x.ndim, smoothing=5, kernel="linear")
+neighbours = 4**x.ndim # limit RBF mem usage; otherwise scales as ~points^2
+radius_interp = RBFInterpolator(x, radii_list, neighbours, smoothing=5, kernel="linear")
+teff_interp = RBFInterpolator(x, teffs_list, neighbours, smoothing=5, kernel="linear")
+logg_interp = RBFInterpolator(x, logg_list, neighbours, smoothing=5, kernel="linear")
 
 x = np.array(list(zip(eep_list, masses_list)), dtype=float)
-age_interp = RBFInterpolator(x, ages_list, neighbors=2**x.ndim, smoothing=5, kernel="linear")
+age_interp = RBFInterpolator(x, ages_list, neighbours, smoothing=5, kernel="linear")
 
 # Priors based on the data
 age_limits = (min(ages_list), max(ages_list))
