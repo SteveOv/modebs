@@ -3,9 +3,10 @@ Low level utility functions for light curve ingest, pre-processing, estimation a
 """
 #pylint: disable=no-member
 from typing import Tuple, List, Callable, Generator
-import inspect
+from inspect import getmodule, getmembers, isfunction
 from functools import lru_cache
 import traceback
+from warnings import warn
 
 from requests.exceptions import HTTPError
 import numpy as np
@@ -46,10 +47,8 @@ def iterate(target_coords: SkyCoord,
     for func in funcs:
         if isinstance(func, str):
             # Find the matching function in this module
-            # TODO: can this be more efficient? Also perhaps better validation of func signature
-            for name, member_func in inspect.getmembers(inspect.getmodule(iterate),
-                                                        lambda m: isinstance(m, Callable)):
-                if func in name:
+            for name, member_func in getmembers(getmodule(iterate), isfunction):
+                if name.startswith("get_") and func in name:
                     func = member_func
                     break
 
@@ -79,6 +78,8 @@ def iterate(target_coords: SkyCoord,
                         break
                     if verbose:
                         print(f"Caught a {type(exc).__name__} when calling {fname}. Trying again.")
+        else:
+            warn(f"Ignoring unknown extinction func: {func}", UserWarning)
 
 
 def get_bayestar_ebv(target_coords: SkyCoord,
