@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 import astropy.units as u
-from astropy.coordinates import SkyCoord
+from astropy.coordinates import SkyCoord, CartesianRepresentation
 
 from libs.extinction import iterate, get_bayestar_ebv, get_gontcharov_av
 
@@ -116,13 +116,13 @@ class Testextinction(unittest.TestCase):
             (-1180, -200,   -30,    0.94,       True),
         ]:
             with self.subTest(f" get_goncharov_av(coords=({x}, {y}, {z}, galactic, cartesian)) "):
-                coords = SkyCoord(u=x, v=y, w=z, unit="pc",
-                                  frame="galactic", representation_type="cartesian").icrs
+                # Doesn't need ICRS but will show if the target func is converting to XYZ correctly
+                coords = SkyCoord(CartesianRepresentation(x, y, z, "pc"), frame="galactic").icrs
 
                 val, reliable = get_gontcharov_av(coords)
-                if not np.isnan(exp_val):
-                    self.assertAlmostEqual(exp_val, val, 2)
-                    self.assertEqual(exp_reliable, reliable)
+
+                self.assertAlmostEqual(exp_val, val, 2)
+                self.assertEqual(exp_reliable, reliable)
 
 
 if __name__ == "__main__":
