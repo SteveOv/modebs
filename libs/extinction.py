@@ -15,7 +15,7 @@ import astropy.units as u
 from astropy.coordinates import SkyCoord
 from astroquery.vizier import Vizier
 
-from dustmaps import bayestar, decaps           # Bayestar dustmaps/dereddening map
+from dustmaps import bayestar, decaps, sfd      # Bayestar and other exinction maps
 from pyvo import registry, DALServiceError      # Vergeley at al. extinction catalogue
 
 
@@ -97,8 +97,7 @@ def get_bayestar_ebv(target_coords: SkyCoord,
     :conversion_factor: the factor to apply to bayestar extinction for E(B-V)
     :returns: tuple of the E(B-V) value and a flags indicating whether it is reliable
     """
-    query = _get_bayestar_query(version)
-    val, flags =  query(target_coords, mode="best", return_flags=True)
+    val, flags =  _get_bayestar_query(version)(target_coords, mode="best", return_flags=True)
     return conversion_factor * val, flags["reliable_dist"]
 
 @lru_cache
@@ -138,6 +137,27 @@ def _get_decaps_query(mean_only: bool, contiguous: bool) -> decaps.DECaPSQueryLi
 
     # Now we can use the local cache for the lookup - this takes some time to set up
     return decaps.DECaPSQueryLite(mean_only=mean_only, contiguous=contiguous)
+
+
+def get_sfd_av(target_coords: SkyCoord) -> Tuple[float, bool]:
+    """
+    Queries the extinction map of Schlegel, Finkbeiner & Davis (1998ApJ...500..525S).
+    An older 2D map but it's light on resources and has broad coverage. Extinction values
+    are published in units of E(B-V)_sfd and which converted to A_V with the CTIO V-band
+    coeff in Table 6 of Schlafly & Finkbeiner (2011ApJ...737..103S).
+
+    :target_coords: the astropy SkyCoords to query for
+    :returns: tuple of the Av value and a flags indicating whether it is reliable
+    """
+    ebv_sfd = _get_sfd_query()(target_coords)
+    return 2.682 * ebv_sfd, (ebv_sfd is not None and not np.isnan(ebv_sfd))
+
+@lru_cache
+def _get_sfd_query() -> sfd.SFDQuery:
+    """ Gets a Bayestar query object. This function is cached as it's an expensive setup. """
+    sfd.config['data_dir'] = '.cache/.dustmapsrc'
+    sfd.fetch()
+    return sfd.SFDQuery()
 
 
 def get_gontcharov_av(target_coords: SkyCoord) -> Tuple[float, bool]:
