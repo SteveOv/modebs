@@ -94,6 +94,36 @@ class Testextinction(unittest.TestCase):
                     self.assertTrue(np.isnan(val))
                 self.assertEqual(exp_reliable, reliable)
 
+    def test_get_gontcharov_av_test_interpolation(self):
+        """ Test get_gontcharov_av() - test the interpolation against known snippet from table """
+        #
+        # Table 1 of Gontcharov(2017AstL...43..472G) gives a snippet of the XYZ data
+        #
+        #   X       Y       Z       E(J-Ks) E(B-V)  RV      AV
+        #   -1200   0       0       0.237   0.392   3.10    1.22
+        #   -1180   -200    -80     0.168   0.278   3.10    0.86
+        #   -1180   -200    -60     0.181   0.300   3.10    0.93
+        #   -1180   -200    -40     0.181   0.300   3.10    0.93
+        #   -1180   -200    -20     0.186   0.308   3.10    0.95
+        #
+        for x,      y,      z,      exp_val,    exp_reliable in [
+            # These land on table values
+            (-1200, 0,      0,      1.22,       True),
+            (-1180, -200,   -80,    0.86,       True),
+            (-1180, -200,   -20,    0.95,       True),
+            # These will require interpolation
+            (-1180, -200,   -70,    0.89,       True),
+            (-1180, -200,   -30,    0.94,       True),
+        ]:
+            with self.subTest(f" get_goncharov_av(coords=({x}, {y}, {z}, galactic, cartesian)) "):
+                coords = SkyCoord(u=x, v=y, w=z, unit="pc",
+                                  frame="galactic", representation_type="cartesian").icrs
+
+                val, reliable = get_gontcharov_av(coords)
+                if not np.isnan(exp_val):
+                    self.assertAlmostEqual(exp_val, val, 2)
+                    self.assertEqual(exp_reliable, reliable)
+
 
 if __name__ == "__main__":
     unittest.main()

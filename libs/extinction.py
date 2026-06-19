@@ -171,7 +171,7 @@ def _get_gontcharov_interp(interp_field: str="Av"):
     """
     print("Acquiring Gontcharov (2017AstL...43..472G) XYZ catalog J/PAZh/43/521/xyzejk", end="...")
     old_row_limit = Vizier.ROW_LIMIT
-    Vizier.ROW_LIMIT = -1
+    Vizier.ROW_LIMIT = -1 # Make sure we download the entire catalogue
     cat = Vizier.get_catalogs(["J/PAZh/43/521/xyzejk"])[0]
     Vizier.ROW_LIMIT = old_row_limit
 
