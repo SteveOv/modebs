@@ -2,38 +2,98 @@
 # pylint: disable=unused-import, line-too-long, invalid-name, no-member
 import unittest
 
+import numpy as np
 import astropy.units as u
 from astropy.coordinates import SkyCoord
 
-from libs.extinction import iterate, get_bayestar_ebv, get_decaps_av
+from libs.extinction import iterate, get_bayestar_ebv, get_gontcharov_av
 
 class Testextinction(unittest.TestCase):
     """ Unit tests for the extinction module. """
+    targets = {
+        # Ooop North! Gontcharov happy but an unreliable extinction from Bayestar
+        "UZ Dra": {
+            "coords": SkyCoord(291.47947545 * u.deg, 68.93546881 * u.deg, 185.38698966 * u.pc, frame="icrs"),
+            # A_V values
+            "gontcharov": (0.219, True),
+            "bayestar": (0, False),
+        },
+        # Covered by both Gontcharov and Bayestar
+        "IT Cas": {
+            "coords": SkyCoord(355.50569743 * u.deg, 51.74352579 * u.deg, 514.95778083 * u.pc, frame="icrs"),
+            "gontcharov": (0.385, True),
+            "bayestar": (0.356, True),
+        },
+        # Way down south (in the LOPS2 field). Gontcharov still OK but outside of Bayestar coverage
+        "TIC 7695666": {
+            "coords": SkyCoord(65.64676092 * u.deg, -41.48319921 * u.deg, 367.56561186 * u.pc, frame="icrs"),
+            "gontcharov": (0.197, True),
+            "bayestar": (np.nan, False),
+        },
+    }
 
+    #
+    #   Tests: iterate(coords: SkyCoord, func: List[str|Callable], yield_ebv, verbose) -> Generator[(val, flag)]
+    #
     def test_iterate_happy_path(self):
         """ Tests iterate() - basic happy path test """
         print()
-        for (target,        yield_ebv, exp_results, coords) in [
-            # For A_V coefficients
-            ("CM Dra",      False, [(0.02, True), (0., False)], SkyCoord(248.57558061*u.deg, 57.16757382*u.deg, 14.86158398*u.pc, frame="icrs")),
-            # In Gontcharov and Bayestar
-            ("IT Cas",      False, [(0.38, True), (0.36, True)], SkyCoord(355.50569743*u.deg, 51.74352579*u.deg, 514.95778083*u.pc, frame="icrs")),
-            # In Gontcharov and expected to be in DECaPS (but that's throwing errors atm!)
-            ("TIC 7695666", False, [(0.20, True)], SkyCoord(65.64676092*u.deg, -41.48319921*u.deg, 367.56561186*u.pc, frame="icrs")),
+        funcs = ["gontcharov", "bayestar"]
+        for target in ["UZ Dra", "IT Cas", "TIC 7695666"]:
+            for yield_ebv in [False, True]:
+                with self.subTest(f" iterate({target}, yield_ebv={yield_ebv}) "):
+                    config = self.targets[target]
+                    res = list(iterate(config["coords"], funcs, yield_ebv=yield_ebv, verbose=True))
 
-            # For E(B-V) coefficients
-            ("CM Dra",      True, [(0.01, True), (0, False)], SkyCoord(248.57558061*u.deg, 57.16757382*u.deg, 14.86158398*u.pc, frame="icrs")),
-            # In Gontcharov and Bayestar
-            ("IT Cas",      True, [(0.12, True), (0.11, True)], SkyCoord(355.50569743*u.deg, 51.74352579*u.deg, 514.95778083*u.pc, frame="icrs")),
-            # In Gontcharov and expected to be in DECaPS (but that's throwing errors atm!)
-            ("TIC 7695666", True, [(0.06, True)], SkyCoord(65.64676092*u.deg, -41.48319921*u.deg, 367.56561186*u.pc, frame="icrs")),
-        ]:
-            with self.subTest(("E(B-V)" if yield_ebv else "A_V") + f" for {target}"):
-                funcs = ["gontcharov_av", get_decaps_av, get_bayestar_ebv]
-                for ix, (val, reliable) in enumerate(iterate(coords, funcs, yield_ebv=yield_ebv, verbose=True)):
-                    self.assertTrue(ix < len(exp_results))
-                    self.assertAlmostEqual(exp_results[ix][0], val, 2)
-                    self.assertEqual(exp_results[ix][1], reliable)
+                    # iterate() expected to filter out nan results
+                    exp_results = [e for e in (config[f] for f in funcs) if not np.isnan(e[0])]
+                    self.assertEqual(len(exp_results), len(res))
+
+                    for ix, (val, reliable) in enumerate(res):
+                        exp_extinction = exp_results[ix][0]
+                        if yield_ebv:
+                            exp_extinction /= 3.1
+                        exp_reliable = exp_results[ix][1]
+
+                        self.assertAlmostEqual(exp_extinction, val, 3)
+                        self.assertEqual(exp_reliable, reliable)
+
+
+    #
+    #   Tests: get_bayestar_ebv(coords: SkyCoord, version: str, conversion_factor: float) -> (val, flag)
+    #
+    def test_get_bayestar_ebv_happy_path(self):
+        """ Test get_bayestar_ebv() - simple happy path with known targets """
+        for target in ["UZ Dra", "IT Cas", "TIC 7695666"]:
+            with self.subTest(f" get_bayestar_ebv({target}) "):
+                config = self.targets[target]
+                val, reliable = get_bayestar_ebv(config["coords"])
+
+                exp_val, exp_reliable = config["bayestar"]
+                if not np.isnan(exp_val):
+                    self.assertAlmostEqual(exp_val / 3.1, val, 3)
+                else:
+                    self.assertTrue(np.isnan(val))
+                self.assertEqual(exp_reliable, reliable)
+
+
+    #
+    #   Tests: get_gontcharov_av(coords: SkyCoord) -> (val, flag)
+    #
+    def test_get_gontcharov_av_happy_path(self):
+        """ Test get_gontcharov_av() - simple happy path with known targets """
+        for target in ["UZ Dra", "IT Cas", "TIC 7695666"]:
+            with self.subTest(f" get_gontcharov_av({target}) "):
+                config = self.targets[target]
+                val, reliable = get_gontcharov_av(config["coords"])
+
+                exp_val, exp_reliable = config["gontcharov"]
+                if not np.isnan(exp_val):
+                    self.assertAlmostEqual(exp_val, val, 3)
+                else:
+                    self.assertTrue(np.isnan(val))
+                self.assertEqual(exp_reliable, reliable)
+
 
 if __name__ == "__main__":
     unittest.main()

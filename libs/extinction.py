@@ -20,10 +20,10 @@ from pyvo import registry, DALServiceError      # Vergeley at al. extinction cat
 
 
 def iterate(target_coords: SkyCoord,
-                     funcs: List[str]=None,
-                     rv: float=3.1,
-                     yield_ebv: bool=False,
-                     verbose: bool=False) -> Generator[Tuple[float, bool], None, None]:
+            funcs: List[str]=None,
+            rv: float=3.1,
+            yield_ebv: bool=False,
+            verbose: bool=False) -> Generator[Tuple[float, bool], None, None]:
     """
     Iterates through calls to the requested extinction lookup functions, published on this
     module, yielding a coefficient and reliability flag for each where a value available.
@@ -40,7 +40,7 @@ def iterate(target_coords: SkyCoord,
     :returns: Generator yielding the chosen value (when found) and a flag indicating its reliability
     """
     if funcs is None:
-        funcs = [get_gontcharov_av, get_decaps_av, get_bayestar_ebv] #, get_vergely_av]
+        funcs = [get_gontcharov_av, get_bayestar_ebv] #, get_vergely_av]
     if isinstance(funcs, str | Callable):
         funcs = [funcs]
 
@@ -48,7 +48,7 @@ def iterate(target_coords: SkyCoord,
         if isinstance(func, str):
             # Find the matching function in this module
             for name, member_func in getmembers(getmodule(iterate), isfunction):
-                if name.startswith("get_") and func in name:
+                if name.lower().startswith("get_") and func in name:
                     func = member_func
                     break
 
@@ -169,6 +169,7 @@ def _get_gontcharov_interp(interp_field: str="Av"):
     Gets an interpolator for the Gontcharov extinction map (J/PAZh/43/521/xyzejk) with which to
     interp either Av or E(B-V) data from galactic (X, Y, Z) coordinates.
     """
+    print("Acquiring Gontcharov (2017AstL...43..472G) XYZ catalog J/PAZh/43/521/xyzejk", end="...")
     old_row_limit = Vizier.ROW_LIMIT
     Vizier.ROW_LIMIT = -1
     cat = Vizier.get_catalogs(["J/PAZh/43/521/xyzejk"])[0]
@@ -177,7 +178,10 @@ def _get_gontcharov_interp(interp_field: str="Av"):
     # Can't get this into a RegularGridInterpolator I've been unable to get the data sorted
     # in a way that makes it happy. However RBFs are nice and flexible.
     points = np.array(list(zip(cat["X"].value, cat["Y"].value, cat["Z"].value)), dtype=float)
-    return RBFInterpolator(points, cat[interp_field].value, neighbors=3**points.shape[1])
+    interp = RBFInterpolator(points, cat[interp_field].value,
+                             neighbors=3**points.shape[1], smoothing=5)
+    print("done.")
+    return interp
 
 
 def get_vergely_av(target_coords: SkyCoord) -> Tuple[float, bool]:
