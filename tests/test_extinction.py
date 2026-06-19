@@ -6,7 +6,7 @@ import numpy as np
 import astropy.units as u
 from astropy.coordinates import SkyCoord, CartesianRepresentation
 
-from libs.extinction import iterate, get_bayestar_ebv, get_sfd_av, get_gontcharov_av
+from libs.extinction import iterate, get_bayestar_ebv, get_gontcharov_av
 
 class Testextinction(unittest.TestCase):
     """ Unit tests for the extinction module. """
@@ -17,21 +17,18 @@ class Testextinction(unittest.TestCase):
             # A_V values
             "gontcharov": (0.219, True),
             "bayestar": (0, False),
-            "sfd": (0.279, True),
         },
         # Covered by both Gontcharov and Bayestar
         "IT Cas": {
             "coords": SkyCoord(355.50569743 * u.deg, 51.74352579 * u.deg, 514.95778083 * u.pc, frame="icrs"),
             "gontcharov": (0.385, True),
             "bayestar": (0.356, True),
-            "sfd": (0.547, True),
         },
         # Way down south (in the LOPS2 field). Gontcharov still OK but outside of Bayestar coverage
         "TIC 7695666": {
             "coords": SkyCoord(65.64676092 * u.deg, -41.48319921 * u.deg, 367.56561186 * u.pc, frame="icrs"),
             "gontcharov": (0.197, True),
             "bayestar": (np.nan, False),
-            "sfd": (0.056, True)
         },
     }
 
@@ -41,7 +38,7 @@ class Testextinction(unittest.TestCase):
     def test_iterate_happy_path(self):
         """ Tests iterate() - basic happy path test """
         print()
-        funcs = ["gontcharov", "bayestar", "sfd"]
+        funcs = ["gontcharov", "bayestar"]
         for target in ["UZ Dra", "IT Cas", "TIC 7695666"]:
             for yield_ebv in [False, True]:
                 with self.subTest(f" iterate({target}, yield_ebv={yield_ebv}) "):
@@ -125,24 +122,6 @@ class Testextinction(unittest.TestCase):
                 val, reliable = get_gontcharov_av(coords)
 
                 self.assertAlmostEqual(exp_val, val, 2)
-                self.assertEqual(exp_reliable, reliable)
-
-
-    #
-    #   Tests: get_sfd_av(coords: SkyCoord) -> (val, flag)
-    #
-    def test_get_sfd_av_happy_path(self):
-        """ Test get_sfd_av() - simple happy path with known targets """
-        for target in ["UZ Dra", "IT Cas", "TIC 7695666"]:
-            with self.subTest(f" get_sfd_av({target}) "):
-                config = self.targets[target]
-                val, reliable = get_sfd_av(config["coords"])
-
-                exp_val, exp_reliable = config["sfd"]
-                if not np.isnan(exp_val):
-                    self.assertAlmostEqual(exp_val, val, 3)
-                else:
-                    self.assertTrue(np.isnan(val))
                 self.assertEqual(exp_reliable, reliable)
 
 
