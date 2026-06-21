@@ -15,9 +15,11 @@ import astropy.units as u
 from astropy.coordinates import SkyCoord
 from astroquery.vizier import Vizier
 
-from dustmaps import bayestar, decaps           # Bayestar and other exinction maps
-from pyvo import registry, DALServiceError      # Vergeley at al. extinction catalogue
+from dustmaps import config, bayestar, decaps, edenhofer2023    # Bayestar and other exinction maps
+from pyvo import registry, DALServiceError                      # Vergeley at al. extinction catalogue
 
+# Parent dir for cached dustmaps files
+config.config["data_dir"] = ".cache/.dustmapsrc"
 
 def iterate(target_coords: SkyCoord,
             funcs: List[str]=None,
@@ -29,7 +31,7 @@ def iterate(target_coords: SkyCoord,
     module, yielding a coefficient and reliability flag for each where a value available.
 
     If no funcs specified the following list will be used, in the order shown:
-    [get_gontcharov_av, get_bayestar_ebv]
+    [get_gontcharov_av, get_edenhofer2023_av, get_bayestar_ebv]
 
     :target_coords: the SkyCoords to get the extinction value for
     :funcs: optional list of functions to iterate over, either by name of function object.
@@ -40,7 +42,7 @@ def iterate(target_coords: SkyCoord,
     :returns: Generator yielding the chosen value (when found) and a flag indicating its reliability
     """
     if funcs is None:
-        funcs = [get_gontcharov_av, get_bayestar_ebv] #, get_vergely_av]
+        funcs = [get_gontcharov_av, get_edenhofer2023_av, get_bayestar_ebv] #, get_vergely_av]
     if isinstance(funcs, str | Callable):
         funcs = [funcs]
 
@@ -104,10 +106,9 @@ def get_bayestar_ebv(target_coords: SkyCoord,
 def _get_bayestar_query(version: str) -> bayestar.BayestarQuery:
     """ Gets a Bayestar query object. This function is cached as it's an expensive setup. """
     # Creates/confirms local cache of Bayestar data within the .cache directory
-    bayestar.config['data_dir'] = '.cache/.dustmapsrc'
-    bayestar.fetch(version=version)
-
     # Now we can use the local cache for the lookup - this takes some time to set up
+    print(f"Setting up query object for the {version.capitalize()} extinction map")
+    bayestar.fetch(version=version)
     return bayestar.BayestarQuery(version=version)
 
 
@@ -116,7 +117,9 @@ def get_decaps_av(target_coords: SkyCoord, rv: float=3.32) -> Tuple[float, bool]
     Queries the DECaPS dereddening map for the E(B-V) value for the target coordinates.
     This complements the Bayestar maps, being concentrated in the southern hemisphere
     suitable for when the Galactic dec is south of -30 deg.
-   
+
+    Heavy on resources (RAM & disk) and doesn't give good coverage of LOPS2.
+
     :target_coords: the astropy SkyCoords to query for
     :rv: the R_V value for the map, with the dustmaps docs recommending 3.32
     :returns: tuple of the Av value and a flags indicating whether it is reliable
@@ -132,11 +135,48 @@ def _get_decaps_query(mean_only: bool, contiguous: bool) -> decaps.DECaPSQueryLi
     """ Gets a Bayestar query object. This function is cached as it's an expensive setup. """
     # Creates/confirms local cache of DECaPS data within the .cache directory
     # silence_warnings prevents the fetch from asking user to confirm download
-    decaps.config['data_dir'] = '.cache/.dustmapsrc'
-    decaps.fetch(mean_only=mean_only, silence_warnings=True)
-
     # Now we can use the local cache for the lookup - this takes some time to set up
+    print("Setting up query object for the DECaPS extinction map")
+    decaps.fetch(mean_only=mean_only, silence_warnings=True)
     return decaps.DECaPSQueryLite(mean_only=mean_only, contiguous=contiguous)
+
+
+def get_edenhofer2023_av(target_coords: SkyCoord,
+                         flavor: str="main",
+                         mode: str="mean") -> Tuple[float, bool]:
+    """
+    Queries the Edenhofer et al. (2024A&A...685A..82E) 3D dustmap. This is based on the the
+    measurements of Zhang, Green & Rix (2023MNRAS.524.1855Z) and publishes extinction in
+    their units of E upon which we use the conversion: A_V = 2.8 * E (from 2023MNRAS.524.1855Z).
+   
+    See https://dustmaps.readthedocs.io/en/latest/modules.html#module-dustmaps.edenhofer2023
+    for more detail on options.
+
+    :target_coords: the astropy SkyCoords to query for
+    :flavor: the map, either "main" (69-1250 pc) or less_data_but_2kpc (69-2000 pc at lower res)
+    :mode: dictates returned values; "mean", "std", "samples" or "random_sample"
+    :returns: tuple of the Av value and a flags indicating whether it is reliable
+    """
+    # We use integrated=True to get extinction density in the ZGR E values, where A_V=2.8*E
+    query = _get_edenhofer2023_query(flavor=flavor,
+                                     fetch_samples="mean" not in mode,
+                                     integrated=True)
+    val = query(target_coords, mode=mode)
+    in_range = query.distance_bounds.min() < target_coords.distance < query.distance_bounds.max()
+    if val is None or np.isnan(val):
+        return None, False
+    return 2.8 * val, in_range
+
+@lru_cache
+def _get_edenhofer2023_query(flavor: str, fetch_samples: bool, integrated: bool) \
+                                                            -> edenhofer2023.Edenhofer2023Query:
+    """ Gets an Edenhofer2023Query query object. Function cached as may be an expensive setup. """
+    # Create/confirm the presence of the dataset in the local cache.
+    # Then read the local cache for the lookup. This takes some time to set up if integrated==True.
+    print("Setting up query object for the Edenhofer2023 extinction map")
+    edenhofer2023.fetch(fetch_samples=fetch_samples, fetch_2kpc="2kpc" in flavor)
+    return edenhofer2023.Edenhofer2023Query(load_samples=fetch_samples, integrated=integrated,
+                                            flavor=flavor, seed=42)
 
 
 def get_gontcharov_av(target_coords: SkyCoord) -> Tuple[float, bool]:
@@ -188,6 +228,10 @@ def get_vergely_av(target_coords: SkyCoord) -> Tuple[float, bool]:
     Queries the Vergely, Lallement & Cox (2022) [2022A&A...664A.174V] 3-d extinction map
     for the Av value of the target coordinates.
 
+    Source data is in Galactic XYZ (Sun at 0,0,0). X towards galactic centre, Y along direction
+    of rotation and Z positive towards galactic North. Distances are in pc.
+    Extinction density is in nanomag/pc at a wavelength of 550 nm.
+    
     TODO: this needs further work
 
     :target_coords: the astropy SkyCoords to query for   

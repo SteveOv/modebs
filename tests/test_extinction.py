@@ -6,7 +6,7 @@ import numpy as np
 import astropy.units as u
 from astropy.coordinates import SkyCoord, CartesianRepresentation
 
-from libs.extinction import iterate, get_bayestar_ebv, get_gontcharov_av
+from libs.extinction import iterate, get_bayestar_ebv, get_edenhofer2023_av, get_gontcharov_av
 
 class Testextinction(unittest.TestCase):
     """ Unit tests for the extinction module. """
@@ -17,18 +17,23 @@ class Testextinction(unittest.TestCase):
             # A_V values
             "gontcharov": (0.219, True),
             "bayestar": (0, False),
+            "edenhofer": (0.029, True),
         },
         # Covered by both Gontcharov and Bayestar
         "IT Cas": {
             "coords": SkyCoord(355.50569743 * u.deg, 51.74352579 * u.deg, 514.95778083 * u.pc, frame="icrs"),
+            # A_V values
             "gontcharov": (0.385, True),
             "bayestar": (0.356, True),
+            "edenhofer": (0.167, True),
         },
         # Way down south (in the LOPS2 field). Gontcharov still OK but outside of Bayestar coverage
         "TIC 7695666": {
             "coords": SkyCoord(65.64676092 * u.deg, -41.48319921 * u.deg, 367.56561186 * u.pc, frame="icrs"),
+            # A_V values
             "gontcharov": (0.197, True),
             "bayestar": (np.nan, False),
+            "edenhofer": (0.046, True), # If flavor is "main" this is 0.046 and for 2k it drops to 0.044
         },
     }
 
@@ -38,7 +43,7 @@ class Testextinction(unittest.TestCase):
     def test_iterate_happy_path(self):
         """ Tests iterate() - basic happy path test """
         print()
-        funcs = ["gontcharov", "bayestar"]
+        funcs = ["gontcharov", "bayestar", "edenhofer"]
         for target in ["UZ Dra", "IT Cas", "TIC 7695666"]:
             for yield_ebv in [False, True]:
                 with self.subTest(f" iterate({target}, yield_ebv={yield_ebv}) "):
@@ -74,6 +79,40 @@ class Testextinction(unittest.TestCase):
                     self.assertAlmostEqual(exp_val / 3.1, val, 3)
                 else:
                     self.assertTrue(np.isnan(val))
+                self.assertEqual(exp_reliable, reliable)
+
+
+
+    #
+    #   Tests: get_edenhofer2023_av(coords: SkyCoord, version: str) -> (val, flag)
+    #
+    def test_get_edenhofer2023_av_happy_path(self):
+        """ Test get_edenhofer2023_av() - simple happy path with known targets """
+        for target in ["UZ Dra", "IT Cas", "TIC 7695666"]:
+            with self.subTest(f" get_edenhofer2023_av({target}) "):
+                config = self.targets[target]
+                val, reliable = get_edenhofer2023_av(config["coords"])
+
+                exp_val, exp_reliable = config["edenhofer"]
+                if not np.isnan(exp_val):
+                    self.assertAlmostEqual(exp_val, val, 3)
+                else:
+                    self.assertTrue(np.isnan(val))
+                self.assertEqual(exp_reliable, reliable)
+
+    @unittest.skip("Combos other than the default of main/mean incur large donwload & mem use")
+    def test_get_edenhofer2023_av_flavor_and_mode(self):
+        """ Test get_edenhofer2023_av() flavor and mode options """
+        config = self.targets["TIC 7695666"]
+        for (flavor,                mode,       exp_val,        exp_reliable) in [
+            ("main",                "mean",     0.046,          True),
+            ("less_data_but_2kpc",  "mean",     0.044,          True),
+            # Excessive memory usage from the combination of the 18 GB samples file and integration
+            ("main",                "std" ,     0.000,          True),
+        ]:
+            with self.subTest(f" get_edenhofer2023_av(TIC 7695666, {flavor}, {mode}) "):
+                val, reliable = get_edenhofer2023_av(config["coords"], flavor=flavor, mode=mode)
+                self.assertAlmostEqual(exp_val, val, 3)
                 self.assertEqual(exp_reliable, reliable)
 
 
