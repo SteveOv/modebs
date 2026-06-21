@@ -12,7 +12,7 @@ from requests.exceptions import HTTPError
 import numpy as np
 from scipy.interpolate import RBFInterpolator
 import astropy.units as u
-from astropy.coordinates import SkyCoord
+from astropy.coordinates import SkyCoord, Galactic
 from astroquery.vizier import Vizier
 
 from dustmaps import config, bayestar, decaps, edenhofer2023    # Bayestar and other exinction maps
@@ -193,7 +193,7 @@ def get_gontcharov_av(target_coords: SkyCoord) -> Tuple[float, bool]:
     """
     ret_val, reliable = None, False
     interp = _get_gontcharov_interp("Av")
-    gal_xyz_coords = target_coords.transform_to("galactic").cartesian.xyz.value
+    gal_xyz_coords = target_coords.transform_to(Galactic).cartesian.xyz.value
 
     # Check the map covers the target
     points = interp.y
@@ -230,9 +230,11 @@ def get_vergely_av(target_coords: SkyCoord) -> Tuple[float, bool]:
 
     Source data is in Galactic XYZ (Sun at 0,0,0). X towards galactic centre, Y along direction
     of rotation and Z positive towards galactic North. Distances are in pc.
-    Extinction density is in nanomag/pc at a wavelength of 550 nm.
-    
-    TODO: this needs further work
+    Extinction density is in nanomag/pc at a wavelength of 550 nm (aka A0).
+
+    With the dust_exinction G23(RV=3.1) extinction curve the ratio of A0/AV is found to be 0.9985.
+
+    TODO: update to work with a cached copy of the data and an interp, as we do with Gontcharov
 
     :target_coords: the astropy SkyCoords to query for   
     :returns: tuple of the A_V value and a flags indicating whether it is reliable
@@ -245,15 +247,14 @@ def get_vergely_av(target_coords: SkyCoord) -> Tuple[float, bool]:
         vo_res = registry.search(ivoid=ivoid)[0]
 
         for res in [10, 50]: # central regions at 10 pc resolution and outer at 50 pc
-            cart = np.ceil(target_coords.cartesian.xyz.to(u.pc) / res) * res
+            cart = np.ceil(target_coords.transform_to(Galactic).cartesian.xyz.to(u.pc)/res) * res
             rec = vo_res.get_service('tap').search(f'SELECT * FROM "{table}" ' +
                 f'WHERE x={cart[0].value:.0f} AND y={cart[1].value:.0f} AND z={cart[2].value:.0f}')
 
             if len(rec):
-                # TODO: anything extra to map these values to Av?
-                ext_nmag_per_pc = rec["Exti"][0] # nmag
-                av = (ext_nmag_per_pc * target_coords.distance.to(u.pc).value) / 10**9
-                reliable = False
+                # The Exti field is extinction in nmag/pc @ 550 nm (A0).
+                av = rec["Exti"][0] * target_coords.distance.to(u.pc).value / 10**9 / 0.9985
+                reliable = True
                 break
     except DALServiceError as exc:
         print(f"Failed to query: {exc}")

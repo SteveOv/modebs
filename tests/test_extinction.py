@@ -6,7 +6,8 @@ import numpy as np
 import astropy.units as u
 from astropy.coordinates import SkyCoord, CartesianRepresentation
 
-from libs.extinction import iterate, get_bayestar_ebv, get_edenhofer2023_av, get_gontcharov_av
+from libs.extinction import iterate, get_bayestar_ebv, get_edenhofer2023_av
+from libs.extinction import get_gontcharov_av, get_vergely_av
 
 class Testextinction(unittest.TestCase):
     """ Unit tests for the extinction module. """
@@ -15,25 +16,28 @@ class Testextinction(unittest.TestCase):
         "UZ Dra": {
             "coords": SkyCoord(291.47947545 * u.deg, 68.93546881 * u.deg, 185.38698966 * u.pc, frame="icrs"),
             # A_V values
-            "gontcharov": (0.219, True),
             "bayestar": (0, False),
             "edenhofer": (0.029, True),
+            "gontcharov": (0.219, True),
+            "vergely": (0.011, True),
         },
         # Covered by both Gontcharov and Bayestar
         "IT Cas": {
             "coords": SkyCoord(355.50569743 * u.deg, 51.74352579 * u.deg, 514.95778083 * u.pc, frame="icrs"),
             # A_V values
-            "gontcharov": (0.385, True),
             "bayestar": (0.356, True),
             "edenhofer": (0.167, True),
+            "gontcharov": (0.385, True),
+            "vergely": (0.115, True),
         },
         # Way down south (in the LOPS2 field). Gontcharov still OK but outside of Bayestar coverage
         "TIC 7695666": {
             "coords": SkyCoord(65.64676092 * u.deg, -41.48319921 * u.deg, 367.56561186 * u.pc, frame="icrs"),
             # A_V values
-            "gontcharov": (0.197, True),
             "bayestar": (np.nan, False),
             "edenhofer": (0.046, True), # If flavor is "main" this is 0.046 and for 2k it drops to 0.044
+            "gontcharov": (0.197, True),
+            "vergely": (0.010, True),
         },
     }
 
@@ -75,10 +79,12 @@ class Testextinction(unittest.TestCase):
                 val, reliable = get_bayestar_ebv(config["coords"])
 
                 exp_val, exp_reliable = config["bayestar"]
-                if not np.isnan(exp_val):
-                    self.assertAlmostEqual(exp_val / 3.1, val, 3)
-                else:
+                if exp_val is None:
+                    self.assertIsNone(val)
+                elif np.isnan(exp_val):
                     self.assertTrue(np.isnan(val))
+                else:
+                    self.assertAlmostEqual(exp_val / 3.1, val, 3)
                 self.assertEqual(exp_reliable, reliable)
 
 
@@ -94,10 +100,12 @@ class Testextinction(unittest.TestCase):
                 val, reliable = get_edenhofer2023_av(config["coords"])
 
                 exp_val, exp_reliable = config["edenhofer"]
-                if not np.isnan(exp_val):
-                    self.assertAlmostEqual(exp_val, val, 3)
-                else:
+                if exp_val is None:
+                    self.assertIsNone(val)
+                elif np.isnan(exp_val):
                     self.assertTrue(np.isnan(val))
+                else:
+                    self.assertAlmostEqual(exp_val, val, 3)
                 self.assertEqual(exp_reliable, reliable)
 
     @unittest.skip("Combos other than the default of main/mean incur large donwload & mem use")
@@ -127,10 +135,12 @@ class Testextinction(unittest.TestCase):
                 val, reliable = get_gontcharov_av(config["coords"])
 
                 exp_val, exp_reliable = config["gontcharov"]
-                if not np.isnan(exp_val):
-                    self.assertAlmostEqual(exp_val, val, 3)
-                else:
+                if exp_val is None:
+                    self.assertIsNone(val)
+                elif np.isnan(exp_val):
                     self.assertTrue(np.isnan(val))
+                else:
+                    self.assertAlmostEqual(exp_val, val, 3)
                 self.assertEqual(exp_reliable, reliable)
 
     def test_get_gontcharov_av_test_interpolation(self):
@@ -161,6 +171,26 @@ class Testextinction(unittest.TestCase):
                 val, reliable = get_gontcharov_av(coords)
 
                 self.assertAlmostEqual(exp_val, val, 2)
+                self.assertEqual(exp_reliable, reliable)
+
+
+    #
+    #   Tests: get_vergely_av(coords: SkyCoord) -> (val, flag)
+    #
+    def test_get_vergely_av_happy_path(self):
+        """ Test get_vergely_av() - simple happy path with known targets """
+        for target in ["UZ Dra", "IT Cas", "TIC 7695666"]:
+            with self.subTest(f" get_vergely_av({target}) "):
+                config = self.targets[target]
+                val, reliable = get_vergely_av(config["coords"])
+
+                exp_val, exp_reliable = config["vergely"]
+                if exp_val is None:
+                    self.assertIsNone(val)
+                elif np.isnan(exp_val):
+                    self.assertTrue(np.isnan(val))
+                else:
+                    self.assertAlmostEqual(exp_val, val, 3)
                 self.assertEqual(exp_reliable, reliable)
 
 
