@@ -270,7 +270,7 @@ if __name__ == "__main__":
                 print("\nPerforming 'quick' minimize fits to mask outliers and set MCMC start.")
                 theta_fit = None
                 retain_mask = np.ones_like(x, dtype=bool)
-                min_to_retain, improve_th = int(np.ceil(len(sed) * 0.75)), 0.8
+                min_to_retain, improve_th = max(15, int(np.ceil(len(sed) * 0.75))), 0.8
                 print(f"Outliers masked when doing so improves fit stat > {1-improve_th:.0%}")
                 cmask, cix, prev_stat = retain_mask.copy(), None, np.inf
                 for out_ix in range(len(sed)): # Want this to run at least once so we set theta_fit
@@ -363,8 +363,8 @@ if __name__ == "__main__":
 
                         _chain = sampler.get_chain(flat=False)
                         _burn_in_samples = _chain.shape[0] - (_data.shape[0] / args.mcmc_walkers)
-                        fig, axes = plt.subplots(nrows=sum(fit_mask), figsize=(9, 2*sum(fit_mask)),
-                                                 sharex=True)
+                        fig, axes = plt.subplots(nrows=sum(fit_mask), figsize=(8, 1.5*sum(fit_mask)),
+                                                 sharex=True, constrained_layout=True)
                         for ix, ax in enumerate(axes.flat):
                             ax.plot(_chain[:, :, ix], "tab:blue", alpha=0.05)
                             ax.axvspan(0, _burn_in_samples, color="silver")
