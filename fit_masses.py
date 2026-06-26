@@ -61,8 +61,14 @@ if __name__ == "__main__":
                     help="plot figs for each target as the process progresses")
     ap.add_argument("-ms", "--max-steps", dest="max_mcmc_steps", type=int, required=False,
                     help="the maximum number of MCMC steps to run for [100 000]")
+    ap.add_argument("-mw", "--mcmc-walkers", dest="mcmc_walkers", type=int, required=False,
+                    help="the number of MCMC walkers to use [100]")
+    ap.add_argument("-mp", "--mcmc-processes", dest="mcmc_processes", type=int, required=False,
+                    help="the number of concurrent MCMC processes to run [8]")
+    ap.add_argument("-mo", "--mcmc-off", dest="do_mcmc_fit", action="store_false", required=False,
+                    help="suppress running of MCMC for parameters")
     ap.set_defaults(plot_figs=False, figs_type="png", figs_dpi=100, do_mcmc_fit=True,
-                    max_mcmc_steps=100000, mcmc_walkers=100, mcmc_thin_by=10, mcmc_processes=5)
+                    max_mcmc_steps=100000, mcmc_walkers=100, mcmc_thin_by=10, mcmc_processes=8)
     args = ap.parse_args()
     drop_dir = Path.cwd() / f"drop/{args.targets_file.stem}"
 
