@@ -135,12 +135,15 @@ if __name__ == "__main__":
 
 
                 # Estimate fit starting position with masses derived from M_sys & the expected mass
-                # ratio and an approximate age for the more massive star within the main-sequence.
+                # ratio and an approximate mid main-sequence age for the more massive star.
                 print("\nSetting up the starting position (theta0) for fitting [MA, MB, log(age)].")
                 if (qphot := trow.qphot) is None or nom_val(qphot) <= 0:
                     qphot = 1
                 theta_masses = nom_vals([_MA := M_sys / (qphot + 1), M_sys - _MA])
-                theta_age = log_age_for_mass_and_eep(np.max(theta_masses))
+                theta_age = np.log10(np.mean([
+                    10**log_age_for_mass_and_eep(np.max(theta_masses), 202),    # ZAMS
+                    10**log_age_for_mass_and_eep(np.max(theta_masses), 454),    # TAMS
+                ]))
                 theta0 = np.concatenate([theta_masses, [theta_age]])
                 print_mass_theta(theta0, "theta0")
 
