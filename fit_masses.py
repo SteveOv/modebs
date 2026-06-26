@@ -132,8 +132,7 @@ if __name__ == "__main__":
                 # ratio and an approximate age for the more massive star within the main-sequence.
                 print("\nSetting up the starting position (theta0) for fitting [MA, MB, log(age)].")
                 if (qphot := trow.qphot) is None or nom_val(qphot) <= 0:
-                    # The approx single k-q (k=q^0.715) relations of Demircan & Kahraman (1991).
-                    qphot = trow.k**1.4
+                    qphot = 1
                 theta_masses = nom_vals([_MA := M_sys / (qphot + 1), M_sys - _MA])
                 theta_age = log_age_for_mass_and_eep(np.max(theta_masses))
                 theta0 = np.concatenate([theta_masses, [theta_age]])
@@ -157,7 +156,7 @@ if __name__ == "__main__":
                 # Set up the likelihood function to evaluate the result of each theta
                 # against known observations from SED fitting
                 print("\nGetting known values from previous stages to set up observed values")
-                y_obs = np.empty((6,), dtype=object)
+                y_obs = np.empty((6, ), dtype=np.dtype(UFloat.dtype))
                 for ix, col in enumerate(["RA", "RB", "TeffA", "TeffB", "loggA", "loggB"]):
                     val = trow[col]
                     if not isinstance(val, UFloat) or not val.s:
