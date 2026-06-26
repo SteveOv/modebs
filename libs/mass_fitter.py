@@ -258,13 +258,18 @@ def mcmc_fit(theta0: np.ndarray[float],
     return uarray(fit_nom, np.mean([fit_err_high, fit_err_low], axis=0)), sampler
 
 
-def log_age_for_mass_and_eep(mass: float, eep: int=300) -> float:
+def log_age_for_mass_and_eep(mass: float, eep: int=353) -> float:
     """
-    An approximate log10(age) for the requested mass and equivalent evolutionary point (EEP).
+    An approximate log10(age) for the requested mass and Equivalent Evolutionary Point (EEP).
     Within the same phases range as the interpolators used for radii & masses for the model func.
+
+    Known "primary" EEPs are:
+    202 - ZAMS (Zero Age M-S)
+    353 - IAMS (Intermediate Age M-S)
+    454 - TAMS (Terminal Age M-S)
 
     :mass: the requested mass (solMass)
     :eep: the equivalent evolutionay point (EEP)
-    :returns: the log(age) of the nearest mass
+    :returns: a log(age) for the requested EEP and star mass
     """
     return np.log10(age_interp([(eep, mass)])[0])
