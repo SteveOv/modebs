@@ -105,7 +105,8 @@ def get_sed_for_target(target: str,
         sed["sed_freq"].convert_unit_to(freq_unit, equivalencies=u.spectral())
 
     if remove_duplicates:
-        sed = unique(sed, keys=["sed_filter", "sed_freq", "sed_flux", "sed_eflux"], keep="first")
+        sed = unique(sed, keep="first",
+                     keys=["sed_filter","sed_freq","sed_flux","sed_eflux","_RAJ2000","_DEJ2000"])
         ucount = len(sed)
         if verbose: print(f"Dropped {rcount-ucount} duplicate(s) leaving {ucount} unique row(s).")
         sed.sort(["sed_freq"], reverse=True)
