@@ -12,6 +12,7 @@ from numbers import Number
 from datetime import datetime, timezone, timedelta
 
 import astropy.units as u
+from astropy.coordinates import SkyCoord
 from astropy.table import Table, unique
 from astropy.io.votable import parse_single_table
 from uncertainties import UFloat, unumpy
@@ -110,6 +111,24 @@ def get_sed_for_target(target: str,
         ucount = len(sed)
         if verbose: print(f"Dropped {rcount-ucount} duplicate(s) leaving {ucount} unique row(s).")
         sed.sort(["sed_freq"], reverse=True)
+    return sed
+
+
+def retain_closest_observations(sed: Table, target_coords: SkyCoord) -> Table:
+    """
+    Will parse the passed SED table and add a dist_r column for the angular distance of each
+    observation from the target's coordinates. With this, the SED table will be updated to leave
+    only the closest observation to the target for each sed_filter within the table.
+
+    :sed: the SED table to filter
+    :target_coordinates: the target's coordinates
+    :returns: the revised SED table, sorted on the sed_wl field
+    """
+    sed["dist_r"] = np.sqrt((target_coords.ra.to(u.deg).value - sed['_RAJ2000'])**2
+                            + (target_coords.dec.to(u.deg).value - sed['_DEJ2000'])**2)
+    sed.sort(["sed_filter", "dist_r"])
+    sed = unique(sed, keys=["sed_filter"], keep="first")
+    sed.sort(["sed_wl"])
     return sed
 
 
