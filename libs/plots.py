@@ -343,7 +343,7 @@ def plot_sed(x: u.Quantity,
 def plot_fitted_model_sed(sed: Table,
                           theta: ArrayLike,
                           model_grid: SvoStellarGrid,
-                          sed_flux_colname: str="sed_der_flux",
+                          sed_flux_colname: str="sed_flux",
                           sed_flux_err_colname: str="sed_eflux",
                           sed_filter_colname: str="sed_filter",
                           sed_lambda_colname: str="sed_wl",
@@ -381,7 +381,7 @@ def plot_fitted_model_sed(sed: Table,
                    [sed[sed_flux_colname].quantity, np.sum(comp_fluxes, axis=0)] +list(comp_fluxes),
                    [sed[sed_flux_err_colname].quantity, None] + [None]*nstars,
                    ["ob", ".k"] + list(_cycle_for(comp_fmts, nstars)),
-                   ["dereddened SED", "fitted pair"] +[f"fitted star {i+1}" for i in range(nstars)],
+                   ["observed", "fitted pair"] +[f"fitted star {i+1}" for i in range(nstars)],
                    **format_kwargs)
 
     # Plot the raw spectra for each component as a background

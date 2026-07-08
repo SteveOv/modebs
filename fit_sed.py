@@ -8,7 +8,6 @@ import argparse
 from datetime import datetime
 from contextlib import redirect_stdout
 import traceback
-from time import sleep
 from textwrap import fill
 
 import numpy as np
@@ -53,11 +52,13 @@ theta_params_and_units = np.array([(f"Teff{sub}", u.K) for sub in subs]
                                 + [("dist", u.pc), ("Av", u.dimensionless_unscaled)])
 
 # Dictates which params in theta are fitted (True) and which are held fixed (False)
+fit_av = False
+use_quick_mode = True   # If True, grid uses pre-filtered fluxes
 fit_mask = np.array([True] * NSTARS      # Teff
                   + [False] * NSTARS     # logg
                   + [True] * NSTARS      # radius
-                  + [True]                  # dist
-                  + [False])                # Av (we handle av by derredening the SED)
+                  + [True]               # dist
+                  + [fit_av])            # Av
 
 # Use a non-interactive matplotlib backend to avoid threading errors (issue #36).
 mpl_use("agg")
@@ -109,7 +110,8 @@ if __name__ == "__main__":
         # Model SED grid based on atmosphere models with known filters pre-applied to non-reddened
         # fluxes. Available grids: BtSettlGrid or KuruczGrid
         model_grid = get_stellar_grid(targets_config.get("stellar_grid", "BtSettlGrid"),
-                                      extinction_model=ext_model, verbose=True)
+                                      extinction_model=ext_model,
+                                      use_quick_mode=use_quick_mode, verbose=True)
         print("Loaded grid based on synthetic models, covering the ranges:")
         print(f"wavelength {model_grid.wavelength_range * model_grid.wavelength_unit:unicode},",
               f"Teff {model_grid.teff_range * model_grid.teff_unit:unicode},",
@@ -123,8 +125,6 @@ if __name__ == "__main__":
         radius_limits = (0.05, 100)
 
         for fit_counter, trow in enumerate(dal.acquire_next_row(**to_fit_criteria), start=1):
-            if fit_counter > 1:
-                sleep(10) # Give emcee a quick break, in prep for the next target
 
             try:
                 target_id = trow.key
@@ -162,13 +162,12 @@ if __name__ == "__main__":
                     avs = np.array([*extinction.iterate(coords, rv=ext_model.Rv, verbose=True)]).T
                     if any(rmask := np.array(avs[1], dtype=bool)):
                         # We have some reliable extinction values, use only these
-                        Av = np.mean(avs[0][rmask])
+                        Av = ufloat(np.mean(avs[0][rmask]), np.std(avs[0][rmask]))
                         print(f"Using the mean of {sum(rmask)} reliable value(s): A_V={Av:.6f}")
                     else:
-                        Av = np.mean(avs[0])
+                        Av = ufloat(np.mean(avs[0]), np.std(avs[0]))
                         print(f"Using the mean of {len(rmask)} value(s): A_V={Av:.6f}")
                         trow.append_warning("unreliable A_V")
-                Av = Av or 0
 
 
                 # Get the SED for this target and de-duplicate (obs may appear multiple times).
@@ -188,23 +187,33 @@ if __name__ == "__main__":
                             & (sed["sed_wl"] >= min(model_grid.wavelength_range)) \
                             & (sed["sed_wl"] <= max(model_grid.wavelength_range))
                 sed = sed[model_mask]
-
-                print("Creating de-reddened SED observations")
-                sed["sed_der_flux"] = sed["sed_flux"] \
-                                    / ext_model.extinguish(sed["sed_wl"].to(u.um), Av=Av)
                 sed.sort(["sed_wl"])
                 print(f"{len(sed)} unique SED observation(s) retained after range and exclusion",
                       "filtering,\nwith the units for flux, frequency and wavelength being",
                       ", ".join(f"{sed[f].unit:unicode}" for f in ["sed_flux","sed_freq","sed_wl"]))            
 
-                if args.plot_figs:
-                    print("\nCreating SED observations plot")
-                    _fluxes = [sed["sed_flux"], sed["sed_der_flux"]] if Av else [sed["sed_flux"]]
-                    fig = plots.plot_sed(sed["sed_wl"].quantity, _fluxes, [sed["sed_eflux"]]*2,
-                                    fmts=["or", ".b"], title=f"{target_id} SED",
-                                    labels=["observed",f"dereddened\n($A_{{\\rm V}}={Av:.3f})$"])
-                    fig.savefig(figs_dir / f"sed-observations.{args.figs_type}", dpi=args.figs_dpi)
-                    plt.close(fig)
+
+                if fit_av:
+                    print("Will not de-redden SED observations as Av will be fitted")
+                    sed["sed_fit_flux"] = sed["sed_flux"]
+                    if args.plot_figs:
+                        fig = plots.plot_sed(sed["sed_wl"].quantity, [sed["sed_fit_flux"]],
+                                             [sed["sed_eflux"]], fmts=["or"], labels=["observed"],
+                                             title=f"{target_id} SED observations")
+                        fig.savefig(figs_dir/f"sed-observations.{args.figs_type}",dpi=args.figs_dpi)
+                        plt.close(fig)
+                else:
+                    print("Creating de-reddened SED observations")
+                    sed["sed_fit_flux"] = sed["sed_flux"] \
+                                    / ext_model.extinguish(sed["sed_wl"].to(u.um), Av=nom_val(Av))
+                    if args.plot_figs:
+                        fig = plots.plot_sed(sed["sed_wl"].quantity,
+                                             [sed["sed_flux"],sed["sed_fit_flux"]],
+                                             [sed["sed_eflux"]]*2,
+                                            fmts=["or", ".b"], labels=["observed", "dereddened"], 
+                                            title=f"{target_id} SED observations")
+                        fig.savefig(figs_dir/f"sed-observations.{args.figs_type}",dpi=args.figs_dpi)
+                        plt.close(fig)
 
 
                 # Set up the MCMC fitting theta and priors. For now, hard coded to 2 stars.
@@ -213,12 +222,15 @@ if __name__ == "__main__":
                 TeffR, radR = trow.TeffR, trow.k
                 TeffR_priors = tuple([1]+ [ufloat(TeffR.n, max(TeffR.s, TeffR.n * .05))]*(NSTARS-1))
                 radR_priors = tuple([1] + [ufloat(radR.n, max(radR.s, radR.n * .05))]*(NSTARS-1))
+                av_prior = 0
+                if fit_av:
+                    av_prior = ufloat(nom_val(Av), std_dev(Av) or (nom_val(Av) * .05))
                 dist_prior = 1000 / trow.parallax
                 if not isinstance(dist_prior, UFloat) or not dist_prior.s:
                     dist_prior = ufloat(nom_val(dist_prior), nom_val(dist_prior) * .05)
-                print(f"Priors: Teff ratios=({', '.join(f'{r:.3f}' for r in TeffR_priors)}),",
-                      f"radius ratios=({', '.join(f'{r:.3f}' for r in radR_priors)}),",
-                      f"dist={dist_prior:.3f},",
+                print(f"Priors: TeffR=({', '.join(f'{r:.3f}' for r in TeffR_priors)}),",
+                      f"radR=({', '.join(f'{r:.3f}' for r in radR_priors)}),",
+                      f"dist={dist_prior:.3f}, Av={av_prior:.3f},",
                       f"Teff_limits={teff_limits}, radius_limits={radius_limits}")
 
                 def ln_prior_func(theta: np.ndarray[float]) -> float:
@@ -233,10 +245,12 @@ if __name__ == "__main__":
                     teffs = theta[0:NSTARS]
                     radii = theta[NSTARS*2:NSTARS*3]
                     dist = theta[-2]
+                    av = theta[-1]
 
                     # Limit criteria checks - hard pass/fail on these
                     if not all(teff_limits[0] <= t <= teff_limits[1] for t in teffs) or \
-                        not all(radius_limits[0] <= r <= radius_limits[1] for r in radii):
+                        not all(radius_limits[0] <= r <= radius_limits[1] for r in radii) or \
+                        not 0 <= av:
                         return -np.inf
 
                     # Gaussian prior criteria: g(x) = 1/(σ*sqrt(2*pi)) * exp(-1/2 * (x-µ)^2/σ^2)
@@ -246,6 +260,8 @@ if __name__ == "__main__":
                         rval += ((teffs[c]/teffs[0] - TeffR_priors[c].n) / TeffR_priors[c].s)**2
                         rval += ((radii[c]/radii[0] - radR_priors[c].n) / radR_priors[c].s)**2
                     rval += ((dist - dist_prior.n) / dist_prior.s)**2
+                    if fit_av:
+                        rval += ((av - av_prior.n) / av_prior.s)**2
                     return -0.5 * rval
 
 
@@ -256,26 +272,26 @@ if __name__ == "__main__":
                                       loggs=[init_logg] * NSTARS,
                                       radii=[1.0] * NSTARS,
                                       dist=coords.distance.to(u.pc).value,
-                                      av=0,
+                                      av=nom_val(Av) if fit_av else 0,
                                       nstars=NSTARS,
                                       verbose=True)
                 x = model_grid.get_filter_indices(sed["sed_filter"])
-                y = (sed["sed_der_flux"].quantity * sed["sed_freq"].quantity)\
+                y = (sed["sed_fit_flux"].quantity * sed["sed_freq"].quantity)\
                                         .to(model_grid.flux_unit, equivalencies=u.spectral()).value
                 y_err = (sed["sed_eflux"].quantity * sed["sed_freq"].quantity)\
                                         .to(model_grid.flux_unit, equivalencies=u.spectral()).value
 
 
-                # Minimize fits to do outlier filtering and optionally give a starting pos for MCMC
-                print("\nPerforming 'quick' minimize fits to mask outliers and set MCMC start.")
+                # Minimize fits to do outlier pruning and optionally give a starting pos for MCMC
+                print("\nPerforming 'quick' minimize fits to prune outliers and set MCMC start.")
                 theta_fit = None
                 retain_mask = np.ones_like(x, dtype=bool)
                 min_to_retain, improve_th = max(15, int(np.ceil(len(sed) * 0.75))), 0.8
-                print(f"Outliers masked when doing so improves fit stat > {1-improve_th:.0%}")
+                print(f"Outliers pruned when doing so improves fit stat > {1-improve_th:.0%}")
                 cmask, cix, prev_stat = retain_mask.copy(), None, np.inf
                 for out_ix in range(len(sed)): # Want this to run at least once so we set theta_fit
                     if prev_stat < 1: # implicitly out_ix > 0
-                        print("Stopping outliers search as stat < 1.0")
+                        print("Stopped outlier pruning as stat < 1.0")
                         break
 
                     ctheta, result = minimize_fit(x=x[cmask],
@@ -318,21 +334,19 @@ if __name__ == "__main__":
                 if args.plot_figs:
                     print("\nCreating retained SED observations plot")
                     fig = plots.plot_sed(sed["sed_wl"][retain_mask].quantity,
-                                    [sed["sed_flux"][retain_mask],sed["sed_der_flux"][retain_mask]],
-                                    [sed["sed_eflux"][retain_mask]]*2,
-                                    fmts=["or", ".b"], title=f"{target_id} SED",
-                                    labels=["observed",f"dereddened\n($A_{{\\rm V}}={Av:.3f})$"])
+                                         [sed["sed_fit_flux"][retain_mask]],
+                                         [sed["sed_eflux"][retain_mask]],
+                                         fmts=[".b"], title=f"{target_id} SED", labels=["retained"])
                     fig.savefig(figs_dir / f"sed-obs-retained.{args.figs_type}", dpi=args.figs_dpi)
                     plt.close(fig)
 
 
                 if args.do_mcmc_fit:
-                    print("\nPerforming a full MCMC from the output from the 'quick' fit.",
-                          "Values marked * are free.")
+                    print("\nPerforming a full MCMC. Values marked * are free.")
                     theta_fit, sampler = mcmc_fit(x=x[retain_mask],
                                                   y=y[retain_mask],
                                                   y_err=y_err[retain_mask],
-                                                  theta0=theta_fit,
+                                                  theta0=theta0,
                                                   fit_mask=fit_mask,
                                                   stellar_grid=model_grid,
                                                   ln_prior_func=ln_prior_func,
@@ -340,8 +354,9 @@ if __name__ == "__main__":
                                                   nsteps=args.max_mcmc_steps,
                                                   thin_by=args.mcmc_thin_by,
                                                   seed=42,
-                                                  early_stopping=True,
                                                   processes=args.mcmc_processes,
+                                                  early_stopping=True,
+                                                  early_stopping_from=10000,
                                                   progress=True,
                                                   verbose=True)
 
@@ -357,7 +372,8 @@ if __name__ == "__main__":
                         plt.close(fig)
 
                         fig = plots.plot_fitted_model_sed(sed[retain_mask], theta_fit, model_grid,
-                                                        title=f"{target_id} SED & MCMC model fit")
+                                                          sed_flux_colname="sed_fit_flux",
+                                                          title=f"{target_id} SED & MCMC model fit")
                         fig.savefig(figs_dir / f"sed-mcmc-fit.{args.figs_type}", dpi=args.figs_dpi)
                         plt.close(fig)
 
