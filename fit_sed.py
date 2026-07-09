@@ -31,7 +31,7 @@ from sed_fit.fitter import _print_theta # pylint: disable=protected-access
 
 from libs import extinction, plots
 from libs.pipeline import PipelineError
-from libs.sed import get_sed_for_target
+from libs.sed import get_sed_for_target, retain_closest_observations
 from libs.iohelpers import Tee
 from libs.targets import Targets
 from libs.pipeline_dal import create_dal
@@ -177,7 +177,9 @@ if __name__ == "__main__":
                 if sed is None or len(sed) == 0:
                     raise PipelineError(target_id, f"No SED observations for '{trow.search_term}'")
 
-                # Filter SED to those covered by our models and also remove any outliers
+                # Reduce the SED to 1 obs per Filter, the one closest to the target coords. Then
+                # filter it to those Filters covered by our models and also remove any outliers
+                sed = retain_closest_observations(sed, coords)
                 model_mask = np.ones((len(sed)), dtype=bool)
                 model_mask &= model_grid.has_filter(sed["sed_filter"])
                 model_mask &= ~np.isin(sed["sed_filter"], config.get("sed_filter_exclusions", []))
@@ -188,32 +190,34 @@ if __name__ == "__main__":
                             & (sed["sed_wl"] <= max(model_grid.wavelength_range))
                 sed = sed[model_mask]
                 sed.sort(["sed_wl"])
-                print(f"{len(sed)} unique SED observation(s) retained after range and exclusion",
-                      "filtering,\nwith the units for flux, frequency and wavelength being",
+                print(f"{len(sed)} unique SED observation(s) retained after range & exclusion",
+                      "filtering, and\nthe retention of only the 'closest' observation to the",
+                      "target for each Filter.\nThe units for flux, frequency and wavelength are:",
                       ", ".join(f"{sed[f].unit:unicode}" for f in ["sed_flux","sed_freq","sed_wl"]))            
 
 
                 if fit_av:
                     print("Will not de-redden SED observations as Av will be fitted")
                     sed["sed_fit_flux"] = sed["sed_flux"]
-                    if args.plot_figs:
-                        fig = plots.plot_sed(sed["sed_wl"].quantity, [sed["sed_fit_flux"]],
-                                             [sed["sed_eflux"]], fmts=["or"], labels=["observed"],
-                                             title=f"{target_id} SED observations")
-                        fig.savefig(figs_dir/f"sed-observations.{args.figs_type}",dpi=args.figs_dpi)
-                        plt.close(fig)
                 else:
                     print("Creating de-reddened SED observations")
                     sed["sed_fit_flux"] = sed["sed_flux"] \
                                     / ext_model.extinguish(sed["sed_wl"].to(u.um), Av=nom_val(Av))
-                    if args.plot_figs:
+
+                if args.plot_figs:
+                    print("\nCreating SED observations plot")
+                    if fit_av:
+                        fig = plots.plot_sed(sed["sed_wl"].quantity, [sed["sed_fit_flux"]],
+                                             [sed["sed_eflux"]], fmts=["or"], labels=["observed"],
+                                             title=f"{target_id} SED observations")
+                    else:
                         fig = plots.plot_sed(sed["sed_wl"].quantity,
                                              [sed["sed_flux"],sed["sed_fit_flux"]],
                                              [sed["sed_eflux"]]*2,
-                                            fmts=["or", ".b"], labels=["observed", "dereddened"], 
-                                            title=f"{target_id} SED observations")
-                        fig.savefig(figs_dir/f"sed-observations.{args.figs_type}",dpi=args.figs_dpi)
-                        plt.close(fig)
+                                             fmts=["or", ".b"], labels=["observed", "dereddened"],
+                                             title=f"{target_id} SED observations")
+                    fig.savefig(figs_dir / f"sed-observations.{args.figs_type}", dpi=args.figs_dpi)
+                    plt.close(fig)
 
 
                 # Set up the MCMC fitting theta and priors. For now, hard coded to 2 stars.
@@ -286,7 +290,7 @@ if __name__ == "__main__":
                 print("\nPerforming 'quick' minimize fits to prune outliers and set MCMC start.")
                 theta_fit = None
                 retain_mask = np.ones_like(x, dtype=bool)
-                min_to_retain, improve_th = max(15, int(np.ceil(len(sed) * 0.75))), 0.8
+                min_to_retain, improve_th = max(10, int(np.ceil(len(sed) * 0.75))), 0.8
                 print(f"Outliers pruned when doing so improves fit stat > {1-improve_th:.0%}")
                 cmask, cix, prev_stat = retain_mask.copy(), None, np.inf
                 for out_ix in range(len(sed)): # Want this to run at least once so we set theta_fit
