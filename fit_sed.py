@@ -287,16 +287,20 @@ if __name__ == "__main__":
 
 
                 # Minimize fits to do outlier pruning and optionally give a starting pos for MCMC
-                print("\nPerforming 'quick' minimize fits to prune outliers and set MCMC start.")
+                print("\nPerforming 'quick' minimize fits to prune outliers.")
                 theta_fit = None
                 retain_mask = np.ones_like(x, dtype=bool)
                 min_to_retain, improve_th = max(10, int(np.ceil(len(sed) * 0.75))), 0.8
                 print(f"Outliers pruned when doing so improves fit stat > {1-improve_th:.0%}")
                 cmask, cix, prev_stat = retain_mask.copy(), None, np.inf
-                for out_ix in range(len(sed)): # Want this to run at least once so we set theta_fit
-                    if prev_stat < 1: # implicitly out_ix > 0
-                        print("Stopped outlier pruning as stat < 1.0")
-                        break
+                for out_ix in range(len(sed)):
+                    if out_ix > 0: # Must run at least once so we have a baseline & set theta_fit
+                        if prev_stat < 1:
+                            print("Stopped pruning as stat < 1.0")
+                            break
+                        if sum(cmask) < min_to_retain:
+                            print(f"Stopped pruning as #rows at/below the min of {min_to_retain}")
+                            break
 
                     ctheta, result = minimize_fit(x=x[cmask],
                                                   y=y[cmask],
@@ -311,10 +315,6 @@ if __name__ == "__main__":
                     if out_ix == 0:
                         print("baseline", end="; ")
                         theta_fit = ctheta
-
-                    if (num_retained := sum(cmask)) <= min_to_retain:
-                        print(f"stopped as SED rows are at or below the minimum of {min_to_retain}")
-                        break
 
                     if out_ix > 0:
                         print(f"candidate {cix}/{sed['sed_filter'][cix]}", end="; ")
