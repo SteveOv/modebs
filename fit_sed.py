@@ -272,9 +272,14 @@ if __name__ == "__main__":
                 print("\nSetting up the starting position (theta0) for fitting.")
                 init_teff = max(teff_limits[0], min(nom_val(trow.Teff_sys), teff_limits[1]))
                 init_logg = max(logg_limits[0], min(nom_val(trow.logg_sys), logg_limits[1]))
+                init_rad = max(radius_limits[0], min(init_teff / 5500, radius_limits[1]))
+                if radR < 1:
+                    init_rads = [init_rad] + [init_rad * nom_val(radR)] * (NSTARS-1)
+                else:
+                    init_rads = [init_rad / nom_val(radR)] + [init_rad] * (NSTARS-1)
                 theta0 = create_theta(teffs=[init_teff] * NSTARS,
                                       loggs=[init_logg] * NSTARS,
-                                      radii=[1.0] * NSTARS,
+                                      radii=init_rads,
                                       dist=coords.distance.to(u.pc).value,
                                       av=nom_val(Av) if fit_av else 0,
                                       nstars=NSTARS,
