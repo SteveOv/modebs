@@ -13,7 +13,8 @@
         "detrend_iterations": 3,
         "default_ld_law": "quad",
         "lc_fit_retries": 2,
-        "lc_fit_timeout": 900
+        "lc_fit_timeout": 900,
+        "sed_tabname_exclusions": ["B/denis/denis"]
     },
     "target_configs": {
         "V539 Ara": {
@@ -423,6 +424,7 @@
             "depthP": 0.277,
             "depthS": 0.205,
             "phiS": 0.449,
+            "sed_filter_exclusions": ["GALEX:NUV"],
             "labels": {
                 "citation_key": "Southworth21obsR7",
                 "source": "Southworth (2021Obs...141..282S) Rediscussion 7, Tables II (third light) & III.",
@@ -884,7 +886,6 @@
             "depthP": 0.385,
             "depthS": 0.385,
             "phiS": 0.500,
-            "sed_filter_exclusions": ["2MASS:Ks", "2MASS:H", "2MASS:J"],
             "labels": {
                 "citation_key": "Southworth21obsR6",
                 "source": "Southworth (2021Obs...141..234S) Rediscussion 6, Tables II & V.",

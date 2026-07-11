@@ -173,12 +173,12 @@ if __name__ == "__main__":
                 # Get the SED for this target and de-duplicate (obs may appear multiple times).
                 print()
                 sed = get_sed_for_target(target_id, trow.search_term,
-                                         radius=0.1, remove_duplicates=True, verbose=True)
+                                         radius=0.25, remove_duplicates=True, verbose=True)
                 if sed is None or len(sed) == 0:
                     raise PipelineError(target_id, f"No SED observations for '{trow.search_term}'")
 
                 # Reduce the SED to 1 obs per Filter, the one closest to the target coords. Then
-                # filter it to those Filters covered by our models and also remove any outliers
+                # filter it to those Filters covered by our models and remove any known exclusions.
                 sed = retain_closest_observations(sed, coords)
                 model_mask = np.ones((len(sed)), dtype=bool)
                 model_mask &= model_grid.has_filter(sed["sed_filter"])
