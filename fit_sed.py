@@ -52,7 +52,7 @@ theta_params_and_units = np.array([(f"Teff{sub}", u.K) for sub in subs]
                                 + [("dist", u.pc), ("Av", u.dimensionless_unscaled)])
 
 # Dictates which params in theta are fitted (True) and which are held fixed (False)
-fit_av = False
+fit_av = True
 use_quick_mode = True   # If True, grid uses pre-filtered fluxes
 fit_mask = np.array([True] * NSTARS      # Teff
                   + [False] * NSTARS     # logg
