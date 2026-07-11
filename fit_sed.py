@@ -297,46 +297,47 @@ if __name__ == "__main__":
                 retain_mask = np.ones_like(x, dtype=bool)
                 min_to_retain, improve_th = max(10, int(np.ceil(len(sed) * 0.75))), 0.8
                 print(f"Outliers pruned when doing so improves fit stat > {1-improve_th:.0%}")
-                cmask, cix, prev_stat = retain_mask.copy(), None, np.inf
+                cand_mask, cand_ix, prev_stat = retain_mask.copy(), None, np.inf
                 for out_ix in range(len(sed)):
-                    if out_ix > 0: # Must run at least once so we have a baseline & set theta_fit
-                        if prev_stat < 1:
-                            print("Stopped pruning as stat < 1.0")
-                            break
-                        if sum(cmask) < min_to_retain:
-                            print(f"Stopped pruning as #rows at/below the min of {min_to_retain}")
-                            break
+                    cand_theta, result = minimize_fit(x=x[cand_mask],
+                                                      y=y[cand_mask],
+                                                      y_err=y_err[cand_mask],
+                                                      theta0=theta0,
+                                                      fit_mask=fit_mask,
+                                                      stellar_grid=model_grid,
+                                                      ln_prior_func=ln_prior_func)
 
-                    ctheta, result = minimize_fit(x=x[cmask],
-                                                  y=y[cmask],
-                                                  y_err=y_err[cmask],
-                                                  theta0=theta0,
-                                                  fit_mask=fit_mask,
-                                                  stellar_grid=model_grid,
-                                                  ln_prior_func=ln_prior_func)
-
-                    stat = result.fun
-                    print(f"[{out_ix:03d}] stat = {stat:.3e}", end="; ")
+                    this_stat = result.fun
+                    print(f"[{out_ix:03d}] stat={this_stat:.3e}", end="; ")
                     if out_ix == 0:
-                        print("baseline", end="; ")
-                        theta_fit = ctheta
-
-                    if out_ix > 0:
-                        print(f"candidate {cix}/{sed['sed_filter'][cix]}", end="; ")
-                        if stat < prev_stat * improve_th:
-                            print(f"accepted; {sum(cmask)}/{len(cmask)} fluxes remain")
-                            theta_fit, retain_mask = ctheta, cmask.copy()
-                        else:
-                            print("rejected for insufficient improvement and now stopping")
-                            break
+                        theta_fit = cand_theta
                     else:
-                        print()
+                        # Decide outcome on overall stat from test fit with candidate excluded
+                        if this_stat >= prev_stat * improve_th:
+                            print("rejected for insufficient improvement and now stopping.")
+                            break
+                        theta_fit, retain_mask, prev_stat = cand_theta, cand_mask.copy(), this_stat
+                        print(f"accepted leaving {sum(retain_mask)}/{len(retain_mask)}", end="; ")
 
-                    # The next candidate mask adds the farthest outlier from this fit.
-                    y_mdl = model_func(ctheta, x[cmask], model_grid, combine=True)
-                    cix = cmask.nonzero()[0][np.argmax(((y_mdl - y[cmask]) / y_err[cmask])**2)]
-                    cmask[cix] = False
-                    prev_stat = stat
+                    if sum(retain_mask) <= min_to_retain:
+                        print(f"stopping as #rows at or below the minimum of {min_to_retain}.")
+                        break
+
+                    if this_stat < 1:
+                        print("stopping as stat is < 1.0.")
+                        break
+
+                    # Now select the first/next candidate, which is farthest outlier from this fit.
+                    y_mdl = model_func(cand_theta, x[cand_mask], model_grid, combine=True)
+                    resids = ((y_mdl - y[cand_mask]) / y_err[cand_mask])**2
+                    max_resid_ix = np.argmax(resids)
+                    cand_ix = cand_mask.nonzero()[0][max_resid_ix]
+                    print(f"max outlier [{cand_ix}] {sed['sed_filter'][cand_ix]}", end="; ")
+                    if resids[max_resid_ix] < min(100, sum(resids) / 2):
+                        print("not significant and now stopping.")
+                        break
+                    print()
+                    cand_mask[cand_ix] = False
 
                 _print_theta(theta_fit, fit_mask, "Minimize fit yielded theta=")
 
