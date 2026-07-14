@@ -384,6 +384,16 @@ def plot_fitted_model_sed(sed: Table,
                    ["observed", "fitted pair"] +[f"fitted star {i+1}" for i in range(nstars)],
                    **format_kwargs)
 
+    # Plot the requested spectrum onto the axes.
+    vfv_unit = u.W / u.m**2
+    def plot_spec(ax, lams, flux, color, alpha, zorder=-100):
+        freqs = lams.to(u.Hz, equivalencies=u.spectral())
+        if flux.unit.is_equivalent(vfv_unit):
+            vfv = (flux).to(vfv_unit, equivalencies=u.spectral_density(freqs))
+        else:
+            vfv = (flux * freqs).to(vfv_unit, equivalencies=u.spectral_density(freqs))
+        ax.plot(lams, vfv, c=color, alpha=alpha, zorder=zorder)
+
     # Plot the raw spectra for each component as a background
     spec_lams = model_grid.wavelengths * model_grid.wavelength_unit
     mask = spec_lams > sed[sed_lambda_colname].quantity.min() * 0.8
@@ -393,7 +403,7 @@ def plot_fitted_model_sed(sed: Table,
         spec_flux = model_grid.get_fluxes(wavelengths=model_grid.wavelengths, teff=teff, logg=logg,
                                           metal=0, radius=rad, distance=dist, av=av)
         spec_flux *= model_grid.flux_unit
-        fig.gca().plot(spec_lams[mask], spec_flux[mask], c=c, alpha=0.15, zorder=-100)
+        plot_spec(fig.gca(), spec_lams[mask], spec_flux[mask], c, 0.15)
     return fig
 
 
