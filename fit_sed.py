@@ -342,12 +342,11 @@ if __name__ == "__main__":
                 _print_theta(theta_fit, fit_mask, "Minimize fit yielded theta=")
 
                 if args.plot_figs:
-                    print("\nCreating retained SED observations plot")
-                    fig = plots.plot_sed(sed["sed_wl"][retain_mask].quantity,
-                                         [sed["sed_fit_flux"][retain_mask]],
-                                         [sed["sed_eflux"][retain_mask]],
-                                         fmts=[".b"], title=f"{target_id} SED", labels=["retained"])
-                    fig.savefig(figs_dir / f"sed-obs-retained.{args.figs_type}", dpi=args.figs_dpi)
+                    print("\nCreating retained SED observations and minimize fit plot")
+                    fig = plots.plot_fitted_model_sed(sed[retain_mask], theta_fit, model_grid,
+                                                      sed_flux_colname="sed_fit_flux",
+                                                      title=f"{target_id} SED & minimize model fit")
+                    fig.savefig(figs_dir / f"sed-retained-fit.{args.figs_type}", dpi=args.figs_dpi)
                     plt.close(fig)
 
 
