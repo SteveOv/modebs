@@ -395,15 +395,14 @@ def plot_fitted_model_sed(sed: Table,
         ax.plot(lams, vfv, c=color, alpha=alpha, zorder=zorder)
 
     # Plot the raw spectra for each component as a background
-    spec_lams = model_grid.wavelengths * model_grid.wavelength_unit
+    spec_lams = np.geomspace(*model_grid.wavelength_range, 5000) * model_grid.wavelength_unit
     mask = spec_lams > sed[sed_lambda_colname].quantity.min() * 0.8
     mask &= spec_lams < sed[sed_lambda_colname].quantity.max() * 1.2
     for (teff, logg, rad, dist, av), c in zip(iterate_theta(theta_noms),
                                               _cycle_for(comp_colors, nstars)):
-        spec_flux = model_grid.get_fluxes(wavelengths=model_grid.wavelengths, teff=teff, logg=logg,
+        spec_flux = model_grid.get_fluxes(wavelengths=spec_lams[mask], teff=teff, logg=logg,
                                           metal=0, radius=rad, distance=dist, av=av)
-        spec_flux *= model_grid.flux_unit
-        plot_spec(fig.gca(), spec_lams[mask], spec_flux[mask], c, 0.15)
+        plot_spec(fig.gca(), spec_lams[mask], spec_flux * model_grid.flux_unit, c, 0.15)
     return fig
 
 
