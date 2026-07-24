@@ -400,8 +400,8 @@ def plot_fitted_model_sed(sed: Table,
     mask &= spec_lams < sed[sed_lambda_colname].quantity.max() * 1.2
     for (teff, logg, rad, dist, av), c in zip(iterate_theta(theta_noms),
                                               _cycle_for(comp_colors, nstars)):
-        spec_flux = model_grid.get_fluxes(wavelengths=spec_lams[mask], teff=teff, logg=logg,
-                                          metal=0, radius=rad, distance=dist, av=av)
+        spec_flux = model_grid.get_fluxes(wavelengths=spec_lams[mask].value, teff=teff,
+                                          logg=logg, metal=0, radius=rad, distance=dist, av=av)
         plot_spec(fig.gca(), spec_lams[mask], spec_flux * model_grid.flux_unit, c, 0.15)
     return fig
 
