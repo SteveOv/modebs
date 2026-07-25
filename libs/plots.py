@@ -313,26 +313,15 @@ def plot_sed(x: u.Quantity,
     fig, ax = plt.subplots(1, 1, figsize=figsize, constrained_layout=True)
 
     vfv_unit = u.W / u.m**2
-    lam = x.to(u.um, equivalencies=u.spectral())
-    freq = x.to(u.Hz, equivalencies=u.spectral())
+    lams = x.to(u.um, equivalencies=u.spectral())
+    with u.set_enabled_equivalencies(u.spectral_density(lams) + u.spectral()):
+        for flux, flux_err, fmt, label in zip(fluxes, flux_errs, fmts, labels):
+            vfv = None if flux is None else flux.to(vfv_unit)
+            vfv_err = None if flux_err is None else flux_err.to(vfv_unit)
+            if vfv is not None:
+                ax.errorbar(lams, vfv, vfv_err, fmt=fmt, alpha=0.5, label=label)
 
-    for flux, flux_err, fmt, label in zip(fluxes, flux_errs, fmts, labels):
-        vfv, vfv_err = None, None
-        if flux is not None:
-            if flux.unit.is_equivalent(vfv_unit, equivalencies=u.spectral_density(freq)):
-                vfv = flux.to(vfv_unit , equivalencies=u.spectral_density(freq))
-            else:
-                vfv = (flux * freq).to(vfv_unit , equivalencies=u.spectral_density(freq))
-        if flux_err is not None:
-            if flux_err.unit.is_equivalent(vfv_unit, equivalencies=u.spectral_density(freq)):
-                vfv_err = flux_err.to(vfv_unit , equivalencies=u.spectral_density(freq))
-            else:
-                vfv_err = (freq * flux_err).to(vfv_unit, equivalencies=u.spectral_density(freq))
-
-        if vfv is not None:
-            ax.errorbar(lam, vfv, vfv_err, fmt=fmt, alpha=0.5, label=label)
-
-    ax.set(xscale="log", xlabel=f"Wavelength [{lam.unit:latex_inline}]",
+    ax.set(xscale="log", xlabel=f"Wavelength [{lams.unit:latex_inline}]",
            yscale="log", ylabel=f"$\\nu {{\\rm F}}(\\nu)$ [{vfv_unit:latex_inline}]")
     ax.grid(True, which="both", axis="both", alpha=0.33, color="lightgray")
     legend_loc = "best" if labels is not None and any(l is not None for l in labels) else None
@@ -387,11 +376,7 @@ def plot_fitted_model_sed(sed: Table,
     # Plot the requested spectrum onto the axes.
     vfv_unit = u.W / u.m**2
     def plot_spec(ax, lams, flux, color, alpha, zorder=-100):
-        freqs = lams.to(u.Hz, equivalencies=u.spectral())
-        if flux.unit.is_equivalent(vfv_unit):
-            vfv = (flux).to(vfv_unit, equivalencies=u.spectral_density(freqs))
-        else:
-            vfv = (flux * freqs).to(vfv_unit, equivalencies=u.spectral_density(freqs))
+        vfv = flux.to(vfv_unit, equivalencies=u.spectral_density(lams) + u.spectral())
         ax.plot(lams, vfv, c=color, alpha=alpha, zorder=zorder)
 
     # Plot the raw spectra for each component as a background

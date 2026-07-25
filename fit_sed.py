@@ -108,11 +108,11 @@ if __name__ == "__main__":
               f"from {min(ext_wl_range):unicode} to {max(ext_wl_range):unicode}.\n")
 
         # Model SED grid based on atmosphere models with known filters pre-applied to non-reddened
-        # fluxes. Available grids: BtSettlGrid or KuruczGrid
+        # fluxes. Available grids: BtSettlGrid, KuruczGrid or BlackBodyGrid
         model_grid = get_stellar_grid(targets_config.get("stellar_grid", "BtSettlGrid"),
                                       extinction_model=ext_model,
                                       use_quick_mode=use_quick_mode, verbose=True)
-        print("Loaded grid based on synthetic models, covering the ranges:")
+        print(f"Loaded the {model_grid.__class__.__name__} which covers the ranges:")
         print(f"wavelength {model_grid.wavelength_range * model_grid.wavelength_unit:unicode},",
               f"Teff {model_grid.teff_range * model_grid.teff_unit:unicode},",
               f"logg {model_grid.logg_range * model_grid.logg_unit:unicode}",
@@ -284,11 +284,15 @@ if __name__ == "__main__":
                                       av=nom_val(Av) if fit_av else 0,
                                       nstars=NSTARS,
                                       verbose=True)
-                x = model_grid.get_filter_indices(sed["sed_filter"])
-                y = (sed["sed_fit_flux"].quantity * sed["sed_freq"].quantity)\
-                                        .to(model_grid.flux_unit, equivalencies=u.spectral()).value
-                y_err = (sed["sed_eflux"].quantity * sed["sed_freq"].quantity)\
-                                        .to(model_grid.flux_unit, equivalencies=u.spectral()).value
+
+
+                print("\nPreparing SED data for fitting.",
+                      f"Fluxes will be fitted in implied units of {model_grid.flux_unit:unicode}")
+                with u.set_enabled_equivalencies(u.spectral_density(sed["sed_freq"].quantity) \
+                                                 + u.spectral()):
+                    x = model_grid.get_filter_indices(sed["sed_filter"])
+                    y = sed["sed_fit_flux"].quantity.to(model_grid.flux_unit).value
+                    y_err = sed["sed_eflux"].quantity.to(model_grid.flux_unit).value
 
 
                 # Minimize fits to do outlier pruning and optionally give a starting pos for MCMC
