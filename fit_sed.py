@@ -253,8 +253,7 @@ if __name__ == "__main__":
 
                     # Limit criteria checks - hard pass/fail on these
                     if not all(teff_limits[0] <= t <= teff_limits[1] for t in teffs) or \
-                        not all(radius_limits[0] <= r <= radius_limits[1] for r in radii) or \
-                        not 0 <= av:
+                        not all(radius_limits[0] <= r <= radius_limits[1] for r in radii):
                         return -np.inf
 
                     # Gaussian prior criteria: g(x) = 1/(σ*sqrt(2*pi)) * exp(-1/2 * (x-µ)^2/σ^2)
