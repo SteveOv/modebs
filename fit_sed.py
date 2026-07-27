@@ -26,8 +26,8 @@ from dust_extinction.parameter_averages import G23
 
 import corner
 from sed_fit.stellar_grids import get_stellar_grid
-from sed_fit.fitter import create_theta, minimize_fit, mcmc_fit, model_func, samples_from_sampler
-from sed_fit.fitter import _print_theta # pylint: disable=protected-access
+from sed_fit.fitter import create_theta, minimize_fit, mcmc_fit, model_func
+from sed_fit.generic_fitter import samples_from_sampler, print_theta
 
 from libs import extinction, plots
 from libs.pipeline import PipelineError
@@ -342,7 +342,7 @@ if __name__ == "__main__":
                     print()
                     cand_mask[cand_ix] = False
 
-                _print_theta(theta_fit, fit_mask, "Minimize fit yielded theta=")
+                print_theta(theta_fit, fit_mask, "Minimize fit yielded theta=")
 
                 if args.plot_figs:
                     print("\nCreating retained SED observations and minimize fit plot")
