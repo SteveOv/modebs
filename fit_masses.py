@@ -8,7 +8,6 @@ import argparse
 from datetime import datetime
 from contextlib import redirect_stdout
 import traceback
-from time import sleep
 from textwrap import fill
 
 import numpy as np
@@ -24,10 +23,9 @@ from uncertainties.unumpy import nominal_values as nom_vals
 from deblib.constants import G, R_sun, M_sun
 
 import corner
-from sed_fit.fitter import samples_from_sampler
+from sed_fit.generic_fitter import minimize_fit, mcmc_fit, samples_from_sampler, print_theta
 
-from libs.mass_fitter import minimize_fit, mcmc_fit
-from libs.mass_fitter import get_age_limits, get_mass_limits, log_age_for_mass_and_eep
+from libs.mist_models import get_mass_limits, get_age_limits, log_age_for_mass_and_eep, model_func
 from libs.iohelpers import Tee
 from libs.targets import Targets
 from libs.pipeline_dal import create_dal
@@ -46,11 +44,6 @@ theta_params_and_units = np.array([(f"M{sub}", u.Msun) for sub in subs] \
 
 # Use a non-interactive matplotlib backend to avoid threading errors (issue #36).
 mpl_use("agg")
-
-
-def print_mass_theta(theta, name: str="theta"):
-    """ Helper function to print out a mass """
-    print(f"{name:s} = [" + ", ".join(f"{t:.3e}" for t in theta) + "]")
 
 
 if __name__ == "__main__":
@@ -92,8 +85,6 @@ if __name__ == "__main__":
 
 
         for fit_counter, trow in enumerate(dal.acquire_next_row(**to_fit_criteria), start=1):
-            if fit_counter > 1:
-                sleep(10) # Give emcee a quick break, in prep for the next target
 
             try:
                 target_id = trow.key
@@ -135,17 +126,15 @@ if __name__ == "__main__":
 
 
                 # Estimate fit starting position with masses derived from M_sys & the expected mass
-                # ratio and an approximate mid main-sequence age for the more massive star.
-                print("\nSetting up the starting position (theta0) for fitting [MA, MB, log(age)].")
+                # ratio and an approximate mid main-sequence EEP for the more massive star.
+                print("\nSetting up the starting position/theta0 for fitting [MA, MB, log_age].")
                 if (qphot := trow.qphot) is None or nom_val(qphot) <= 0:
                     qphot = 1
                 theta_masses = nom_vals([_MA := M_sys / (qphot + 1), M_sys - _MA])
-                theta_age = np.log10(np.mean([
-                    10**log_age_for_mass_and_eep(np.max(theta_masses), 202),    # ZAMS
-                    10**log_age_for_mass_and_eep(np.max(theta_masses), 454),    # TAMS
-                ]))
+                theta_age = log_age_for_mass_and_eep(np.max(theta_masses), 353) # IAMS
                 theta0 = np.concatenate([theta_masses, [theta_age]])
-                print_mass_theta(theta0, "theta0")
+                fit_mask = np.ones_like(theta0, dtype=bool)
+                print_theta(theta0, fit_mask, "theta0 = ")
 
 
                 def ln_prior_func(theta: np.ndarray) -> float:
@@ -155,12 +144,14 @@ if __name__ == "__main__":
                     if not age_limits[0] <= 10**log_age <= age_limits[1] \
                         or not all(mass_limits[0] <= mass <= mass_limits[1] for mass in masses):
                         return -np.inf
+
                     # Gaussian prior on the total mass
-                    retval = -0.5 * ((M_sys.n - np.sum(masses)) / M_sys.s)**2
+                    retval = ((M_sys.n - np.sum(masses)) / M_sys.s)**2
                     # Straw man Gaussian prior on age as the fit usually benefits from constraint.
                     # TODO: need to find something more appropriate.
-                    retval -= 0.5 * ((theta_age - log_age) / 0.3)**2
-                    return retval
+                    retval += ((theta_age - log_age) / 0.3)**2
+                    return -0.5 * retval
+
 
                 # Set up the likelihood function to evaluate the result of each theta
                 # against known observations from SED fitting
@@ -172,6 +163,7 @@ if __name__ == "__main__":
                         val = ufloat(nom_val(val), 0.02 * nom_val(val))
                     y_obs[ix] = val
                     print(f"{col:>20s}: {val:9.3f}")
+
                 wt = -0.5 / (len(y_obs) - len(theta0)) # likelihood = -0.5 * sum(resids) / deg_free
                 def ln_likelihood_func(y_model: np.ndarray) -> float:
                     """ Evaluate current model against observations to give reduced chi^2 """
@@ -179,19 +171,40 @@ if __name__ == "__main__":
                     return wt * np.sum([((m - o.n) / o.s)**2 for m, o in zip(y_model, y_obs)])
 
 
+                def ln_prob_func(theta: np.ndarray[float]) -> float:
+                    """
+                    The function which returns the log posterior probability; the probability that the candidate params
+                    (theta) are those responsible for the observations. This is a negative value tending towards zero
+                    as the probability increases. Think of this as:
+
+                    ln(P(posterior)) = ln(P(prior) * P(likelihood)) = ln_prior_func() + ln_likelihood_func()
+                    """
+                    # pylint: disable=cell-var-from-loop
+                    retval = ln_prior_func(theta)
+                    if np.isfinite(retval):
+                        # The "model func": gets the stars' radii, teffs & loggs from MIST models
+                        model_y = model_func(masses=theta[:-1], log_age=theta[-1])
+                        if any(model_y <= 0):
+                            return -np.inf
+
+                    if np.isfinite(retval):
+                        retval += ln_likelihood_func(model_y)
+                    return retval
+
+
                 print("\nPerforming an initial 'quick' minimize fit for approximate values.")
-                theta_fit, _ = minimize_fit(theta0=theta0,
-                                            ln_prior_func=ln_prior_func,
-                                            ln_likelihood_func=ln_likelihood_func,
+                theta_fit, _ = minimize_fit(ln_prob_func=ln_prob_func,
+                                            theta0=theta0,
+                                            fit_mask=fit_mask,
                                             verbose=True)
-                print_mass_theta(theta_fit, "theta_min")
 
 
                 if args.do_mcmc_fit:
-                    print("\nPerforming a full MCMC fit for masses & log(age) with uncertainties.")
-                    theta_fit, sampler = mcmc_fit(theta0=theta0,
+                    print("\nPerforming a full MCMC for masses & log(age) with uncertainties.")
+                    theta_fit, sampler = mcmc_fit(ln_prob_func=ln_prob_func,
                                                   ln_prior_func=ln_prior_func,
-                                                  ln_likelihood_func=ln_likelihood_func,
+                                                  theta0=theta0,
+                                                  fit_mask=fit_mask,
                                                   nwalkers=args.mcmc_walkers,
                                                   nsteps=args.max_mcmc_steps,
                                                   thin_by=args.mcmc_thin_by,
@@ -201,7 +214,6 @@ if __name__ == "__main__":
                                                   processes=args.mcmc_processes,
                                                   progress=True,
                                                   verbose=True)
-                    print_mass_theta(theta_fit, "theta_mcmc")
 
 
                     if args.plot_figs:
@@ -213,7 +225,6 @@ if __name__ == "__main__":
                         fig.savefig(figs_dir / f"masses-mcmc-corner.{args.figs_type}",
                                     dpi=args.figs_dpi)
                         plt.close(fig)
-
 
                 print(f"\nFinal fitted parameters for {target_id} ([known value])")
                 high_uncert_params = []
