@@ -41,7 +41,7 @@ for log_age in sorted(iso.ages):
         logg_list += list(iso_block[mass_sort]["log_g"])
 
 # Create the interpolators for radius and teff; using RBF interpolation as we have irregular data.
-x = np.array(list(zip(ages_list, masses_list)), dtype=float)
+x = np.array(list(zip(eep_list, masses_list)), dtype=float)
 neighbours = 4**x.ndim # limit RBF mem usage; otherwise scales as ~points^2
 radius_interp = RBFInterpolator(x, radii_list, neighbours, smoothing=5, kernel="linear")
 teff_interp = RBFInterpolator(x, teffs_list, neighbours, smoothing=5, kernel="linear")
@@ -85,13 +85,13 @@ def log_age_for_mass_and_eep(mass: float, eep: int=353) -> float:
     """
     return np.log10(age_interp([(eep, mass)])[0])
 
-def model_func(masses: np.ndarray[float], log_age: float):
+def model_func(masses: np.ndarray[float], eeps: np.ndarray[float]) -> np.ndarray[float]:
     """
     For each of the passed masses & eeps will model the radius, Teff and logg.
 
     :masses: the stellar masses
-    :log_age: the common log10 age of the stars
+    :eeps: the corresponding EEPs
     :returns: the model stars' [radii, Teffs, loggs]
     """
-    xi = np.array([(10**log_age, m) for m in masses])
+    xi = list(zip(eeps, masses))
     return np.concatenate([radius_interp(xi), teff_interp(xi), logg_interp(xi)])

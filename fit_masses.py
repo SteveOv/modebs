@@ -21,26 +21,28 @@ from uncertainties import ufloat, UFloat, nominal_value as nom_val, std_dev
 from uncertainties.unumpy import nominal_values as nom_vals
 
 from deblib.constants import G, R_sun, M_sun
+from deblib.vmath import wrap_func_for_uncertainties
 
 import corner
 from sed_fit.generic_fitter import minimize_fit, mcmc_fit, samples_from_sampler, print_theta
 
-from libs.mist_models import get_mass_limits, get_age_limits, log_age_for_mass_and_eep, model_func
+from libs.mist_models import get_mass_limits, get_eep_limits, log_age_for_mass_and_eep, model_func
 from libs.iohelpers import Tee
 from libs.targets import Targets
 from libs.pipeline_dal import create_dal
 from libs.utils import to_file_safe_str
 
+log_age_with_uncertainties = wrap_func_for_uncertainties(log_age_for_mass_and_eep)
 
 THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 
 NUM_STARS = 2
 subs = ["ABCDEFGHIJKLM"[n] for n in range(NUM_STARS)]
-theta_labels = np.array([f"$M_{{\\rm {sub}}} / {{\\rm M_{{\\odot}}}}$" for sub in subs]
-                      + ["$\\log{{({{\\rm age}})}} / {{\\rm yr}}$"])
+theta_labels = np.array([f"$M_{{\\rm {sub}}} / {{\\rm M_{{\\odot}}}}$" for sub in subs] \
+                      + [f"$EEP_{{\\rm {sub}}}$" for sub in subs])
 
 theta_params_and_units = np.array([(f"M{sub}", u.Msun) for sub in subs] \
-                                + [("log_age", u.dex(u.yr))])
+                                + [(f"eep{sub}", u.dimensionless_unscaled) for sub in subs])
 
 # Use a non-interactive matplotlib backend to avoid threading errors (issue #36).
 mpl_use("agg")
@@ -121,35 +123,36 @@ if __name__ == "__main__":
                 M_sys = (4 * np.pi**2 * (a * R_sun)**3) / (G * (trow.period * 86400)**2) / M_sun
                 print(f" system mass (M_sys): {M_sys:9.3f} {u.Msun:unicode}",
                       "(calculated from semi-major axis & orbital period)")
-                age_limits = get_age_limits()
+                eep_limits = get_eep_limits()
                 mass_limits = get_mass_limits()
+                age_ratio = ufloat(1, 0.02)
 
 
                 # Estimate fit starting position with masses derived from M_sys & the expected mass
                 # ratio and an approximate mid main-sequence EEP for the more massive star.
-                print("\nSetting up the starting position/theta0 for fitting [MA, MB, log_age].")
+                print("\nSetting up the starting position/theta0 for fitting",
+                      "[" + ", ".join(theta_params_and_units[..., 0]) + "]")
                 if (qphot := trow.qphot) is None or nom_val(qphot) <= 0:
                     qphot = 1
-                theta_masses = nom_vals([_MA := M_sys / (qphot + 1), M_sys - _MA])
-                theta_age = log_age_for_mass_and_eep(np.max(theta_masses), 353) # IAMS
-                theta0 = np.concatenate([theta_masses, [theta_age]])
-                fit_mask = np.ones_like(theta0, dtype=bool)
-                print_theta(theta0, fit_mask, "theta0 = ")
+                theta_masses = np.array([M_sys / (1+qphot)] + [M_sys / (1 + 1/qphot)]*(NUM_STARS-1))
+                theta_masses = nom_vals(theta_masses * (M_sys / sum(theta_masses)))
+                theta0 = np.append(theta_masses, [353] * NUM_STARS) # 353 equiv IAMS
+                print_theta(theta0, prefix="theta0 = ")
 
 
                 def ln_prior_func(theta: np.ndarray) -> float:
                     """ Evaluate current theta against prior criteria """
                     # pylint: disable=cell-var-from-loop
-                    masses, log_age = theta[:-1], theta[-1]
-                    if not age_limits[0] <= 10**log_age <= age_limits[1] \
-                        or not all(mass_limits[0] <= mass <= mass_limits[1] for mass in masses):
+                    masses, eeps = theta[:NUM_STARS], theta[NUM_STARS:]
+                    if not all (eep_limits[0] <= e <= eep_limits[1] for e in eeps) \
+                        or not all(mass_limits[0] <= m <= mass_limits[1] for m in masses):
                         return -np.inf
 
-                    # Gaussian prior on the total mass
-                    retval = ((M_sys.n - np.sum(masses)) / M_sys.s)**2
-                    # Straw man Gaussian prior on age as the fit usually benefits from constraint.
-                    # TODO: need to find something more appropriate.
-                    retval += ((theta_age - log_age) / 0.3)**2
+                    # Gaussian priors on the total mass and the closeness of the stars' ages
+                    retval = ((np.sum(masses) - M_sys.n) / M_sys.s)**2
+                    log_ages = [log_age_for_mass_and_eep(m, e) for m, e in zip(masses, eeps)]
+                    for age_ix in range(1, NUM_STARS):
+                        retval += (((log_ages[age_ix]/log_ages[0]) - age_ratio.n) / age_ratio.s)**2
                     return -0.5 * retval
 
 
@@ -183,7 +186,7 @@ if __name__ == "__main__":
                     retval = ln_prior_func(theta)
                     if np.isfinite(retval):
                         # The "model func": gets the stars' radii, teffs & loggs from MIST models
-                        model_y = model_func(masses=theta[:-1], log_age=theta[-1])
+                        model_y = model_func(masses=theta[:NUM_STARS], eeps=theta[NUM_STARS:])
                         if any(model_y <= 0):
                             return -np.inf
 
@@ -195,22 +198,20 @@ if __name__ == "__main__":
                 print("\nPerforming an initial 'quick' minimize fit for approximate values.")
                 theta_fit, _ = minimize_fit(ln_prob_func=ln_prob_func,
                                             theta0=theta0,
-                                            fit_mask=fit_mask,
                                             verbose=True)
 
 
                 if args.do_mcmc_fit:
-                    print("\nPerforming a full MCMC for masses & log(age) with uncertainties.")
+                    print("\nPerforming a full MCMC for masses & eeps with uncertainties.")
                     theta_fit, sampler = mcmc_fit(ln_prob_func=ln_prob_func,
                                                   ln_prior_func=ln_prior_func,
                                                   theta0=theta0,
-                                                  fit_mask=fit_mask,
                                                   nwalkers=args.mcmc_walkers,
                                                   nsteps=args.max_mcmc_steps,
                                                   thin_by=args.mcmc_thin_by,
                                                   seed=42,
                                                   early_stopping=True,
-                                                  early_stopping_from=25000,
+                                                  early_stopping_from=10000,
                                                   processes=args.mcmc_processes,
                                                   progress=True,
                                                   verbose=True)
@@ -226,10 +227,18 @@ if __name__ == "__main__":
                                     dpi=args.figs_dpi)
                         plt.close(fig)
 
+                print("\nCalculating the stars' log(age) from masses and eeps")
+                log_ages = [log_age_with_uncertainties(m, e)
+                                    for m, e in zip(theta_fit[:NUM_STARS], theta_fit[NUM_STARS:])]
+                log_age = np.mean(log_ages)
+
+
                 print(f"\nFinal fitted parameters for {target_id} ([known value])")
                 high_uncert_params = []
                 write_params = { "M_sys": M_sys, "a": a }
-                for (k, unit), val in zip(theta_params_and_units, theta_fit):
+                for (k, unit), val in zip(
+                        np.concatenate([theta_params_and_units, [("log_age", u.dex(u.yr))]]),
+                        np.concatenate([theta_fit, [log_age]])):
                     label = ""
                     if config.get("labels", {}).get(k, None) is not None:
                         lval = ufloat(config.labels.get(k, np.NaN), config.labels.get(k+"_err", 0))
@@ -237,9 +246,10 @@ if __name__ == "__main__":
                     print(f"{k:>12s} = {val:.3f} {unit:unicode} \t", label)
 
                     # *** also updates the target data ***
-                    write_params[k] = val
-                    if std_dev(val) > abs(nom_val(val) * 0.20):
-                        high_uncert_params += [k]
+                    if not k.startswith("eep"):
+                        write_params[k] = val
+                        if std_dev(val) > abs(nom_val(val) * 0.20):
+                            high_uncert_params += [k]
                 if source := config.get("labels", {}).get("source", None):
                     print(f"Source(s) of known values: {source}")
                 if len(high_uncert_params) > 0:
