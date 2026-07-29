@@ -127,6 +127,21 @@ if __name__ == "__main__":
                 mass_limits = get_mass_limits()
                 age_ratio = ufloat(1, 0.02)
 
+                def ln_prior_func(theta: np.ndarray) -> float:
+                    """ Evaluate current theta against prior criteria """
+                    # pylint: disable=cell-var-from-loop
+                    masses, eeps = theta[:NUM_STARS], theta[NUM_STARS:]
+                    if not all (eep_limits[0] <= e <= eep_limits[1] for e in eeps) \
+                        or not all(mass_limits[0] <= m <= mass_limits[1] for m in masses):
+                        return -np.inf
+
+                    # Gaussian priors on the total mass and the closeness of the stars' ages
+                    retval = ((np.sum(masses) - M_sys.n) / M_sys.s)**2
+                    ages = [log_age_for_mass_and_eep(m, e) for m, e in zip(masses, eeps)]
+                    for age_ix in range(1, NUM_STARS):
+                        retval += (((ages[age_ix] / ages[0]) - age_ratio.n) / age_ratio.s)**2
+                    return -0.5 * retval
+
 
                 # Estimate fit starting position with masses derived from M_sys & the expected mass
                 # ratio and an approximate mid main-sequence EEP for the more massive star.
@@ -138,23 +153,6 @@ if __name__ == "__main__":
                 theta_masses = nom_vals(theta_masses * (M_sys / sum(theta_masses)))
                 theta0 = np.append(theta_masses, [353] * NUM_STARS) # 353 equiv IAMS
                 print_theta(theta0, prefix="theta0 = ")
-
-
-                def ln_prior_func(theta: np.ndarray) -> float:
-                    """ Evaluate current theta against prior criteria """
-                    # pylint: disable=cell-var-from-loop
-                    masses, eeps = theta[:NUM_STARS], theta[NUM_STARS:]
-                    if not all (eep_limits[0] <= e <= eep_limits[1] for e in eeps) \
-                        or not all(mass_limits[0] <= m <= mass_limits[1] for m in masses):
-                        return -np.inf
-
-                    # Gaussian priors on the total mass and the closeness of the stars' ages
-                    retval = ((np.sum(masses) - M_sys.n) / M_sys.s)**2
-                    log_ages = [log_age_for_mass_and_eep(m, e) for m, e in zip(masses, eeps)]
-                    for age_ix in range(1, NUM_STARS):
-                        retval += (((log_ages[age_ix]/log_ages[0]) - age_ratio.n) / age_ratio.s)**2
-                    return -0.5 * retval
-
 
                 # Set up the likelihood function to evaluate the result of each theta
                 # against known observations from SED fitting
