@@ -18,7 +18,7 @@ import astropy.units as u
 # pylint: disable=line-too-long, wrong-import-position
 warnings.filterwarnings("ignore", "Using UFloat objects with std_dev==0 may give unexpected results.", category=UserWarning)
 from uncertainties import ufloat, UFloat, nominal_value as nom_val, std_dev
-from uncertainties.unumpy import nominal_values as nom_vals
+from uncertainties.unumpy import nominal_values as nom_vals, std_devs
 
 from deblib.constants import G, R_sun, M_sun
 from deblib.vmath import wrap_func_for_uncertainties
@@ -26,13 +26,14 @@ from deblib.vmath import wrap_func_for_uncertainties
 import corner
 from sed_fit.generic_fitter import minimize_fit, mcmc_fit, samples_from_sampler, print_theta
 
-from libs.mist_models import get_mass_limits, get_eep_limits, log_age_for_mass_and_eep, model_func
+from libs.mist_models import get_mass_limits, get_eep_limits, model_func, get_log_ages
 from libs.iohelpers import Tee
 from libs.targets import Targets
 from libs.pipeline_dal import create_dal
 from libs.utils import to_file_safe_str
 
-log_age_with_uncertainties = wrap_func_for_uncertainties(log_age_for_mass_and_eep)
+# Have to double-wrap this as the uncertainties wrapping doesn't work on arrays.
+get_log_age_and_err = wrap_func_for_uncertainties(lambda mass, eep: get_log_ages([mass], [eep])[0])
 
 THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 
@@ -137,7 +138,7 @@ if __name__ == "__main__":
 
                     # Gaussian priors on the total mass and the closeness of the stars' ages
                     retval = ((np.sum(masses) - M_sys.n) / M_sys.s)**2
-                    ages = [log_age_for_mass_and_eep(m, e) for m, e in zip(masses, eeps)]
+                    ages = get_log_ages(masses, eeps)
                     for age_ix in range(1, NUM_STARS):
                         retval += (((ages[age_ix] / ages[0]) - age_ratio.n) / age_ratio.s)**2
                     return -0.5 * retval
@@ -157,19 +158,21 @@ if __name__ == "__main__":
                 # Set up the likelihood function to evaluate the result of each theta
                 # against known observations from SED fitting
                 print("\nGetting known values from previous stages to set up observed values")
-                y_obs = np.empty((6, ), dtype=np.dtype(UFloat.dtype))
-                for ix, col in enumerate(["RA", "RB", "TeffA", "TeffB", "loggA", "loggB"]):
-                    val = trow[col]
-                    if not isinstance(val, UFloat) or not val.s:
-                        val = ufloat(nom_val(val), 0.02 * nom_val(val))
-                    y_obs[ix] = val
-                    print(f"{col:>20s}: {val:9.3f}")
+                y_obs = np.empty(shape=(NUM_STARS, 3), dtype=np.dtype(UFloat.dtype))
+                for star_ix in range(NUM_STARS):
+                    cols = [f"R{subs[star_ix]}", f"Teff{subs[star_ix]}", f"logg{subs[star_ix]}"]
+                    y_obs[star_ix] = trow.get_values(cols)
+                    for val_ix, val in enumerate(y_obs[star_ix]):
+                        if not isinstance(val, UFloat) or not val.s:
+                            y_obs[star_ix][val_ix] = ufloat(nom_val(val), 0.02 * nom_val(val))
+                    print("\n".join(f"{c:>20s}: {v:9.3f}" for c, v in zip(cols, y_obs[star_ix])))
 
-                wt = -0.5 / (len(y_obs) - len(theta0)) # likelihood = -0.5 * sum(resids) / deg_free
+                wt = -0.5 / (y_obs.size - theta0.size) # likelihood = -0.5 * sum(resids) / deg_free
+                y_obs_noms, recip_y_obs_sigmas_sq = nom_vals(y_obs), 1 / std_devs(y_obs)**2
                 def ln_likelihood_func(y_model: np.ndarray) -> float:
                     """ Evaluate current model against observations to give reduced chi^2 """
                     # pylint: disable=cell-var-from-loop
-                    return wt * np.sum([((m - o.n) / o.s)**2 for m, o in zip(y_model, y_obs)])
+                    return wt * np.sum((y_model - y_obs_noms)**2 * recip_y_obs_sigmas_sq)
 
 
                 def ln_prob_func(theta: np.ndarray[float]) -> float:
@@ -185,7 +188,7 @@ if __name__ == "__main__":
                     if np.isfinite(retval):
                         # The "model func": gets the stars' radii, teffs & loggs from MIST models
                         model_y = model_func(masses=theta[:NUM_STARS], eeps=theta[NUM_STARS:])
-                        if any(model_y <= 0):
+                        if np.any(model_y <= 0):
                             return -np.inf
 
                     if np.isfinite(retval):
@@ -240,7 +243,7 @@ if __name__ == "__main__":
 
 
                 print("\nCalculating the stars' log(age) from masses and eeps")
-                log_ages = [log_age_with_uncertainties(m, e)
+                log_ages = [get_log_age_and_err(m, e)
                                     for m, e in zip(theta_fit[:NUM_STARS], theta_fit[NUM_STARS:])]
                 log_age = np.mean(log_ages)
 

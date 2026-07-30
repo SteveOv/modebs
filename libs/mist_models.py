@@ -41,21 +41,22 @@ for log_age in sorted(iso.ages):
         logg_list += list(iso_block[mass_sort]["log_g"])
 
 # Create the interpolators for radius and teff; using RBF interpolation as we have irregular data.
-x = np.array(list(zip(eep_list, masses_list)), dtype=float)
-neighbours = 4**x.ndim # limit RBF mem usage; otherwise scales as ~points^2
-radius_interp = RBFInterpolator(x, radii_list, neighbours, smoothing=5, kernel="linear")
-teff_interp = RBFInterpolator(x, teffs_list, neighbours, smoothing=5, kernel="linear")
-logg_interp = RBFInterpolator(x, logg_list, neighbours, smoothing=5, kernel="linear")
+points = np.array(list(zip(eep_list, masses_list)), dtype=float)
+neighbours = 4**points.ndim # limit RBF mem usage; otherwise scales as ~points^2
+age_interp = RBFInterpolator(points, ages_list, neighbours, smoothing=5, kernel="linear")
+rad_teff_logg_interp = RBFInterpolator(points,
+                                       list(zip(radii_list, teffs_list, logg_list)),
+                                       neighbours,
+                                       smoothing=5,
+                                       kernel="linear")
 
-x = np.array(list(zip(eep_list, masses_list)), dtype=float)
-age_interp = RBFInterpolator(x, ages_list, neighbours, smoothing=5, kernel="linear")
 
 # Priors based on the data
 age_limits = (min(ages_list), max(ages_list))
 eep_limits = (min(eep_list), max(eep_list))
 mass_limits = (min(masses_list), max(masses_list))
 
-del x, ages_list, masses_list, radii_list, teffs_list, eep_list, iso
+del points, ages_list, masses_list, radii_list, teffs_list, eep_list, iso
 
 def get_age_limits():
     """ Get the lower and upper bounds of the ages within the model. """
@@ -69,21 +70,21 @@ def get_eep_limits():
     """ Get the lower and upper bounds of the EEPs within the model. """
     return eep_limits
 
-def log_age_for_mass_and_eep(mass: float, eep: int=353) -> float:
+def get_log_ages(masses: np.ndarray[float], eeps: np.ndarray[float]) -> np.ndarray[float]:
     """
-    An approximate log10(age) for the requested mass and Equivalent Evolutionary Point (EEP).
-    Within the same phases range as the interpolators used for radii & masses for the model func.
+    An approximate log10(age) for the requested masses and eeps.
+    Within the same phases range as the interpolators used for the model func.
 
     Known "primary" EEPs are:
     202 - ZAMS (Zero Age M-S)
     353 - IAMS (Intermediate Age M-S)
     454 - TAMS (Terminal Age M-S)
 
-    :mass: the requested mass (solMass)
-    :eep: the equivalent evolutionay point (EEP)
+    :masses: the requested masses (solMass)
+    :eeps: the equivalent evolutionay points (EEP)
     :returns: a log(age) for the requested EEP and star mass
     """
-    return np.log10(age_interp([(eep, mass)])[0])
+    return np.log10(age_interp(list(zip(eeps, masses))))
 
 def model_func(masses: np.ndarray[float], eeps: np.ndarray[float]) -> np.ndarray[float]:
     """
@@ -91,7 +92,6 @@ def model_func(masses: np.ndarray[float], eeps: np.ndarray[float]) -> np.ndarray
 
     :masses: the stellar masses
     :eeps: the corresponding EEPs
-    :returns: the model stars' [radii, Teffs, loggs]
+    :returns: the model stars' [[radius0, Teff0, logg0], ..., [radiusN, TeffN, loggN]]
     """
-    xi = list(zip(eeps, masses))
-    return np.concatenate([radius_interp(xi), teff_interp(xi), logg_interp(xi)])
+    return rad_teff_logg_interp(list(zip(eeps, masses)))
