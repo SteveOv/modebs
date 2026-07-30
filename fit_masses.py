@@ -258,7 +258,10 @@ if __name__ == "__main__":
                     if config.get("labels", {}).get(k, None) is not None:
                         lval = ufloat(config.labels.get(k, np.NaN), config.labels.get(k+"_err", 0))
                         label = f"({lval:.3f} {unit:unicode})"
-                    print(f"{k:>12s} = {val:.3f} {unit:unicode} \t", label)
+                    if nom_val(val) < 1e6:
+                        print(f"{k:>12s} = {val:9.3f} {unit:unicode} \t", label)
+                    else:
+                        print(f"{k:>12s} = {val:6.3e} {unit:unicode} \t", label)
 
                     # *** also updates the target data ***
                     if not k.startswith("eep"):
