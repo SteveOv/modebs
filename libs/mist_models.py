@@ -70,9 +70,9 @@ def get_eep_limits():
     """ Get the lower and upper bounds of the EEPs within the model. """
     return eep_limits
 
-def get_log_ages(masses: np.ndarray[float], eeps: np.ndarray[float]) -> np.ndarray[float]:
+def get_ages(masses: np.ndarray[float], eeps: np.ndarray[float]) -> np.ndarray[float]:
     """
-    An approximate log10(age) for the requested masses and eeps.
+    Get the ages (yr) for the requested masses and eeps.
     Within the same phases range as the interpolators used for the model func.
 
     Known "primary" EEPs are:
@@ -84,7 +84,7 @@ def get_log_ages(masses: np.ndarray[float], eeps: np.ndarray[float]) -> np.ndarr
     :eeps: the equivalent evolutionay points (EEP)
     :returns: a log(age) for the requested EEP and star mass
     """
-    return np.log10(age_interp(list(zip(eeps, masses))))
+    return age_interp(list(zip(eeps, masses)))
 
 def model_func(masses: np.ndarray[float], eeps: np.ndarray[float]) -> np.ndarray[float]:
     """

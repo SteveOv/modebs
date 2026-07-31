@@ -21,19 +21,19 @@ from uncertainties import ufloat, UFloat, nominal_value as nom_val, std_dev
 from uncertainties.unumpy import nominal_values as nom_vals, std_devs
 
 from deblib.constants import G, R_sun, M_sun
-from deblib.vmath import wrap_func_for_uncertainties
+from deblib.vmath import wrap_func_for_uncertainties, log10
 
 import corner
 from sed_fit.generic_fitter import minimize_fit, mcmc_fit, samples_from_sampler, print_theta
 
-from libs.mist_models import get_mass_limits, get_eep_limits, model_func, get_log_ages
+from libs.mist_models import get_mass_limits, get_eep_limits, model_func, get_ages
 from libs.iohelpers import Tee
 from libs.targets import Targets
 from libs.pipeline_dal import create_dal
 from libs.utils import to_file_safe_str
 
 # Have to double-wrap this as the uncertainties wrapping doesn't work on arrays.
-get_log_age_and_err = wrap_func_for_uncertainties(lambda mass, eep: get_log_ages([mass], [eep])[0])
+get_age_and_uncert = wrap_func_for_uncertainties(lambda mass, eep: get_ages([mass], [eep])[0])
 
 THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 
@@ -138,7 +138,7 @@ if __name__ == "__main__":
 
                     # Gaussian priors on the total mass and the closeness of the stars' ages
                     retval = ((np.sum(masses) - M_sys.n) / M_sys.s)**2
-                    ages = get_log_ages(masses, eeps)
+                    ages = get_ages(masses, eeps)
                     for age_ix in range(1, NUM_STARS):
                         retval += (((ages[age_ix] / ages[0]) - age_ratio.n) / age_ratio.s)**2
                     return -0.5 * retval
@@ -242,10 +242,10 @@ if __name__ == "__main__":
                         plt.close(fig)
 
 
-                print("\nCalculating the stars' log(age) from masses and eeps")
-                log_ages = [get_log_age_and_err(m, e)
+                print("\nCalculating the stars' age from masses and eeps")
+                star_ages = [get_age_and_uncert(m, e)
                                     for m, e in zip(theta_fit[:NUM_STARS], theta_fit[NUM_STARS:])]
-                log_age = np.mean(log_ages)
+                log_age = log10(np.mean(star_ages))
 
 
                 print(f"\nFinal fitted parameters for {target_id} ([known value])")
