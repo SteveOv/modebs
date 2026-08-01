@@ -47,10 +47,12 @@
                 "LR": 0.5912,           "LR_err": 0.0057,
                 "MA": 6.239,            "MA_err": 0.066,
                 "MB": 5.313,            "MB_err": 0.060,
+                "q": 0.852,             "q_err": 0.013,
                 "RA": 4.551,            "RA_err": 0.019,
                 "RB": 3.575,            "RB_err": 0.035,
                 "TeffA": 18100,         "TeffA_err": 500,
                 "TeffB": 17100,         "TeffB_err": 500,
+                "TeffR": 0.945,         "TeffR_err": 0.038,
                 "loggA": 3.9170,        "loggA_err": 0.0029,
                 "loggB": 4.0570,        "loggB_err": 0.0084
             }
@@ -88,16 +90,17 @@
                 "LR": 0.924,            "LR_err": 0.042,
                 "MA": 6.065,            "MA_err": 0.015,
                 "MB": 5.950,            "MB_err": 0.012,
+                "q": 0.9810,            "q_err": 0.0014,
                 "RA": 4.094,            "RA_err": 0.056,
                 "RB": 3.978,            "RB_err": 0.049,
                 "TeffA": 18100,         "TeffA_err": 500,
                 "TeffB": 17900,         "TeffB_err": 500,
+                "TeffR": 0.989,         "TeffR_err": 0.039,
                 "loggA": 3.997,         "loggA_err": 0.012,
                 "loggB": 4.013,         "loggB_err": 0.012,
-                "q": 0.9810,            "q_err": 0.0014,
                 "a": 34.899,            "a_err": 0.025,
                 "E(B-V)": 0.06,         "E(B-V)_err": 0.02,
-                "log_age": 7.602,       "log_age_err": 0.011,
+                "age": 40e6,            "age_err": 1e6,
                 "Z": 0.017
             }
         },
@@ -134,14 +137,17 @@
                 "LR": 0.804,            "LR_err": 0.029,
                 "MA": 4.674,            "MA_err": 0.091,
                 "MB": 4.586,            "MB_err": 0.084,
+                "q": 0.981,             "q_err": 0.012,
                 "RA": 4.117,            "RA_err": 0.039,
                 "RB": 3.653,            "RB_err": 0.045,
                 "TeffA": 14870,         "TeffA_err": 500,
                 "TeffB": 14940,         "TeffB_err": 500,
+                "TeffR": 1.005,         "TeffR_err": 0.048,
                 "loggA": 3.879,         "loggA_err": 0.007,
                 "loggB": 3.974,         "loggB_err": 0.010,
+                "a": 40.06,             "a_err": 0.23,
                 "E(B-V)": 0.44,         "E(B-V)_err": 0.05,
-                "log_age": 7.94,       "log_age_err": 0.03,
+                "age": 87e6,            "age_err": 5e6,
                 "Z": 0.017
             }
         },
@@ -173,12 +179,15 @@
                 "L3": 0.054,            "L3_err": 0.014,
                 "MA": 3.516,            "MA_err": 0.050,
                 "MB": 1.738,            "MB_err": 0.023,
+                "q": 0.4944,            "q_err": 0.0043,
                 "RA": 2.476,            "RA_err": 0.015,
                 "RB": 1.503,            "RB_err": 0.016,
                 "TeffA": 12300,         "TeffA_err": 170,
                 "TeffB": 7675,          "TeffB_err": 100,
+                "TeffR": 0.624,         "TeffR_err": 0.012,
                 "loggA": 4.1967,        "loggA_err": 0.0042,
                 "loggB": 4.3244,        "loggB_err": 0.0090,
+                "a": 10.598,            "a_err": 0.047,
                 "E(B-V)": 0.12,         "E(B-V)_err": 0.03
             }
         },
@@ -211,13 +220,18 @@
                 "LR": 0.8249,           "LR_err": 0.0023,
                 "MA": 2.5444,           "MA_err": 0.0086,
                 "MB": 2.3581,           "MB_err": 0.0085,
+                "q": 0.9268,            "q_err": 0.0020,
                 "RA": 1.8433,           "RA_err": 0.0022,
                 "RB": 1.7658,           "RB_err": 0.0026,
                 "TeffA": 10950,         "TeffA_err": 150,
                 "TeffB": 10350,         "TeffB_err": 150,
+                "TeffR": 0.945,         "TeffR_err": 0.019,
                 "loggA": 4.3125,        "loggA_err": 0.0008,
                 "loggB": 4.3169,        "loggB_err": 0.0011,
-                "E(B-V)": 0.01,         "E(B-V)_err": 0.01
+                "a": 18.416,            "a_err": 0.020,
+                "E(B-V)": 0.01,         "E(B-V)_err": 0.01,
+                "age": 33e6,            "age_err": 3e6,
+                "Z": 0.020
             }
         },
         "V1229 Tau": {
@@ -248,14 +262,16 @@
                 "L3": 0.029,            "L3_err": 0.014,
                 "MA": 2.273,            "MA_err": 0.011,
                 "MB": 1.595,            "MB_err": 0.008,
+                "q": 0.702,             "q_err": 0.005,
                 "RA": 1.799,            "RA_err": 0.019,
                 "RB": 1.1410,           "RB_err": 0.021,
                 "TeffA": 10200,         "TeffA_err": 90,
                 "TeffB": 7670,          "TeffB_err": 85,
+                "TeffR": 0.752,         "TeffR_err": 0.011,
                 "loggA": 4.285,         "loggA_err": 0.009,
                 "loggB": 4.342,         "loggB_err": 0.013,
                 "E(B-V)": 0.04,         "E(B-V)_err": 0.01,
-                "log_age": 8.230,       "log_age_err": 0.051,
+                "age": 170e6,           "age_err": 20e6,
                 "Z": 0.017
             }
         },
@@ -286,10 +302,12 @@
                 "L3": 0.191,            "L3_err": 0.002,
                 "MA": 2.17,             "MA_err": 0.02,
                 "MB": 2.13,             "MB_err": 0.01,
+                "q": 0.982,             "q_err": 0.010,
                 "RA": 1.87,             "RA_err": 0.04,
                 "RB": 1.85,             "RB_err": 0.04,
                 "TeffA": 9210,          "TeffA_err": 110,
                 "TeffB": 9075,          "TeffB_err": 110,
+                "TeffR": 0.985,         "TeffR_err": 0.017,
                 "loggA": 4.23,          "loggA_err": 0.02,
                 "loggB": 4.23,          "loggB_err": 0.02
             }
@@ -324,14 +342,17 @@
                 "LR": 0.9629,           "LR_err": 0.0051,
                 "MA": 2.098,            "MA_err": 0.021,
                 "MB": 2.091,            "MB_err": 0.018,
+                "q": 0.9966,            "q_err": 0.0059,
                 "RA": 2.1785,           "RA_err": 0.0072,
                 "RB": 2.1387,           "RB_err": 0.0070,
                 "TeffA": 9500,          "TeffA_err": 200,
                 "TeffB": 9500,          "TeffB_err": 200,
+                "TeffR": 1.000,         "TeffR_err": 0.030,
                 "loggA": 4.0835,        "loggA_err": 0.0024,
                 "loggB": 4.0981,        "loggB_err": 0.0020,
+                "a": 12.109,            "a_err": 0.029,
                 "E(B-V)": 0.07,         "E(B-V)_err": 0.02,
-                "log_age": 8.756,       "log_age_err": 0.015,
+                "age": 570e6,           "age_err": 20e6,
                 "Z": 0.010
             }
         },
@@ -361,12 +382,15 @@
                 "ecosw": 0.0,
                 "esinw": 0.0,
                 "L3": 0.0,
+                "LR": 0.788,            "LR_err": 0.019,
                 "MA": 1.964,            "MA_err": 0.007,
                 "MB": 1.814,            "MB_err": 0.007,
+                "q": 0.924,             "q_err": 0.005,
                 "RA": 1.927,            "RA_err": 0.011,
                 "RB": 1.841,            "RB_err": 0.011,
                 "TeffA": 7960,          "TeffA_err": 420,
                 "TeffB": 7670,          "TeffB_err": 410,
+                "TeffR": 0.964,         "TeffR_err": 0.072,
                 "loggA": 4.162,         "loggA_err": 0.007,
                 "loggB": 4.167,         "loggB_err": 0.007
             }
@@ -400,12 +424,15 @@
                 "LR": 0.3126,
                 "MA": 1.9621,           "MA_err": 0.0070,
                 "MB": 1.5463,           "MB_err": 0.0034,
+                "q": 0.7881,            "q_err": 0.0014,
                 "RA": 2.733,            "RA_err": 0.010,
                 "RB": 1.642,            "RB_err": 0.011,
                 "TeffA": 7820,          "TeffA_err": 105,
                 "TeffB": 7405,          "TeffB_err": 120,
+                "TeffR": 0.947,         "TeffR_err": 0.020,
                 "loggA": 3.858,         "loggA_err": 0.003,
-                "loggB": 4.197,         "loggB_err": 0.006
+                "loggB": 4.197,         "loggB_err": 0.006,
+                "E(B-V)": 0.006,        "E(B-V)_err": 0.004
             }
         },
         "RR Lyn": {
@@ -438,13 +465,17 @@
                 "LR": 0.3183,           "LR_err": 0.0060,
                 "MA": 1.939,            "MA_err": 0.007,
                 "MB": 1.510,            "MB_err": 0.003,
+                "q": 0.7790,            "q_err": 0.0013,
                 "RA": 2.564,            "RA_err": 0.019,
                 "RB": 1.613,            "RB_err": 0.013,
                 "TeffA": 7770,          "TeffA_err": 200,
                 "TeffB": 7180,          "TeffB_err": 200,
+                "TeffR": 0.924,         "TeffR_err": 0.035,
                 "loggA": 3.9078,        "loggA_err": 0.0063,
                 "loggB": 4.2017,        "loggB_err": 0.0071,
-                "E(B-V)": 0.002,        "E(B-V)_err": 0.002
+                "a": 29.405,            "a_err": 0.027,
+                "E(B-V)": 0.002,        "E(B-V)_err": 0.002,
+                "age": 950e6,           "age_err": 20e6
             }
         },
         "V362 Pav": {
@@ -470,18 +501,21 @@
                 "k": 0.384,             "k_err": 0.003,
                 "J": 0.25,
                 "inc": 84.304,          "inc_err": 0.035,
-                "ecosw": 0.0003,        "ecosw_err": 0.004,
+                "ecosw": 0.0003,        "ecosw_err": 0.0004,
                 "esinw": -0.0014,       "esinw_err": 0.0004,
                 "L3": -0.054,           "L3_err": 0.005,
                 "LR": 0.0284,
                 "MA": 1.936,            "MA_err": 0.018,
                 "MB": 0.8767,           "MB_err": 0.0051,
+                "q": 0.4530,            "q_err": 0.0019,
                 "RA": 2.1931,           "RA_err": 0.0093,
                 "RB": 0.8428,           "RB_err": 0.0056,
                 "TeffA": 8200,          "TeffA_err": 70,
                 "TeffB": 4950,          "TeffB_err": 200,
+                "TeffR": 0.604,         "TeffR_err": 0.025,
                 "loggA": 4.043,         "loggA_err": 0.003,
-                "loggB": 4.530,         "loggB_err": 0.005
+                "loggB": 4.530,         "loggB_err": 0.005,
+                "E(B-V)": 0.016,        "E(B-V)_err": 0.010
             }
         },
         "V456 Cyg": {
@@ -510,14 +544,18 @@
                 "ecosw": 0.0,
                 "esinw": 0.0,
                 "L3": -0.0344,          "L3_err": 0.0059,
+                "LR": 0.665,            "LR_err": 0.014,
                 "MA": 1.859,            "MA_err": 0.041,
                 "MB": 1.576,            "MB_err": 0.037,
+                "q": 0.848,             "q_err": 0.027,
                 "RA": 1.588,            "RA_err": 0.015,
                 "RB": 1.507,            "RB_err": 0.016,
                 "TeffA": 7750,          "TeffA_err": 100,
                 "TeffB": 7250,          "TeffB_err": 120,
+                "TeffR": 0.935,         "TeffR_err": 0.020,
                 "loggA": 4.306,         "loggA_err": 0.006,
-                "loggB": 4.279,         "loggB_err": 0.008
+                "loggB": 4.279,         "loggB_err": 0.008,
+                "a": 5.881,             "a_err": 0.043
             }
         },
         "GW Eri": {
@@ -547,14 +585,17 @@
                 "esinw": 0.0,
                 "L3": 0.028,            "L3_err": 0.003,
                 "LR": 0.9417,
-                "MA": 1.79,             "MA_err": 0.0057,
-                "MB": 1.78,             "MB_err": 0.0054,
-                "RA": 1.83,             "RA_err": 0.0016,
-                "RB": 1.80,             "RB_err": 0.0015,
+                "MA": 1.7936,           "MA_err": 0.0057,
+                "MB": 1.7768,           "MB_err": 0.0054,
+                "q": 0.9906,            "q_err": 0.0019,
+                "RA": 1.828,            "RA_err": 0.016,
+                "RB": 1.796,            "RB_err": 0.015,
                 "TeffA": 8370,          "TeffA_err": 82,
                 "TeffB": 8180,          "TeffB_err": 81,
+                "TeffR": 0.977,         "TeffR_err": 0.014,
                 "loggA": 4.168,         "loggA_err": 0.007,
-                "loggB": 4.179,         "loggB_err": 0.007
+                "loggB": 4.179,         "loggB_err": 0.007,
+                "E(B-V)": 0.001,        "E(B-V)_err": 0.005
             }
         },
         "OO Peg": {
@@ -585,14 +626,17 @@
                 "LR": 0.7794,           "LR_err": 0.0065,
                 "MA": 1.689,            "MA_err": 0.088,
                 "MB": 1.744,            "MB_err": 0.058,
+                "q": 1.032,             "q_err": 0.029,
                 "RA": 2.120,            "RA_err": 0.029,
                 "RB": 1.907,            "RB_err": 0.027,
                 "TeffA": 7850,          "TeffA_err": 350,
                 "TeffB": 7600,          "TeffB_err": 450,
+                "TeffR": 0.968,         "TeffR_err": 0.072,
                 "loggA": 4.013,         "loggA_err": 0.011,
                 "loggB": 4.119,         "loggB_err": 0.005,
+                "a": 13.16,             "a_err": 0.18,
                 "E(B-V)": 0.09,         "E(B-V)_err": 0.02,
-                "log_age": 9.00,        "log_age_err": 0.13
+                "age": 1e9,             "age_err": 0.3e9
             }
         },
         "CW Eri": {
@@ -624,14 +668,17 @@
                 "LR": 0.4532,           "LR_err": 0.0015,
                 "MA": 1.568,            "MA_err": 0.016,
                 "MB": 1.314,            "MB_err": 0.010,
+                "q": 0.8385,            "q_err": 0.0047,
                 "RA": 2.105,            "RA_err": 0.007,
                 "RB": 1.481,            "RB_err": 0.005,
                 "TeffA": 6839,          "TeffA_err": 87,
                 "TeffB": 6561,          "TeffB_err": 98,
+                "TeffR": 0.959,         "TeffR_err": 0.019,
                 "loggA": 3.9869,        "loggA_err": 0.0026,
                 "loggB": 4.2156,        "loggB_err": 0.0022,
+                "a": 11.694,            "a_err": 0.034,
                 "E(B-V)": 0.013,        "E(B-V)_err": 0.015,
-                "log_age": 9.23,
+                "age": 1.7e9,
                 "Z": 0.017
             }
         },
@@ -664,14 +711,17 @@
                 "LR": 1.1203,           "LR_err": 0.0029,
                 "MA": 1.558,            "MA_err": 0.008,
                 "MB": 1.599,            "MB_err": 0.012,
+                "q": 1.0266,            "q_err": 0.0040,
                 "RA": 2.063,            "RA_err": 0.006,
                 "RB": 2.205,            "RB_err": 0.006,
                 "TeffA": 6720,          "TeffA_err": 100,
                 "TeffB": 6690,          "TeffB_err": 100,
+                "TeffR": 0.996,         "TeffR_err": 0.021,
                 "loggA": 4.0016,        "loggA_err": 0.0019,
                 "loggB": 3.9550,        "loggB_err": 0.0023,
+                "a": 18.024,            "a_err": 0.035,
                 "E(B-V)": 0.00,         "E(B-V)_err": 0.01,
-                "log_age": 9.23,
+                "age": 1.7e9,
                 "Z": 0.017
             }
         },
@@ -702,14 +752,18 @@
                 "LR": 1.0972,           "LR_err": 0.0052,
                 "MA": 1.488,            "MA_err": 0.011,
                 "MB": 1.482,            "MB_err": 0.011,
+                "q": 0.9963,            "q_err": 0.0047,
                 "RA": 2.1499,           "RA_err": 0.0058,
                 "RB": 2.2708,           "RB_err": 0.0058,
                 "TeffA": 6596,          "TeffA_err": 150,
                 "TeffB": 6564,          "TeffB_err": 150,
+                "TeffR": 0.995,         "TeffR_err": 0.032,
                 "loggA": 3.9458,        "loggA_err": 0.0018,
                 "loggB": 3.8967,        "loggB_err": 0.0017,
+                "a": 12.109,            "a_err": 0.029,
                 "E(B-V)": 0.05,         "E(B-V)_err": 0.02,
-                "log_age": 9.31
+                "age": 2.2e9,           "age_err": 0.1e9,
+                "Z": 0.014
             }
         },
         "AN Cam": {
@@ -739,14 +793,18 @@
                 "LR": 1.2570,           "LR_err": 0.0041,
                 "MA": 1.380,            "MA_err": 0.021,
                 "MB": 1.402,            "MB_err": 0.025,
+                "q": 1.016,             "q_err": 0.011,
                 "RA": 2.159,            "RA_err": 0.012,
                 "RB": 2.646,            "RB_err": 0.014,
                 "TeffA": 6050,          "TeffA_err": 150,
                 "TeffB": 5750,          "TeffB_err": 150,
+                "TeffR": 0.950,         "TeffR_err": 0.034,
                 "loggA": 3.9095,        "loggA_err": 0.0030,
                 "loggB": 3.7400,        "loggB_err": 0.0037,
+                "a": 45.05,             "a_err": 0.24,
                 "E(B-V)": 0.06,         "E(B-V)_err": 0.04,
-                "log_age": 9.5
+                "age": 3300e6,          "age_err": 7e6,
+                "Z": 0.185
             }
         },
         "IT Cas": {
@@ -778,14 +836,17 @@
                 "LR": 0.9952,           "LR_err": 0.0062,
                 "MA": 1.324,            "MA_err": 0.009,
                 "MB": 1.322,            "MB_err": 0.008,
+                "q": 0.9981,            "q_err": 0.0042,
                 "RA": 1.555,            "RA_err": 0.004,
                 "RB": 1.551,            "RB_err": 0.005,
                 "TeffA": 6740,          "TeffA_err": 105,
                 "TeffB": 6740,          "TeffB_err": 105,
+                "TeffR": 1.000,         "TeffR_err": 0.022,
                 "loggA": 4.1765,        "loggA_err": 0.0022,
                 "loggB": 4.1778,        "loggB_err": 0.0021,
+                "a": 14.414,            "a_err": 0.030,
                 "E(B-V)": 0.083,        "E(B-V)_err": 0.056,
-                "log_age": 9.30,        "log_age_err": 0.02,
+                "age": 2.0e9,           "age_err": 0.1e9,
                 "Z": 0.014
             }
         },
@@ -818,14 +879,17 @@
                 "LR": 0.6641,           "LR_err": 0.0025,
                 "MA": 1.291,            "MA_err": 0.012,
                 "MB": 1.193,            "MB_err": 0.009,
+                "q": 0.9244,            "q_err": 0.0050,
                 "RA": 1.2783,           "RA_err": 0.0036,
                 "RB": 1.1224,           "RB_err": 0.0032,
                 "TeffA": 6450,          "TeffA_err": 120,
                 "TeffB": 6170,          "TeffB_err": 120,
+                "TeffR": 0.957,         "TeffR_err": 0.026,
                 "loggA": 4.3356,        "loggA_err": 0.0020,
                 "loggB": 4.4145,        "loggB_err": 0.0015,
+                "a": 12.533,            "a_err": 0.0034,
                 "E(B-V)": 0.02,         "E(B-V)_err": 0.01,
-                "log_age": 8.8,        "log_age_err": 0.1,
+                "age": 600e6,           "age_err": 200e6, 
                 "Z": 0.020
             }
         },
@@ -858,14 +922,17 @@
                 "LR": 0.859,            "LR_err": 0.031,
                 "MA": 1.289,            "MA_err": 0.006,
                 "MB": 1.232,            "MB_err": 0.005,
+                "q": 0.9557,            "q_err": 0.0027,
                 "RA": 1.389,            "RA_err": 0.011,
                 "RB": 1.318,            "RB_err": 0.014,
                 "TeffA": 6500,          "TeffA_err": 200,
                 "TeffB": 6400,          "TeffB_err": 200,
+                "TeffR": 0.985,         "TeffR_err": 0.043,
                 "loggA": 4.2626,        "loggA_err": 0.0070,
                 "loggB": 4.2887,        "loggB_err": 0.0089,
+                "a": 12.295,            "a_err": 0.017,
                 "E(B-V)": 0.002,        "E(B-V)_err": 0.002,
-                "log_age": 9.26,        "log_age_err": 0.05,
+                "age": 1.8e9,           "age_err": 0.2e9,
                 "Z": 0.017
             }
         },
@@ -899,14 +966,17 @@
                 "LR": 0.9367,           "LR_err": 0.0037,
                 "MA": 1.275,            "MA_err": 0.004,
                 "MB": 1.258,            "MB_err": 0.003,
+                "q": 0.9868,            "q_err": 0.0016,
                 "RA": 1.294,            "RA_err": 0.002,
                 "RB": 1.264,            "RB_err": 0.002,
                 "TeffA": 6512,          "TeffA_err": 50,
                 "TeffB": 6460,          "TeffB_err": 50,
+                "TeffR": 0.992,         "TeffR_err": 0.011,
                 "loggA": 4.3194,        "loggA_err": 0.0010,
                 "loggB": 4.3343,        "loggB_err": 0.0010,
+                "a": 14.984,            "a_err": 0.013,
                 "E(B-V)": 0.002,        "E(B-V)_err": 0.002,
-                "log_age": 9.02,        "log_age_err": 0.02,
+                "age": 1050e6,          "age_err": 50e6,
                 "Z": 0.017
             }
         },
@@ -939,14 +1009,18 @@
                 "LR": 0.814,            "LR_err": 0.013,
                 "MA": 1.1354,           "MA_err": 0.0023,
                 "MB": 1.0984,           "MB_err": 0.0022,
+                "q": 0.9673,            "q_err": 0.0013,
                 "RA": 1.2474,           "RA_err": 0.0046,
                 "RB": 1.1498,           "RB_err": 0.0049,
                 "TeffA": 6000,          "TeffA_err": 150,
                 "TeffB": 5935,          "TeffB_err": 150,
+                "TeffR": 0.989,         "TeffR_err": 0.035,
                 "loggA": 4.3012,        "loggA_err": 0.0032,
                 "loggB": 4.3576,        "loggB_err": 0.0037,
+                "a": 26.814,            "a_err": 0.017,
                 "E(B-V)": 0.00,         "E(B-V)_err": 0.01,
-                "log_age": 9.5
+                "age": 3.5e9,
+                "Z": 0.017
             }
         },
         "ZZ UMa": {
@@ -978,14 +1052,17 @@
                 "LR": 0.357,            "LR_err": 0.020,
                 "MA": 1.135,            "MA_err": 0.009,
                 "MB": 0.965,            "MB_err": 0.005,
+                "q": 0.8505,            "q_err": 0.0034,
                 "RA": 1.437,            "RA_err": 0.007,
                 "RB": 1.075,            "RB_err": 0.005,
                 "TeffA": 5960,          "TeffA_err": 70,
                 "TeffB": 5270,          "TeffB_err": 90,
+                "TeffR": 0.884,         "TeffR_err": 0.018,
                 "loggA": 4.1782,        "loggA_err": 0.0041,
                 "loggB": 4.3597,        "loggB_err": 0.0034,
+                "a": 9.388,             "a_err": 0.020,
                 "E(B-V)": 0.00,         "E(B-V)_err": 0.01,
-                "log_age": 9.7,
+                "age": 5.5e9,
                 "Z": 0.020
             }
         },
@@ -1018,10 +1095,12 @@
                 "LR": 0.068,            "LR_err": 0.009,
                 "MA": 1.0038,           "MA_err": 0.0066,
                 "MB": 0.5955,           "MB_err": 0.0022,
+                "q": 0.593,             "q_err": 0.005,
                 "RA": 0.980,            "RA_err": 0.013,
                 "RB": 0.5873,           "RB_err": 0.0067,
                 "TeffA": 5890,          "TeffA_err": 100,
                 "TeffB": 3880,          "TeffB_err": 120,
+                "TeffR": 0.659,         "TeffR_err": 0.023,
                 "loggA": 4.457,         "loggA_err": 0.012,
                 "loggB": 4.676,         "loggB_err": 0.010
             }
@@ -1049,15 +1128,19 @@
                 "k": 0.9450,            "k_err": 0.0008,
                 "J": 0.98133,           "J_err": 0.00081,
                 "inc": 89.5514,         "inc_err": 0.0020,
+                "b": 0.11711,           "b_err": 0.00054,
                 "ecosw": -0.00163,      "ecosw_err": 0.00009,
                 "esinw": 0.0050,        "esinw_err": 0.0002,
                 "L3": 0.0,
-                "MA": 0.2310,           "MA_err": 0.0009,
-                "MB": 0.2141,           "MB_err": 0.0010,
-                "RA": 0.2534,           "RA_err": 0.0019,
-                "RB": 0.2396,           "RB_err": 0.0015,
+                "LR": 0.882,            "LR_err": 0.112,
+                "MA": 0.22507,          "MA_err": 0.00024,
+                "MB": 0.21017,          "MB_err": 0.00028,
+                "q": 0.938,             "q_err": 0.002,
+                "RA": 0.25113,          "RA_err": 0.00016,
+                "RB": 0.23732,          "RB_err": 0.00014,
                 "TeffA": 3130,          "TeffA_err": 70,
                 "TeffB": 3120,          "TeffB_err": 70,
+                "TeffR": 0.997,         "TeffR_err": 0.032,
                 "loggA": 4.994,         "loggA_err": 0.007,
                 "loggB": 5.010,         "loggB_err": 0.006
             }
