@@ -350,7 +350,6 @@
                 "TeffR": 1.000,         "TeffR_err": 0.030,
                 "loggA": 4.0835,        "loggA_err": 0.0024,
                 "loggB": 4.0981,        "loggB_err": 0.0020,
-                "a": 12.109,            "a_err": 0.029,
                 "E(B-V)": 0.07,         "E(B-V)_err": 0.02,
                 "age": 570e6,           "age_err": 20e6,
                 "Z": 0.010
@@ -374,11 +373,11 @@
             "phiS": 0.501,
             "labels": {
                 "citation_key": "SouthworthSmalley+05mnras",
-                "source": "Southworth et al. (2005MNRAS.363..529S) Tables 10 (V-band) & 12.",
-                "rA_plus_rB": 0.3118,   "rA_plus_rB_err": 0.0009,
-                "k": 0.996,             "k_err": 0.041,
+                "source": "Southworth et al. (2005MNRAS.363..529S) Tables 10 (adopted or V-band for J & LR) & 12.",
+                "rA_plus_rB": 0.3099,   "rA_plus_rB_err": 0.0004,
+                "k": 0.953,             "k_err": 0.011,
                 "J": 0.869,             "J_err": 0.027,
-                "inc": 87.64,           "inc_err": 0.11,
+                "inc": 87.55,           "inc_err": 0.04,
                 "ecosw": 0.0,
                 "esinw": 0.0,
                 "L3": 0.0,
