@@ -1,13 +1,13 @@
 """ General purpose utility/helper functions """
-from typing import Iterable  as _Iterable
+from typing import Iterable  as _Iterable, Union as _Union
 from numbers import Number as _Number
 from itertools import zip_longest as _zip_longest, chain as _chain
 from itertools import combinations as _combinations, product as _product
 import re as _re
 
 import numpy as _np
-from astropy.units import Unit as _Unit
-from uncertainties import nominal_value as _nom_val
+from astropy.units import UnitBase as _UnitBase, FunctionUnitBase as _FunctionUnitBase
+from uncertainties import nominal_value as _nom_val, UFloat as _UFloat
 
 _to_file_safe_sub_pattern = _re.compile(r"[^\w\d._-]", _re.IGNORECASE)
 
@@ -25,8 +25,11 @@ def to_file_safe_str(text: str, replacement: str="-", lower: bool=True) -> str:
     return retval.lower() if lower else retval
 
 
-def format_value(value: _Number, unit: _Unit=None, reference_value: _Number=None,
-                 num_format: str="9.3f", large_num_format: str="6.3e",
+def format_value(value: _Union[_Number, _UFloat],
+                 unit: _Union[str, _UnitBase, _FunctionUnitBase]=None,
+                 reference_value: _Union[_Number, _UFloat]=None,
+                 num_format: str="9.3f",
+                 large_num_format: str="6.3e",
                  large_num_threshold: float=1e6) -> str:
     """
     Converts the requested value to text with the accompanying unit and an optional reference value.
@@ -34,10 +37,14 @@ def format_value(value: _Number, unit: _Unit=None, reference_value: _Number=None
     large_num_format if the value reaches or exceeds large_num_threshold.
     """
     value_fmt = f"{{0:{num_format if _nom_val(value) < large_num_threshold else large_num_format}}}"
-    unit_text = f" {unit:unicode}" if unit else "  "
+    unit_text = ""
+    if isinstance(unit, (_UnitBase, _FunctionUnitBase)):
+        unit_text = f" {unit:unicode}"
+    elif isinstance(unit, str):
+        unit_text = " " + unit
     text = value_fmt.format(value) + unit_text
     if reference_value:
-        text += " \t(" + value_fmt.format(reference_value) + unit_text + ")"
+        text += "   \t (" + value_fmt.format(reference_value) + unit_text + ")"
     return text
 
 
