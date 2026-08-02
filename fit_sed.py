@@ -78,8 +78,12 @@ if __name__ == "__main__":
                     help="the number of concurrent MCMC processes to run [8]")
     ap.add_argument("-mo", "--mcmc-off", dest="do_mcmc_fit", action="store_false", required=False,
                     help="suppress running of MCMC for parameters")
+    ap.add_argument("-uel", "--use-extinction-labels", dest="use_extinction_labels",
+                    action="store_true", required=False,
+                    help="force override of Av with known Av or E(B-V) values if present in config")
     ap.set_defaults(plot_figs=False, figs_type="png", figs_dpi=100, do_mcmc_fit=True,
-                    max_mcmc_steps=100000, mcmc_walkers=100, mcmc_thin_by=10, mcmc_processes=8)
+                    max_mcmc_steps=100000, mcmc_walkers=100, mcmc_thin_by=10, mcmc_processes=8,
+                    use_extinction_labels=False)
     args = ap.parse_args()
     drop_dir = Path.cwd() / f"drop/{args.targets_file.stem}"
 
@@ -156,8 +160,17 @@ if __name__ == "__main__":
 
                 # Get the extinction coefficient, based on the coords
                 print()
-                if (Av := config.get("A_V", config.get("E(B-V)", 0) * Rv)) > 0:
-                    print(f"Found extinction override in target config giving A_V={Av:.6f}")
+                if args.use_extinction_labels:
+                    print("*** The -uel/--use-extinction-labels switch is set, so will override",
+                        "extinction lookup if an Av or E(B-V) is found in the target's labels. ***")
+                if args.use_extinction_labels and ("Av" in known_vals or "E(B-V)" in known_vals):
+                    if "Av" in known_vals:
+                        Av = ufloat(known_vals["Av"], known_vals.get("Av_err", 0))
+                    else:
+                        Av = ufloat(known_vals["E(B-V)"], known_vals.get("E(B-V)_err", 0)) * Rv
+                    print(f"Found extinction override in target's labels giving Av={Av:.6f}")
+                elif (Av := config.get("Av", config.get("E(B-V)", 0) * Rv)) > 0:
+                    print(f"Found extinction override in target config giving Av={Av:.6f}")
                 else:
                     # Get the mean of the various catalogues, prioritising reliable results
                     print(f"Getting extinction data based on {target_id} {coords}".replace("\n",""))
@@ -165,11 +178,11 @@ if __name__ == "__main__":
                     if any(rmask := np.array(avs[1], dtype=bool)):
                         # We have some reliable extinction values, use only these
                         Av = ufloat(np.mean(avs[0][rmask]), np.std(avs[0][rmask]))
-                        print(f"Using the mean of {sum(rmask)} reliable value(s): A_V={Av:.6f}")
+                        print(f"Using the mean of {sum(rmask)} reliable value(s): Av={Av:.6f}")
                     else:
                         Av = ufloat(np.mean(avs[0]), np.std(avs[0]))
-                        print(f"Using the mean of {len(rmask)} value(s): A_V={Av:.6f}")
-                        trow.append_warning("unreliable A_V")
+                        print(f"Using the mean of {len(rmask)} value(s): Av={Av:.6f}")
+                        trow.append_warning("unreliable Av")
 
 
                 # Get the SED for this target and de-duplicate (obs may appear multiple times).

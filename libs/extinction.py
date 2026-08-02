@@ -37,7 +37,7 @@ def iterate(target_coords: SkyCoord,
     :funcs: optional list of functions to iterate over, either by name of function object.
     These must be callable as func(coords: SkyCoord) -> (value: float, flags: Dict)
     :rv: the R_V value to use if it is necessary to convert between Av and E(B-V) values
-    :yield_ebv: whether to yield E(B-V) (True) or A_V (False) values
+    :yield_ebv: whether to yield E(B-V) (True) or Av (False) values
     :verbose: whether or not to print progress/diagnostics to stdout
     :returns: Generator yielding the chosen value (when found) and a flag indicating its reliability
     """
@@ -65,7 +65,7 @@ def iterate(target_coords: SkyCoord,
                         elif not yield_ebv and fname.lower().endswith("_ebv"):
                             val *= rv
                         if verbose:
-                            print(f"{fname}:", "E(B-V)" if yield_ebv else "A_V", f"= {val:.6f}",
+                            print(f"{fname}:", "E(B-V)" if yield_ebv else "Av", f"= {val:.6f}",
                                   "(reliable)" if reliable else "")
                         yield val, reliable
                     elif verbose:
@@ -147,7 +147,7 @@ def get_edenhofer2023_av(target_coords: SkyCoord,
     """
     Queries the Edenhofer et al. (2024A&A...685A..82E) 3D dustmap. This is based on the the
     measurements of Zhang, Green & Rix (2023MNRAS.524.1855Z) and publishes extinction in
-    their units of E upon which we use the conversion: A_V = 2.8 * E (from 2023MNRAS.524.1855Z).
+    their units of E upon which we use the conversion: Av = 2.8 * E (from 2023MNRAS.524.1855Z).
    
     See https://dustmaps.readthedocs.io/en/latest/modules.html#module-dustmaps.edenhofer2023
     for more detail on options.
@@ -157,7 +157,7 @@ def get_edenhofer2023_av(target_coords: SkyCoord,
     :mode: dictates returned values; "mean", "std", "samples" or "random_sample"
     :returns: tuple of the Av value and a flags indicating whether it is reliable
     """
-    # We use integrated=True to get extinction density in the ZGR E values, where A_V=2.8*E
+    # We use integrated=True to get extinction density in the ZGR E values, where Av=2.8*E
     query = _get_edenhofer2023_query(flavor=flavor,
                                      fetch_samples="mean" not in mode,
                                      integrated=True)
@@ -182,14 +182,14 @@ def _get_edenhofer2023_query(flavor: str, fetch_samples: bool, integrated: bool)
 def get_gontcharov_av(target_coords: SkyCoord) -> Tuple[float, bool]:
     """
     Queries the Gontcharov (2017) [2017AstL...43..472G] 3-d extinction map
-    for the A_V value of the target coordinates.
+    for the Av value of the target coordinates.
 
     Uses a locally cached X, Y, Z table (J/PAZh/43/521/xyzejk), which includes values for Av, E(B-V)
     and Rv unlike the radial table which only has values for E(J-Ks). The X, Y, Z table covers the
     region (-1200 <= X <= 1200, -1200 <= Y <= 1200, -600 <= Z <= 600).
 
     :target_coords: the astropy SkyCoords to query for   
-    :returns: tuple of the A_V value and a dict of the diagnostic flags associated with the query
+    :returns: tuple of the Av value and a dict of the diagnostic flags associated with the query
     """
     ret_val, reliable = None, False
     interp = _get_gontcharov_interp("Av")
@@ -237,7 +237,7 @@ def get_vergely_av(target_coords: SkyCoord) -> Tuple[float, bool]:
     TODO: update to work with a cached copy of the data and an interp, as we do with Gontcharov
 
     :target_coords: the astropy SkyCoords to query for   
-    :returns: tuple of the A_V value and a flags indicating whether it is reliable
+    :returns: tuple of the Av value and a flags indicating whether it is reliable
     """
     av, reliable = None, False
     try:

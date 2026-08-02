@@ -15,7 +15,7 @@ class Testextinction(unittest.TestCase):
         # Ooop North! Gontcharov happy but an unreliable extinction from Bayestar
         "UZ Dra": {
             "coords": SkyCoord(291.47947545 * u.deg, 68.93546881 * u.deg, 185.38698966 * u.pc, frame="icrs"),
-            # A_V values
+            # Av values
             "bayestar": (0, False),
             "edenhofer": (0.029, True),
             "gontcharov": (0.219, True),
@@ -24,7 +24,7 @@ class Testextinction(unittest.TestCase):
         # Covered by both Gontcharov and Bayestar
         "IT Cas": {
             "coords": SkyCoord(355.50569743 * u.deg, 51.74352579 * u.deg, 514.95778083 * u.pc, frame="icrs"),
-            # A_V values
+            # Av values
             "bayestar": (0.356, True),
             "edenhofer": (0.167, True),
             "gontcharov": (0.385, True),
@@ -33,7 +33,7 @@ class Testextinction(unittest.TestCase):
         # Way down south (in the LOPS2 field). Gontcharov still OK but outside of Bayestar coverage
         "TIC 7695666": {
             "coords": SkyCoord(65.64676092 * u.deg, -41.48319921 * u.deg, 367.56561186 * u.pc, frame="icrs"),
-            # A_V values
+            # Av values
             "bayestar": (np.nan, False),
             "edenhofer": (0.046, True), # If flavor is "main" this is 0.046 and for 2k it drops to 0.044
             "gontcharov": (0.197, True),
