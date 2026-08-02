@@ -1142,7 +1142,8 @@
                 "TeffB": 3120,          "TeffB_err": 70,
                 "TeffR": 0.997,         "TeffR_err": 0.032,
                 "loggA": 4.994,         "loggA_err": 0.007,
-                "loggB": 5.010,         "loggB_err": 0.006
+                "loggB": 5.010,         "loggB_err": 0.006,
+                "a": 3.7404,            "a_err": 0.0014
             }
         }
     }
