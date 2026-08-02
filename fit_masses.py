@@ -30,7 +30,7 @@ from libs.mist_models import get_mass_limits, get_eep_limits, model_func, get_ag
 from libs.iohelpers import Tee
 from libs.targets import Targets
 from libs.pipeline_dal import create_dal
-from libs.utils import to_file_safe_str
+from libs.utils import to_file_safe_str, format_value
 
 # Have to double-wrap this as the uncertainties wrapping doesn't work on arrays.
 get_age_and_uncert = wrap_func_for_uncertainties(lambda mass, eep: get_ages([mass], [eep])[0])
@@ -97,6 +97,7 @@ if __name__ == "__main__":
                 print(f"Processing target {fit_counter} of {to_fit_count}: {target_id}")
                 print("------------------------------------------------------------")
                 config = targets_config.get_target_config(target_id)
+                known_vals = config.get("labels", {})
                 if args.plot_figs:
                     figs_dir = drop_dir / "figs" / to_file_safe_str(target_id)
                     figs_dir.mkdir(parents=True, exist_ok=True)
@@ -111,21 +112,28 @@ if __name__ == "__main__":
                 print("Getting known values from previous stages to set up fitting priors")
                 rA = trow.rA_plus_rB / (trow.k + 1)
                 rB = trow.rA_plus_rB / ((1 / trow.k) + 1)
-                print("\n".join(f"{p:>20s}: {v:9.3f} {u:unicode}" for p, v, u in [
-                                                    ("RA", trow.RA, u.solRad),
-                                                    ("RB", trow.RB, u.solRad),
-                                                    ("rA", rA, u.dimensionless_unscaled),
-                                                    ("rB", rB, u.dimensionless_unscaled),
-                                                    ("period", trow.period, u.d)]))
+                for k, val, unit in [("RA", trow.RA, u.solRad),
+                                     ("RB", trow.RB, u.solRad),
+                                     ("rA", rA, u.dimensionless_unscaled),
+                                     ("rB", rB, u.dimensionless_unscaled),
+                                     ("period", trow.period, u.d)]:
+                    print(f"{k:>20s}:", format_value(val, unit))
 
                 # Set up the priors and the corresponding function to evaluate them
                 # Calculate the system's semi-major axis and system mass (with Kepler's 3rd law)
+                print("Calculating system mass from radii and period ([known value])")
                 a = np.mean([trow.RA / rA, trow.RB / rB])
-                print(f" semi-major axis (a): {a:9.3f} {u.Rsun:unicode}",
-                      "(calculated from fitted & fractional radii)")
                 M_sys = (4 * np.pi**2 * (a * R_sun)**3) / (G * (trow.period * 86400)**2) / M_sun
-                print(f" system mass (M_sys): {M_sys:9.3f} {u.Msun:unicode}",
-                      "(calculated from semi-major axis & orbital period)")
+                for prefix, k, val, unit in  [(" semi-major axis (a):", "a", a, u.Rsun),
+                                              (" system mass (M_sys):", "M_sys", M_sys, u.Msun)]:
+                    kval = None
+                    if k in known_vals:
+                        kval = ufloat(known_vals.get(k, np.NaN), known_vals.get(f'{k}_err', 0))
+                    elif k == "M_sys" and "MA" in known_vals and "MB" in known_vals:
+                        kval = ufloat(known_vals["MA"], known_vals.get("MA_err", 0)) \
+                                + ufloat(known_vals["MB"], known_vals.get("MB_err", 0))
+                    print(prefix, format_value(val, unit, kval))
+
                 eep_limits = get_eep_limits()
                 mass_limits = get_mass_limits()
                 age_ratio = ufloat(1, 0.02)
@@ -164,10 +172,10 @@ if __name__ == "__main__":
                 for star_ix in range(NUM_STARS):
                     cols = [f"R{subs[star_ix]}", f"Teff{subs[star_ix]}", f"logg{subs[star_ix]}"]
                     y_obs[star_ix] = trow.get_values(cols)
-                    for val_ix, val in enumerate(y_obs[star_ix]):
+                    for val_ix, (val, unit) in enumerate(zip(y_obs[star_ix], [u.Rsun, u.K, u.dex])):
                         if not isinstance(val, UFloat) or not val.s:
                             y_obs[star_ix][val_ix] = ufloat(nom_val(val), 0.02 * nom_val(val))
-                    print("\n".join(f"{c:>20s}: {v:9.3f}" for c, v in zip(cols, y_obs[star_ix])))
+                        print(f"{cols[val_ix]:>20s}:", format_value(val, unit))
 
                 wt = -0.5 / (y_obs.size - theta0.size) # likelihood = -0.5 * sum(resids) / deg_free
                 y_obs_noms, recip_y_obs_sigmas_sq = nom_vals(y_obs), 1 / std_devs(y_obs)**2
@@ -255,12 +263,10 @@ if __name__ == "__main__":
                 write_params = { "M_sys": M_sys, "a": a }
                 for (k, unit), val in zip(np.concatenate([theta_params_and_units, ages_and_units]),
                                           np.concatenate([theta_fit, [sys_age, log10(sys_age)]])):
-                    value_fmt = f"{{0:{'9.3f' if nom_val(val) < 1e6 else '6.3e'}}} {{1:unicode}}"
-                    lbl = None
-                    if config.get("labels", {}).get(k, None) is not None:
-                        lval = ufloat(config.labels.get(k, np.NaN), config.labels.get(k+"_err", 0))
-                        lbl = value_fmt.format(lval, unit)
-                    print(f"{k:>12s} =", value_fmt.format(val, unit), f"\t({lbl})" if lbl else "")
+                    kval = None
+                    if k in known_vals:
+                        kval = ufloat(known_vals.get(k, np.NaN), known_vals.get(k+"_err", 0))
+                    print(f"{k:>12s} =", format_value(val, unit, kval))
 
                     # *** also updates the target data ***
                     if not (k.startswith("eep") or k in ["age"]):

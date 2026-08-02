@@ -6,6 +6,8 @@ from itertools import combinations as _combinations, product as _product
 import re as _re
 
 import numpy as _np
+from astropy.units import Unit as _Unit
+from uncertainties import nominal_value as _nom_val
 
 _to_file_safe_sub_pattern = _re.compile(r"[^\w\d._-]", _re.IGNORECASE)
 
@@ -21,6 +23,22 @@ def to_file_safe_str(text: str, replacement: str="-", lower: bool=True) -> str:
     """
     retval = _to_file_safe_sub_pattern.sub(replacement, text)
     return retval.lower() if lower else retval
+
+
+def format_value(value: _Number, unit: _Unit=None, reference_value: _Number=None,
+                 num_format: str="9.3f", large_num_format: str="6.3e",
+                 large_num_threshold: float=1e6) -> str:
+    """
+    Converts the requested value to text with the accompanying unit and an optional reference value.
+    The number format used will depend on the magnitude of the value, switching from num_format to
+    large_num_format if the value reaches or exceeds large_num_threshold.
+    """
+    value_fmt = f"{{0:{num_format if _nom_val(value) < large_num_threshold else large_num_format}}}"
+    unit_text = f" {unit:unicode}" if unit else "  "
+    text = value_fmt.format(value) + unit_text
+    if reference_value:
+        text += " \t(" + value_fmt.format(reference_value) + unit_text + ")"
+    return text
 
 
 def grouper(iterable: _Iterable, size: int, fillvalue=None):
