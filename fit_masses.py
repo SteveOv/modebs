@@ -273,7 +273,7 @@ if __name__ == "__main__":
                         write_params[k] = val
                         if std_dev(val) > abs(nom_val(val) * 0.20):
                             high_uncert_params += [k]
-                if source := config.get("labels", {}).get("source", None):
+                if source := known_vals.get("source", None):
                     print(f"Source(s) of known values: {source}")
                 if len(high_uncert_params) > 0:
                     trow.append_warning(f"uncert {','.join(high_uncert_params)}>20%")

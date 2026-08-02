@@ -35,7 +35,7 @@ from libs.sed import get_sed_for_target, retain_closest_observations
 from libs.iohelpers import Tee
 from libs.targets import Targets
 from libs.pipeline_dal import create_dal
-from libs.utils import to_file_safe_str
+from libs.utils import to_file_safe_str, format_value
 
 THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 
@@ -47,9 +47,9 @@ theta_labels = np.array([f"$T_{{\\rm eff,{sub}}} / {{\\rm K}}$" for sub in subs]
                       + ["$D / {\\rm pc}$", "${\\rm A_{V}}$"])
 
 theta_params_and_units = np.array([(f"Teff{sub}", u.K) for sub in subs]
-                                + [(f"logg{sub}", u.dimensionless_unscaled) for sub in subs]
+                                + [(f"logg{sub}", u.dex) for sub in subs]
                                 + [(f"R{sub}", u.Rsun) for sub in subs]
-                                + [("dist", u.pc), ("Av", u.dimensionless_unscaled)])
+                                + [("dist", u.pc), ("Av", None)])
 
 # Dictates which params in theta are fitted (True) and which are held fixed (False)
 fit_av = True
@@ -102,10 +102,11 @@ if __name__ == "__main__":
         print(f"The working-set indicates there are {to_fit_count} targets to be fitted.")
 
         # Extinction model: G23 (Gordon et al., 2023) Milky Way R(V) filter gives us broad coverage
-        ext_model = G23(Rv=3.1)
+        Rv = targets_config.get("Rv", 3.1)
+        ext_model = G23(Rv=Rv)
         ext_wl_range = np.reciprocal(ext_model.x_range) * u.um # x_range has implicit units of 1/um
-        print(f"\nUsing {ext_model.__class__.__name__} extinction model which covers the range",
-              f"from {min(ext_wl_range):unicode} to {max(ext_wl_range):unicode}.\n")
+        print(f"\nUsing the {ext_model.__class__.__name__} extinction model with Rv={Rv}, which",
+            f"covers the range from {min(ext_wl_range):unicode} to {max(ext_wl_range):unicode}.\n")
 
         # Model SED grid based on atmosphere models with known filters pre-applied to non-reddened
         # fluxes. Available grids: BtSettlGrid, KuruczGrid or BlackBodyGrid
@@ -119,7 +120,7 @@ if __name__ == "__main__":
               f"\nand metallicity {model_grid.metal_range * u.dimensionless_unscaled:unicode},",
               f"with fluxes returned in units of {model_grid.flux_unit:unicode}")
 
-        # Fixed priors limits for MCMC fit
+        # Fixed priors limits for fitting
         teff_limits = model_grid.teff_range
         logg_limits = model_grid.logg_range
         radius_limits = (0.05, 100)
@@ -132,6 +133,7 @@ if __name__ == "__main__":
                 print(f"Processing target {fit_counter} of {to_fit_count}: {target_id}")
                 print("------------------------------------------------------------")
                 config = targets_config.get_target_config(target_id)
+                known_vals = config.get("labels", {})
                 if args.plot_figs:
                     figs_dir = drop_dir / "figs" / to_file_safe_str(target_id)
                     figs_dir.mkdir(parents=True, exist_ok=True)
@@ -154,12 +156,12 @@ if __name__ == "__main__":
 
                 # Get the extinction coefficient, based on the coords
                 print()
-                if (Av := config.get("A_V", config.get("E(B-V)", 0) * ext_model.Rv)) > 0:
+                if (Av := config.get("A_V", config.get("E(B-V)", 0) * Rv)) > 0:
                     print(f"Found extinction override in target config giving A_V={Av:.6f}")
                 else:
                     # Get the mean of the various catalogues, prioritising reliable results
                     print(f"Getting extinction data based on {target_id} {coords}".replace("\n",""))
-                    avs = np.array([*extinction.iterate(coords, rv=ext_model.Rv, verbose=True)]).T
+                    avs = np.array([*extinction.iterate(coords, rv=Rv, verbose=True)]).T
                     if any(rmask := np.array(avs[1], dtype=bool)):
                         # We have some reliable extinction values, use only these
                         Av = ufloat(np.mean(avs[0][rmask]), np.std(avs[0][rmask]))
@@ -408,20 +410,22 @@ if __name__ == "__main__":
                 write_params = {}
                 high_uncert_params = []
                 for (k, unit), val, mask in zip(theta_params_and_units, theta_fit, fit_mask):
-                    label = ""
+                    kval = None
                     if k == "dist" and trow.parallax:
-                        label = f"({1000 / trow.parallax:.3f} pc)"
-                    elif config.get("labels", {}).get(k, None) is not None:
-                        lval = ufloat(config.labels.get(k, np.NaN), config.labels.get(k+"_err", 0))
-                        label = f"({lval:.3f} {unit:unicode})"
-                    print(f"{k:>12s}{'*' if mask else ' ':s} = {val:.3f} {unit:unicode} \t", label)
+                        kval = 1000 / trow.parallax
+                    elif k in known_vals:
+                        kval = ufloat(known_vals.get(k, np.NaN), known_vals.get(f"{k}_err", 0))
+                    elif k == "Av" and "E(B-V)" in known_vals:
+                        kval = ufloat(known_vals.get("E(B-V)", 0), known_vals.get("E(B-V)_err", 0))
+                        kval *= Rv
+                    print(f"{k:>12s}{'*' if mask else ' ':s} =", format_value(val, unit, kval))
 
                     # *** also update the target data except Av which was handled by dereddening ***
                     if k not in ["Av"]:
                         write_params[k] = val
                         if std_dev(val) > abs(nom_val(val) * 0.20):
                             high_uncert_params += [k]
-                if source := config.get("labels", {}).get("source", None):
+                if source := known_vals.get("source", None):
                     print(f"Source(s) of known values: {source}")
                 if trow.parallax_bibcode:
                     print(f"Source of the known distance (parallax): {trow.parallax_bibcode}")
