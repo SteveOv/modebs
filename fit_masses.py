@@ -44,6 +44,8 @@ theta_labels = np.array([f"$M_{{\\rm {sub}}} / {{\\rm M_{{\\odot}}}}$" for sub i
 
 theta_params_and_units = np.array([(f"M{sub}", u.Msun) for sub in subs] \
                                 + [(f"eep{sub}", u.dimensionless_unscaled) for sub in subs])
+ages_and_units = np.array([("age", u.yr), ("log_age", u.dex(u.yr))])
+
 
 # Use a non-interactive matplotlib backend to avoid threading errors (issue #36).
 mpl_use("agg")
@@ -245,26 +247,23 @@ if __name__ == "__main__":
                 print("\nCalculating the stars' age from masses and eeps")
                 star_ages = [get_age_and_uncert(m, e)
                                     for m, e in zip(theta_fit[:NUM_STARS], theta_fit[NUM_STARS:])]
-                log_age = log10(np.mean(star_ages))
+                sys_age = np.mean(star_ages)
 
 
                 print(f"\nFinal fitted parameters for {target_id} ([known value])")
                 high_uncert_params = []
                 write_params = { "M_sys": M_sys, "a": a }
-                for (k, unit), val in zip(
-                        np.concatenate([theta_params_and_units, [("log_age", u.dex(u.yr))]]),
-                        np.concatenate([theta_fit, [log_age]])):
-                    label = ""
+                for (k, unit), val in zip(np.concatenate([theta_params_and_units, ages_and_units]),
+                                          np.concatenate([theta_fit, [sys_age, log10(sys_age)]])):
+                    value_fmt = f"{{0:{'9.3f' if nom_val(val) < 1e6 else '6.3e'}}} {{1:unicode}}"
+                    lbl = None
                     if config.get("labels", {}).get(k, None) is not None:
                         lval = ufloat(config.labels.get(k, np.NaN), config.labels.get(k+"_err", 0))
-                        label = f"({lval:.3f} {unit:unicode})"
-                    if nom_val(val) < 1e6:
-                        print(f"{k:>12s} = {val:9.3f} {unit:unicode} \t", label)
-                    else:
-                        print(f"{k:>12s} = {val:6.3e} {unit:unicode} \t", label)
+                        lbl = value_fmt.format(lval, unit)
+                    print(f"{k:>12s} =", value_fmt.format(val, unit), f"\t({lbl})" if lbl else "")
 
                     # *** also updates the target data ***
-                    if not k.startswith("eep"):
+                    if not (k.startswith("eep") or k in ["age"]):
                         write_params[k] = val
                         if std_dev(val) > abs(nom_val(val) * 0.20):
                             high_uncert_params += [k]
