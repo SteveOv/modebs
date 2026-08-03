@@ -239,8 +239,8 @@ if __name__ == "__main__":
                 # The ratios are wrt the primary components - the prior_func ignores the 0th item
                 print("\nSetting up the fitting priors and the ln_prior_func() callback.")
                 TeffR, radR = trow.TeffR, trow.k
-                TeffR_priors = tuple([1]+ [ufloat(TeffR.n, max(TeffR.s, TeffR.n * .05))]*(NSTARS-1))
-                radR_priors = tuple([1] + [ufloat(radR.n, max(radR.s, radR.n * .05))]*(NSTARS-1))
+                TeffR_priors = tuple([1] + [ufloat(TeffR.n, TeffR.s or (TeffR.n * .05))]*(NSTARS-1))
+                radR_priors = tuple([1] + [ufloat(radR.n, radR.s or (radR.n * .05))]*(NSTARS-1))
                 av_prior = 0
                 if fit_av:
                     av_prior = ufloat(nom_val(Av), std_dev(Av) or (nom_val(Av) * .05))
