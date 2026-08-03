@@ -69,8 +69,12 @@ if __name__ == "__main__":
                     help="json file containing the details of the targets to fit")
     ap.add_argument("-pf", "--plot-figs", dest="plot_figs", action="store_true", required=False,
                     help="plot figs for each target as the process progresses")
+    ap.add_argument("-t", "--task", dest="task", type=int, required=False,
+                    help="optional override of the JKTEBOP task to run")
+    ap.add_argument("-mi", "--mc-iterations", dest="mc_iterations", type=int, required=False,
+                    help="optional override of the iterations if fitting with JKTEBOP task 8")
     ap.set_defaults(plot_figs=False, lc_fig_cols=4, figs_type="png", figs_dpi=100,
-                    is_testing=True, max_workers=8)
+                    is_testing=True, task=None, mc_iterations=None, max_workers=8)
     args = ap.parse_args()
     drop_dir = Path.cwd() / f"drop/{args.targets_file.stem}"
 
@@ -375,14 +379,25 @@ if __name__ == "__main__":
                 } for lc, ld, fo in zip(lcs, ld_params, fit_overrides, strict=True)]
 
 
+                # The task and #iterations can be overrriden from the command line
+                fit_task = args.task or config.get("lc_fit_task", 3)
+                fit_iterations = args.mc_iterations or config.get("lc_fit_mc_iterations", 10)
+                fit_attempts = 1 + (config.get("lc_fit_retries", 2) if fit_task == 3 else 0)
+                fit_timeout = config.get("lc_fit_timeout", 900) if fit_task == 3 else None
+                print(f"\nWill fit {len(lcs)} lightcurve(s) with JKTEBOP task",
+                    f"8 (MC) for {fit_iterations} iterations." if fit_task == 8 else f"{fit_task}.",
+                    f"\nWill make up to {fit_attempts} attempt(s) to reach a good fit for each LC.",
+                    f"Each fit task will time out after {fit_timeout} s." if fit_timeout else "")
+
                 # Now we fit the lightcurves with JKTEBOP. If max_workers >1 progress updates
                 # will occur after each attempt is complete, but overall elapsed time is reduced.
                 # If set to 1, tasks are serialized but more frequent progress updates will occur.
-                print(f"\nFitting {len(lcs)} lightcurves with JKTEBOP task 3")
-                fitted_param_dicts = pipeline.fit_target_lightcurves(lcs, in_params, read_keys, 3,
-                                                max_workers=args.max_workers,
-                                                max_attempts=1 + config.get("lc_fit_retries", 2),
-                                                timeout=config.get("lc_fit_timeout", 900))
+                fitted_param_dicts = pipeline.fit_target_lightcurves(lcs, in_params, read_keys,
+                                                                     task=fit_task,
+                                                                     iterations=fit_iterations,
+                                                                     max_workers=args.max_workers,
+                                                                     max_attempts=fit_attempts,
+                                                                     timeout=fit_timeout)
 
                 # If >1 worker then jktebop stdout was written in another process and is not seen
                 # by redirect_stdout/Tee. A copy is in the params dicts, so log it manually to file.
@@ -403,7 +418,7 @@ if __name__ == "__main__":
                     print(f"\n## Warning: {warn_count} of {sum(conv_mask)} converged LC fit(s)",
                           "has warnings:", ", ".join(lc.meta["LABEL"] for lc in lcs[warn_mask]))
 
-                if args.plot_figs:
+                if args.plot_figs and fit_task == 3:
                     print("\nCreating a plot of the fit and residual of each lightcurve.")
                     if fail_count > 0:
                         print("Axes titles with a * suffix indicate fits that did not converge.")
@@ -459,7 +474,8 @@ if __name__ == "__main__":
 
 
                 # Where error bars are likely over-optimistic we increase them to a defined minimum
-                if True is True: # Alternatively, a criterion based on a minimum #LCs being reliable
+                # Alternatively, a criterion based on a minimum #LCs being reliable
+                if fit_task == 3 and True is True:
                     min_err_pc = 0.02
                     print(f"\nApplying a minimum of {min_err_pc:.0%} to the uncertainties.",end=" ")
                     kup = []
