@@ -113,6 +113,8 @@ class DalDataRow(_AbstractContextManager):
         ("RB_err", float),
         ("dist", float),
         ("dist_err", float),
+        ("Av", float),
+        ("Av_err", float),
         # Mass fitting i/o params
         ("M_sys", float),
         ("M_sys_err", float),

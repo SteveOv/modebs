@@ -433,11 +433,11 @@ if __name__ == "__main__":
                         kval *= Rv
                     print(f"{k:>12s}{'*' if mask else ' ':s} =", format_value(val, unit, kval))
 
-                    # *** also update the target data except Av which was handled by dereddening ***
-                    if k not in ["Av"]:
-                        write_params[k] = val
-                        if std_dev(val) > abs(nom_val(val) * 0.20):
-                            high_uncert_params += [k]
+                    # *** also update the target data ***
+                    write_params[k] = val
+                    if std_dev(val) > abs(nom_val(val) * 0.20) and k not in ["Av"]:
+                        high_uncert_params += [k]
+
                 if source := known_vals.get("source", None):
                     print(f"Source(s) of known values: {source}")
                 if trow.parallax_bibcode:
