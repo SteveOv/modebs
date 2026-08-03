@@ -28,7 +28,7 @@ from libs.pipeline import PipelineError
 from libs.iohelpers import Tee
 from libs.targets import Targets
 from libs.pipeline_dal import create_dal
-from libs.utils import to_file_safe_str
+from libs.utils import to_file_safe_str, format_value
 
 
 THIS_STEM = Path(getsourcefile(lambda: 0)).stem
@@ -112,6 +112,7 @@ if __name__ == "__main__":
                 print(f"Processing target {fit_counter} of {to_fit_count}: {target_id}")
                 print("------------------------------------------------------------")
                 config = targets_config.get_target_config(target_id)
+                known_vals = config.get("labels", {})
                 if args.plot_figs:
                     figs_dir = drop_dir / "figs" / to_file_safe_str(target_id)
                     figs_dir.mkdir(parents=True, exist_ok=True)
@@ -287,7 +288,8 @@ if __name__ == "__main__":
                 preds_dict = pipeline.predictions_to_mean_dict(preds, True, "inc")
                 print(("Mean predicted" if preds.size > 1 else "Predicted"), "parameters",
                       f"from {len(lcs)} LC group(s), including the value calculated for inc.")
-                print("\n".join(f"{p:>14s}: {preds_dict[p]:12.6f}" for p in preds_dict))
+                for p in preds_dict:
+                    print(f"{p:>14s}:", format_value(preds_dict[p], num_format="12.6f"))
                 if nom_val(preds_dict["rA_plus_rB"]) > 0.4:
                     trow.append_warning("MAVEN rA_plus_rB>0.4")
 
@@ -472,16 +474,20 @@ if __name__ == "__main__":
                 # Report on the final, fitted params & uncertainties.
                 print(f"\nFinal parameters and uncertainties for {target_id} ([known value])")
                 for k in (n for n in read_keys if final_params[n] is not None):
-                    print(f"{k:>14s}: {final_params[k]:12.6f}", end="")
-                    if (lval := config.get("labels", {}).get(k, None)) is not None:
-                        if (lerr := config.get("labels", {}).get(k + "_err")) is not None:
-                            lval = ufloat(lval, lerr)
-                        print(f"\t({lval})")
-                    else:
-                        print()
+                    kval = None
+                    if k in known_vals:
+                        kval = ufloat(known_vals.get(k, np.NaN), known_vals.get(f"{k}_err", 0))
+                    print(f"{k:>14s}:", format_value(final_params[k], None, kval, "12.6f"))
+                print("Calculated TeffR (Teff ratio) from LR and k")
                 TeffR = (final_params["LR"] / final_params["k"]**2)**0.25
-                print(f"         TeffR: {TeffR:12.6f} (calculated from LR & k)")
-                if source := config.get("labels", {}).get("source", None):
+                kval = None
+                if "TeffR" in known_vals:
+                    kval = ufloat(known_vals.get("TeffR", np.NaN), known_vals.get("TeffR_err", 0))
+                elif "TeffA" in known_vals and "TeffB" in known_vals:
+                    kval = ufloat(known_vals.get("TeffB", np.NaN), known_vals.get("TeffB_err", 0)) \
+                        / ufloat(known_vals.get("TeffA", np.NaN), known_vals.get("TeffA_err", 0))
+                print(f"{'TeffR':>14s}:", format_value(TeffR, None, kval, num_format="12.6f"))
+                if source := known_vals.get("source", None):
                     print(f"Source(s) of known values: {source}")
 
                 # Raise warnings about anomolous parameter values
