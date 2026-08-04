@@ -88,6 +88,10 @@ class TargetConfig():
             else:
                 yield val
 
+    def __contains__(self, item):
+        # Support for "in"
+        return self._config.__contains__(item)
+
     def __getattr__(self, item):
         """
         Handles the default behaviour for attributes, which is to get the value of the corresponding
@@ -168,3 +172,7 @@ class Targets():
     def has_value(self, key) -> bool:
         """ Returns whether or not a value (and not None) is held for this key """
         return self._targets_config.get(key, None) is not None
+
+    def __contains__(self, item):
+        # Support for "in"
+        return self._targets_config.__contains__(item)
