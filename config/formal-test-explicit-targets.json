@@ -78,7 +78,7 @@
             "depthP": 0.370,
             "depthS": 0.340,
             "phiS": 0.500,
-            "E(B-V)": 0.06,
+            "E(B-V)": 0.06,         "E(B-V)_err": 0.02,
             "labels": {
                 "citation_key": "Southworth26obsR31",
                 "source": "Southworth (2026arXiv260604870S) Tables II (LB/LA constrained) & IV.",
@@ -111,7 +111,7 @@
             "aka": "TIC 83905462, HIP 1263",
             "SpT": "B5 V + B5 V",
             "details": "9 short cadence sectors (17-18, 24, 57-58, 77-78 & 84-85); a pair of B5 V stars in a 9.65 d elliptical orbit; eclipses are approximately 0.45 and 0.44 mag deep with the secondary at phase ~0.62;",
-            "notes": "distorted sections of S18 & 78; override teff_sys to more appropriate value for SpT; needs both stars' LD fixed at pow2/0.519/0.3811 to match the published light-curve fits; Southworth25obsR22 uses E(B-V)=0.44+/-0.05 mag and gives dist=1814+/-37 pc; Southworth25obsR22 finds good agreement with PARSEC 1.2 models for Z=0.017 and an age of 87+/-5 Myr;",
+            "notes": "distorted sections of S18 & 78; override teff_sys to more appropriate value for SpT; needs both stars' LD fixed at pow2/0.519/0.3811 to match the published light-curve fits; Southworth25obsR22 uses E(B-V)=0.44+/-0.05 mag and gives dist=1814+/-37 pc (nearer than Gaia DR3); to agree with Southworth25obsR22 Teff & radii requires using the Stilism E(B-V)=0.50+/-0.08 mentioned in same at the expense of high uncertainties in Teffs; using E(B-V)=0.44+/-0.05 gives lower Teffs & higher radii than Southworth25obsR22; Southworth25obsR22 finds good agreement with PARSEC 1.2 models for Z=0.017 and an age of 87+/-5 Myr;",
             "xexclude_sectors": [18, 78],
             "t0": 1768.793125437901,
             "t0_err": 0.0003902072348864,
@@ -124,7 +124,7 @@
             "depthS": 0.357,
             "phiS": 0.619,
             "Teff_sys": 12000,
-            "E(B-V)": 0.44,
+            "E(B-V)": 0.44,         "E(B-V)_err": 0.05,
             "jktebop_overrides": { "LDA1_fit": 0, "LDB1_fit": 0 },
             "labels": {
                 "citation_key": "Southworth25obsR22",

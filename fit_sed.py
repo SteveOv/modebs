@@ -154,35 +154,34 @@ if __name__ == "__main__":
                 print(f"SpT:\t{trow.spt or config.get('SpT', '')}")
                 print(f"morph:\t{trow.morph or -1:.3f}\nDR3 ruwe:\t{trow.ruwe or -1:.3f}")
                 print(f"Teff_sys:\t{trow.Teff_sys or -1:.0f}\nlogg_sys:\t{trow.logg_sys or -1:.3f}")
-
                 if trow.ruwe is not None and trow.ruwe > 1.4:
                     trow.append_warning("ruwe>1.4")
 
-                # Get the extinction coefficient, based on the coords
-                print()
-                if args.use_extinction_labels:
-                    print("*** The -uel/--use-extinction-labels switch is set, so will override",
-                        "extinction lookup if an Av or E(B-V) is found in the target's labels. ***")
-                if args.use_extinction_labels and ("Av" in known_vals or "E(B-V)" in known_vals):
-                    if "Av" in known_vals:
-                        Av = ufloat(known_vals["Av"], known_vals.get("Av_err", 0))
-                    else:
-                        Av = ufloat(known_vals["E(B-V)"], known_vals.get("E(B-V)_err", 0)) * Rv
-                    print(f"Found extinction override in target's labels giving Av={Av:.6f}")
-                elif (Av := config.get("Av", config.get("E(B-V)", 0) * Rv)) > 0:
-                    print(f"Found extinction override in target config giving Av={Av:.6f}")
-                else:
-                    # Get the mean of the various catalogues, prioritising reliable results
-                    print(f"Getting extinction data based on {target_id} {coords}".replace("\n",""))
-                    avs = np.array([*extinction.iterate(coords, rv=Rv, verbose=True)]).T
-                    if any(rmask := np.array(avs[1], dtype=bool)):
-                        # We have some reliable extinction values, use only these
-                        Av = ufloat(np.mean(avs[0][rmask]), np.std(avs[0][rmask]))
-                        print(f"Using the mean of {sum(rmask)} reliable value(s): Av={Av:.6f}")
-                    else:
-                        Av = ufloat(np.mean(avs[0]), np.std(avs[0]))
-                        print(f"Using the mean of {len(rmask)} value(s): Av={Av:.6f}")
-                        trow.append_warning("unreliable Av")
+
+                # Get the extinction, based on the coords, prioritising the mean of reliable results
+                print(f"\nGetting extinction based on {target_id}", f"{coords}".replace("\n",""))
+                Av, is_reliable_av = 0, False
+                avs = np.array([*extinction.iterate(coords, rv=Rv, verbose=True)]).T
+                if any(reliable_mask := np.array(avs[1], dtype=bool)):
+                    Av = ufloat(np.mean(avs[0][reliable_mask]), np.std(avs[0][reliable_mask]))
+                    is_reliable_av = True
+                    print(f"Found the mean of {sum(reliable_mask)} reliable value(s): Av={Av:.6f}")
+                elif avs.shape[1]:
+                    Av = ufloat(np.mean(avs[0]), np.std(avs[0]))
+                    print(f"Found the mean of {avs.shape[1]} value(s): Av={Av:.6f}")
+                # Check for overrides
+                for overrides, use_it, msg in [
+                    (config, True, "Found an extinction override in target's config"),
+                    (known_vals, args.use_extinction_labels, "*** The --use-extinction-labels " \
+                                + "switch is set and found an extinction value in target's labels")
+                ]:
+                    if use_it and ("Av" in overrides or "E(B-V)" in overrides):
+                        Av = ufloat(overrides.get("Av", overrides.get("E(B-V)", np.nan)*Rv),
+                                    overrides.get("AV_err", overrides.get("E(B-V)_err", 0)*Rv))
+                        is_reliable_av = True
+                        print(msg, f"giving Av={Av:.6f}")
+                if not is_reliable_av:
+                    trow.append_warning("unreliable Av")
 
 
                 # Get the SED for this target and de-duplicate (obs may appear multiple times).
