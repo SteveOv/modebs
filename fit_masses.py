@@ -14,16 +14,14 @@ import numpy as np
 from matplotlib import use as mpl_use
 import matplotlib.pyplot as plt
 import astropy.units as u
+import corner
 
 # pylint: disable=line-too-long, wrong-import-position
 warnings.filterwarnings("ignore", "Using UFloat objects with std_dev==0 may give unexpected results.", category=UserWarning)
 from uncertainties import ufloat, UFloat, nominal_value as nom_val, std_dev
 from uncertainties.unumpy import nominal_values as nom_vals, std_devs
 
-from deblib.constants import G, R_sun, M_sun
 from deblib.vmath import wrap_func_for_uncertainties, log10
-
-import corner
 from sed_fit.generic_fitter import minimize_fit, mcmc_fit, samples_from_sampler, print_theta
 
 from libs.mist_models import get_mass_limits, get_eep_limits, model_func, get_ages
@@ -107,36 +105,17 @@ if __name__ == "__main__":
                 print(fill(f"Details:{config.get('details', '')}", subsequent_indent="\t"))
                 print(fill(f"Notes:  {config.get('notes', '')}", subsequent_indent="\t"))
                 print(f"SpT:\t{trow.spt or config.get('SpT', '')}")
-                print(f"morph:\t{trow.morph or -1:.3f}\n")
+                print(f"morph:\t{trow.morph or -1:.3f}")
 
-                print("Getting known values from previous stages to set up fitting priors")
-                rA = trow.rA_plus_rB / (trow.k + 1)
-                rB = trow.rA_plus_rB / ((1 / trow.k) + 1)
-                for k, val, unit in [("RA", trow.RA, u.solRad),
-                                     ("RB", trow.RB, u.solRad),
-                                     ("rA", rA, u.dimensionless_unscaled),
-                                     ("rB", rB, u.dimensionless_unscaled),
-                                     ("period", trow.period, u.d)]:
-                    print(f"{k:>20s}:", format_value(val, unit))
 
                 # Set up the priors and the corresponding function to evaluate them
-                # Calculate the system's semi-major axis and system mass (with Kepler's 3rd law)
-                print("Calculating system mass from radii and period ([known value])")
-                a = np.mean([trow.RA / rA, trow.RB / rB])
-                M_sys = (4 * np.pi**2 * (a * R_sun)**3) / (G * (trow.period * 86400)**2) / M_sun
-                for prefix, k, val, unit in  [(" semi-major axis (a):", "a", a, u.Rsun),
-                                              (" system mass (M_sys):", "M_sys", M_sys, u.Msun)]:
-                    kval = None
-                    if k in known_vals:
-                        kval = ufloat(known_vals.get(k, np.NaN), known_vals.get(f'{k}_err', 0))
-                    elif k == "M_sys" and "MA" in known_vals and "MB" in known_vals:
-                        kval = ufloat(known_vals["MA"], known_vals.get("MA_err", 0)) \
-                                + ufloat(known_vals["MB"], known_vals.get("MB_err", 0))
-                    print(prefix, format_value(val, unit, kval))
-
+                print("\nSetting up the fitting priors and the ln_prior_func() callback.")
+                M_sys = trow.M_sys              # From SED fitting
                 eep_limits = get_eep_limits()
                 mass_limits = get_mass_limits()
-                age_ratio = ufloat(1, 0.02)
+                ageR = ufloat(1, 0.02)
+                print(f"Priors: M_sys={M_sys:.3f}, ageR={ageR:.3f}, eep_limits={eep_limits},",
+                      f"mass_limits=({', '.join(f'{m:.3f}' for m in mass_limits)})")
 
                 def ln_prior_func(theta: np.ndarray) -> float:
                     """ Evaluate current theta against prior criteria """
@@ -150,7 +129,7 @@ if __name__ == "__main__":
                     retval = ((np.sum(masses) - M_sys.n) / M_sys.s)**2
                     ages = get_ages(masses, eeps)
                     for age_ix in range(1, NUM_STARS):
-                        retval += (((ages[age_ix] / ages[0]) - age_ratio.n) / age_ratio.s)**2
+                        retval += (((ages[age_ix] / ages[0]) - ageR.n) / ageR.s)**2
                     return -0.5 * retval
 
 
@@ -164,6 +143,7 @@ if __name__ == "__main__":
                 theta_masses = nom_vals(theta_masses * (M_sys / sum(theta_masses)))
                 theta0 = np.append(theta_masses, [353] * NUM_STARS) # 353 equiv IAMS
                 print_theta(theta0, prefix="theta0 = ")
+
 
                 # Set up the likelihood function to evaluate the result of each theta
                 # against known observations from SED fitting
@@ -194,16 +174,13 @@ if __name__ == "__main__":
                     ln(P(posterior)) = ln(P(prior) * P(likelihood)) = ln_prior_func() + ln_likelihood_func()
                     """
                     # pylint: disable=cell-var-from-loop
-                    retval = ln_prior_func(theta)
-                    if np.isfinite(retval):
-                        # The "model func": gets the stars' radii, teffs & loggs from MIST models
-                        model_y = model_func(masses=theta[:NUM_STARS], eeps=theta[NUM_STARS:])
-                        if np.any(model_y <= 0):
-                            return -np.inf
-
-                    if np.isfinite(retval):
-                        retval += ln_likelihood_func(model_y)
-                    return retval
+                    ln_prior_val = ln_prior_func(theta)
+                    if np.isinf(ln_prior_val):
+                        return -np.inf
+                    model_y = model_func(masses=theta[:NUM_STARS], eeps=theta[NUM_STARS:])
+                    if np.any(model_y <= 0):
+                        return -np.inf
+                    return ln_prior_val + ln_likelihood_func(model_y)
 
 
                 print("\nPerforming an initial 'quick' minimize fit for approximate values.")
@@ -260,7 +237,7 @@ if __name__ == "__main__":
 
                 print(f"\nFinal fitted parameters for {target_id} ([known value])")
                 high_uncert_params = []
-                write_params = { "M_sys": M_sys, "a": a }
+                write_params = {}
                 for (k, unit), val in zip(np.concatenate([theta_params_and_units, ages_and_units]),
                                           np.concatenate([theta_fit, [sys_age, log10(sys_age)]])):
                     kval = None

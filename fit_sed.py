@@ -25,6 +25,7 @@ from uncertainties.unumpy import nominal_values as nom_vals
 from dust_extinction.parameter_averages import G23
 
 import corner
+from deblib.constants import G, R_sun, M_sun
 from sed_fit.stellar_grids import get_stellar_grid
 from sed_fit.fitter import create_theta, minimize_fit, mcmc_fit, model_func
 from sed_fit.generic_fitter import samples_from_sampler, print_theta
@@ -420,27 +421,40 @@ if __name__ == "__main__":
 
                 print(f"\nFinal parameters for {target_id} ([known value])")
                 write_params = {}
-                high_uncert_params = []
                 for (k, unit), val, mask in zip(theta_params_and_units, theta_fit, fit_mask):
                     kval = None
                     if k == "dist" and trow.parallax:
                         kval = 1000 / trow.parallax
                     elif k in known_vals:
-                        kval = ufloat(known_vals.get(k, np.NaN), known_vals.get(f"{k}_err", 0))
+                        kval = ufloat(known_vals[k], known_vals.get(f"{k}_err", 0))
                     elif k == "Av" and "E(B-V)" in known_vals:
-                        kval = ufloat(known_vals.get("E(B-V)", 0), known_vals.get("E(B-V)_err", 0))
-                        kval *= Rv
+                        kval = ufloat(known_vals["E(B-V)"], known_vals.get("E(B-V)_err", 0)) * Rv
                     print(f"{k:>12s}{'*' if mask else ' ':s} =", format_value(val, unit, kval))
-
-                    # *** also update the target data ***
                     write_params[k] = val
-                    if std_dev(val) > abs(nom_val(val) * 0.20) and k not in ["Av"]:
-                        high_uncert_params += [k]
 
-                if source := known_vals.get("source", None):
-                    print(f"Source(s) of known values: {source}")
+                print("Calculated system mass from fractional radii, radii and period")
+                rA = trow.rA_plus_rB / (trow.k + 1)
+                rB = trow.rA_plus_rB / ((1 / trow.k) + 1)
+                a = np.mean([write_params["RA"] / rA, write_params["RB"] / rB])
+                M_sys = (4 * np.pi**2 * (a * R_sun)**3) / (G * (trow.period * 86400)**2) / M_sun
+                kval = None
+                if "a" in known_vals:
+                    kval = ufloat(known_vals["a"], known_vals.get("a_err", 0))
+                print(f"{'a':>12s}  =", format_value(a, u.R_sun, kval))
+                kval = None
+                if "MA" in known_vals and "MB" in known_vals:
+                    kval = ufloat(known_vals["MA"], known_vals.get("MA_err", 0)) \
+                            + ufloat(known_vals["MB"], known_vals.get("MB_err", 0))
+                print(f"{'M_sys':>12s}  =", format_value(M_sys, u.M_sun, kval))
+                write_params |= { "a": a, "M_sys": M_sys }
+
+                if "source" in known_vals:
+                    print("Source(s) of known values:", known_vals["source"])
                 if trow.parallax_bibcode:
-                    print(f"Source of the known distance (parallax): {trow.parallax_bibcode}")
+                    print("Source of the known distance (parallax):", trow.parallax_bibcode)
+
+                high_uncert_params = [k for k, val in write_params.items()
+                                if std_dev(val) > abs(nom_val(val) * 0.20) and k not in ["Av", "a"]]
                 if len(high_uncert_params) > 0:
                     trow.append_warning(f"uncert {','.join(k for k in high_uncert_params)}>20%")
 
