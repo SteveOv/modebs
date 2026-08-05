@@ -67,13 +67,15 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Pipeline stage 2: fitting target lightcurves.")
     ap.add_argument(dest="targets_file", type=Path, metavar="TARGETS_FILE",
                     help="json file containing the details of the targets to fit")
+    ap.add_argument("-t", "--target", dest="target", type=str, required=False,
+                    help="a single target id from the targets file to be fitted or re-fitted")
     ap.add_argument("-pf", "--plot-figs", dest="plot_figs", action="store_true", required=False,
                     help="plot figs for each target as the process progresses")
-    ap.add_argument("-t", "--task", dest="task", type=int, required=False,
+    ap.add_argument("-jt", "--task", dest="task", type=int, required=False,
                     help="optional override of the JKTEBOP task to run")
     ap.add_argument("-mi", "--mc-iterations", dest="mc_iterations", type=int, required=False,
                     help="optional override of the iterations if fitting with JKTEBOP task 8")
-    ap.set_defaults(plot_figs=False, lc_fig_cols=4, figs_type="png", figs_dpi=100,
+    ap.set_defaults(target=None, plot_figs=False, lc_fig_cols=4, figs_type="png", figs_dpi=100,
                     is_testing=True, task=None, mc_iterations=None, max_workers=8)
     args = ap.parse_args()
     drop_dir = Path.cwd() / f"drop/{args.targets_file.stem}"
@@ -104,9 +106,12 @@ if __name__ == "__main__":
         dal_kwargs = targets_config.get("dal_kwargs", {})
         dal_kwargs.setdefault("file", drop_dir / "working-set.table")
         dal = create_dal(targets_config.get("dal_type", "QTableFileDal"), True, **dal_kwargs)
-        to_fit_criteria = { "fitted_lcs": False }
+        if args.target:
+            to_fit_criteria = { "target_id": args.target }
+        else:
+            to_fit_criteria = { "fitted_lcs": False }
         to_fit_count = dal.count_where(**to_fit_criteria)
-        print(f"The working-set indicates there are {to_fit_count} target(s) to be fitted.")
+        print(f"The working-set and switches indicates {to_fit_count} target(s) to be fitted.")
 
 
         for fit_counter, trow in enumerate(dal.acquire_next_row(**to_fit_criteria), start=1):
@@ -516,10 +521,12 @@ if __name__ == "__main__":
                     trow.append_warning(f"uncert {','.join(warn_params)}>20%")
 
                 # Finally, store the params and the flag that indicates LC fitting has completed.
+                # Subsequent stages set to incomplete as this fit will have invalidated them.
                 print(f"\nWriting final values for {', '.join(k for k in write_keys)},",
                       "TeffR, Teff_sys & logg_sys to working-set.")
                 trow.set_values(**{ k: final_params[k] for k in write_keys }, TeffR=TeffR,
-                                Teff_sys=Teff_sys, logg_sys=logg_sys, fitted_lcs=True, errors="")
+                                Teff_sys=Teff_sys, logg_sys=logg_sys,
+                                fitted_lcs=True, fitted_sed=False, fitted_masses=False, errors="")
 
 
             except Exception as exc: # pylint: disable=broad-exception-caught

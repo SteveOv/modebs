@@ -53,6 +53,8 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Pipeline stage 4: fitting target masses.")
     ap.add_argument(dest="targets_file", type=Path, metavar="TARGETS_FILE",
                     help="json file containing the details of the targets to fit")
+    ap.add_argument("-t", "--target", dest="target", type=str, required=False,
+                    help="a single target id from the targets file to be fitted or re-fitted")
     ap.add_argument("-pf", "--plot-figs", dest="plot_figs", action="store_true", required=False,
                     help="plot figs for each target as the process progresses")
     ap.add_argument("-ms", "--max-steps", dest="max_mcmc_steps", type=int, required=False,
@@ -63,7 +65,7 @@ if __name__ == "__main__":
                     help="the number of concurrent MCMC processes to run [8]")
     ap.add_argument("-mo", "--mcmc-off", dest="do_mcmc_fit", action="store_false", required=False,
                     help="suppress running of MCMC for parameters")
-    ap.set_defaults(plot_figs=False, figs_type="png", figs_dpi=100, do_mcmc_fit=True,
+    ap.set_defaults(target=None, plot_figs=False, figs_type="png", figs_dpi=100, do_mcmc_fit=True,
                     max_mcmc_steps=100000, mcmc_walkers=100, mcmc_thin_by=10, mcmc_processes=8)
     args = ap.parse_args()
     drop_dir = Path.cwd() / f"drop/{args.targets_file.stem}"
@@ -82,9 +84,12 @@ if __name__ == "__main__":
         dal_kwargs = targets_config.get("dal_kwargs", {})
         dal_kwargs.setdefault("file", drop_dir / "working-set.table")
         dal = create_dal(targets_config.get("dal_type", "QTableFileDal"), True, **dal_kwargs)
-        to_fit_criteria = { "fitted_lcs": True, "fitted_sed": True, "fitted_masses": False }
+        if args.target:
+            to_fit_criteria = { "fitted_lcs": True, "fitted_sed": True, "target_id": args.target }
+        else:
+            to_fit_criteria = { "fitted_lcs": True, "fitted_sed": True, "fitted_masses": False }
         to_fit_count = dal.count_where(**to_fit_criteria)
-        print(f"The working-set indicates there are {to_fit_count} target(s) to be fitted.")
+        print(f"The working-set and switches indicates {to_fit_count} target(s) to be fitted.")
 
 
         for fit_counter, trow in enumerate(dal.acquire_next_row(**to_fit_criteria), start=1):

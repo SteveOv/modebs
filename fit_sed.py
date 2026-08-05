@@ -69,6 +69,8 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Pipeline stage 3: fitting target SED.")
     ap.add_argument(dest="targets_file", type=Path, metavar="TARGETS_FILE",
                     help="json file containing the details of the targets to fit")
+    ap.add_argument("-t", "--target", dest="target", type=str, required=False,
+                    help="a single target id from the targets file to be fitted or re-fitted")
     ap.add_argument("-pf", "--plot-figs", dest="plot_figs", action="store_true", required=False,
                     help="plot figs for each target as the process progresses")
     ap.add_argument("-ms", "--mcmc-steps", dest="max_mcmc_steps", type=int, required=False,
@@ -82,7 +84,7 @@ if __name__ == "__main__":
     ap.add_argument("-uel", "--use-extinction-labels", dest="use_extinction_labels",
                     action="store_true", required=False,
                     help="force override of Av with known Av or E(B-V) values if present in config")
-    ap.set_defaults(plot_figs=False, figs_type="png", figs_dpi=100, do_mcmc_fit=True,
+    ap.set_defaults(target=None, plot_figs=False, figs_type="png", figs_dpi=100, do_mcmc_fit=True,
                     max_mcmc_steps=100000, mcmc_walkers=100, mcmc_thin_by=10, mcmc_processes=8,
                     use_extinction_labels=False)
     args = ap.parse_args()
@@ -102,9 +104,12 @@ if __name__ == "__main__":
         dal_kwargs = targets_config.get("dal_kwargs", {})
         dal_kwargs.setdefault("file", drop_dir / "working-set.table")
         dal = create_dal(targets_config.get("dal_type", "QTableFileDal"), True, **dal_kwargs)
-        to_fit_criteria = { "fitted_lcs": True, "fitted_sed": False }
+        if args.target:
+            to_fit_criteria = { "fitted_lcs": True, "target_id": args.target }
+        else:
+            to_fit_criteria = { "fitted_lcs": True, "fitted_sed": False }
         to_fit_count = dal.count_where(**to_fit_criteria)
-        print(f"The working-set indicates there are {to_fit_count} targets to be fitted.")
+        print(f"The working-set and switches indicates {to_fit_count} target(s) to be fitted.")
 
         # Extinction model: G23 (Gordon et al., 2023) Milky Way R(V) filter gives us broad coverage
         Rv = targets_config.get("Rv", 3.1)
@@ -459,9 +464,10 @@ if __name__ == "__main__":
                     trow.append_warning(f"uncert {','.join(k for k in high_uncert_params)}>20%")
 
 
-                # Finally, store the params and the flag that indicates SED fitting has completed
+                # Finally, store the params and the flag that indicates SED fitting has completed.
+                # Subsequent stages set to incomplete as this fit will have invalidated them.
                 print(f"\nWriting fitted params for {list(write_params.keys())} to working-set.")
-                trow.set_values(**write_params, fitted_sed=True, errors="")
+                trow.set_values(**write_params, fitted_sed=True, fitted_masses=False, errors="")
 
 
 
