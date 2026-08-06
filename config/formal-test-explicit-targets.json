@@ -179,6 +179,7 @@
                 "ecosw": -0.0636,       "ecosw_err": 0.0029,
                 "esinw": -0.023,        "esinw_err": 0.006,
                 "L3": 0.054,            "L3_err": 0.014,
+                "LR": 0.056,            "LR_err": 0.004,
                 "MA": 3.516,            "MA_err": 0.050,
                 "MB": 1.738,            "MB_err": 0.023,
                 "q": 0.4944,            "q_err": 0.0043,
@@ -1103,7 +1104,9 @@
                 "TeffB": 3880,          "TeffB_err": 120,
                 "TeffR": 0.659,         "TeffR_err": 0.023,
                 "loggA": 4.457,         "loggA_err": 0.012,
-                "loggB": 4.676,         "loggB_err": 0.010
+                "loggB": 4.676,         "loggB_err": 0.010,
+                "a": 16.450,            "a_err": 0.030,
+                "E(B-V)": 0.045,        "E(B-V)_err": 0.020
             }
         },
         "CM Dra": {
