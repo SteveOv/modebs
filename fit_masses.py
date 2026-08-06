@@ -118,7 +118,7 @@ if __name__ == "__main__":
                 M_sys = trow.M_sys              # From SED fitting
                 eep_limits = get_eep_limits()
                 mass_limits = get_mass_limits()
-                ageR = ufloat(1, 0.02)
+                ageR = ufloat(1, 0.1)
                 print(f"Priors: M_sys={M_sys:.3f}, ageR={ageR:.3f}, eep_limits={eep_limits},",
                       f"mass_limits=({', '.join(f'{m:.3f}' for m in mass_limits)})")
 
