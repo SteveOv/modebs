@@ -1,4 +1,5 @@
 """ Models to derive masses from known sys_mass, radii & teffs and MIST models. """
+# pylint: disable=invalid-name
 from pathlib import Path
 from inspect import getsourcefile
 
@@ -43,12 +44,14 @@ for log_age in sorted(iso.ages):
 # Create the interpolators for radius and teff; using RBF interpolation as we have irregular data.
 points = np.array(list(zip(eep_list, masses_list)), dtype=float)
 neighbours = 4**points.ndim # limit RBF mem usage; otherwise scales as ~points^2
-age_interp = RBFInterpolator(points, ages_list, neighbours, smoothing=5, kernel="linear")
+smoothing = 5
+kernel = "linear" # Low dimensionality of points precludes the other kernels
+age_interp = RBFInterpolator(points, ages_list, neighbours, smoothing, kernel)
 rad_teff_logg_interp = RBFInterpolator(points,
                                        list(zip(radii_list, teffs_list, logg_list)),
                                        neighbours,
-                                       smoothing=5,
-                                       kernel="linear")
+                                       smoothing,
+                                       kernel)
 
 
 # Priors based on the data
