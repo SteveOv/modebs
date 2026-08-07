@@ -263,6 +263,52 @@ class Testpipeline(unittest.TestCase):
                 for ix, exp_group_sectors in enumerate(exp_groups):
                     self.assertListEqual(list(out_lcs[ix].meta["sectors"]), exp_group_sectors)
 
+    def test_arrange_sector_groups_with_override(self):
+        """ Test arrange_sector_groups() assert override arrangement applied """
+        for override,           exp_groups in [
+            ([[4], [31]],       [[4], [31]]),
+            ([[4, 31]],         [[4, 31]]),
+            ([(4, 31)],         [[4, 31]]),
+            ([[4]],             [[4]]),
+            # Only 1 level deep it's treated as groups of single sectors (ie [4, 31] -> [[4], [31]] )
+            ([4, 31],           [[4], [31]]),
+            ([4],               [[4]]),
+            # Edge cases
+            # If >2 levels deep it groups at 2nd level: (ie [[[4], [31]]] -> [[4, 31]] )
+            ([[[4], [31]]],     [[4, 31]]),
+            ([[4], 31],         [[4], [31]]),
+            ([[4], []],         [[4]]),
+            ([],                []),
+        ]:
+            with self.subTest(f" CW Eri/[4, 31]: groups_override={override} -> {exp_groups} "):
+                config = KNOWN_TARGETS["CW Eri"]
+                lcs = load_lightcurves("CW Eri", [4, 31])
+
+                # Read the ephemeris. We need this to find eclipses and set completeness metrics
+                eph = query_tess_ebs_ephemeris(config["tic"]) or {}
+                t0 = eph.get("t0", config.get("t0", config.get("t0", None)))
+                period = eph.get("period", config.get("period", None))
+                widthp = eph.get("widthP", config.get("widthP", None))
+                widths = eph.get("widthS", config.get("widthS", None))
+                depthp = eph.get("depthP", config.get("depthP", None))
+                depths = eph.get("depthS", config.get("depthS", None))
+                phis = eph.get("phiS", config.get("phiS", None))
+
+                # Prior steps in the pipeline where we have a dependency
+                # Sets primary|secondary _times & _completeness arrays and t0 ('best' primary) to lcs' meta
+                add_eclipse_meta_to_lightcurves(lcs, t0, period, widthp, widths, depthp, depths, phis)
+
+                # Test
+                out_lcs = arrange_sector_groups(lcs,
+                                                completeness_th=0.8,
+                                                groups_override=override,
+                                                verbose=True)
+
+                # One LC per group, with each LC made up of the expected sectors
+                self.assertEqual(len(exp_groups), len(out_lcs))
+                for ix, exp_group_sectors in enumerate(exp_groups):
+                    self.assertListEqual(list(out_lcs[ix].meta["sectors"]), exp_group_sectors)
+
 
     #
     # append_mags_to_lightcurves_and_detrend(lcs: LightCurveCollection, ...)

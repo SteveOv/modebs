@@ -287,7 +287,7 @@ def arrange_sector_groups(lcs: LightCurveCollection,
     :min_eclipses: the minimum eclipse count criteria for a usable group or subsector
     :max_crowdsap_var: maximum variance in CROWDSAP allowed when forming a group
     :max_group_size: the maximum number of sectors to combine for a group, or no max if None
-    :groups_override: if set, the grouping logic will be bypassed, and these used (to be deprecated)
+    :groups_override: if set, the grouping logic will be bypassed, and these used (no slice support)
     :allow_slice: whether to allow sectors to be sliced into sections, subject to eclipse criteria
     :min_slice_eclipses: minimum eclipse criteria for a usable slice, or same as for group if None
     :verbose: whether or not to send messages to stdout with details of the group decisions made
@@ -348,7 +348,11 @@ def arrange_sector_groups(lcs: LightCurveCollection,
     # Make sure the sectors are sorted by sector number for grouping to work
     lcs = LightCurveCollection(sorted(lcs, key=lambda l: l.sector))
     out_lcs = []
-    if groups_override is None:
+    if groups_override:
+        for group in groups_override:
+            # Conveniently isin supports each group as a single sector number or a list of sectors
+            out_lcs += [join_lightcurves(lcs[np.isin(lcs.sector, group)])]
+    else:
         # Isolate the sectors into contiguous blocks; so [1,2,4,5,6,8] becomes [[1,2], [4,5,6], [8]]
         # By making a key of the sector number minus its list index, we have a value to group by
         # as it remains unchanged within each block of contiguously incrementing values.
