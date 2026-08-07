@@ -710,7 +710,7 @@ def fit_target_lightcurves(lcs: LightCurveCollection,
                     in_params | task_params,
                     read_keys,
                     fit_stem,
-                    _create_lc_std_further_process_cmds(lc),
+                    _create_lc_std_further_process_cmds(lc, in_params),
                     max_attempts,
                     timeout,
                     hold_stdout) \
@@ -729,18 +729,22 @@ def fit_target_lightcurves(lcs: LightCurveCollection,
     return fitted_params
 
 
-def _create_lc_std_further_process_cmds(lc: LightCurve) -> List[str]:
+def _create_lc_std_further_process_cmds(lc: LightCurve, in_params: Dict) -> List[str]:
     """
     Creates a standard set of JKTEBOP processing instructions for appending to an in file.
-    The instructions set up poly fits for scale factor and chi^sq adjustment
+    The instructions set up poly fits for scale factor and chi^sq adjustment and any lrats
+    found in the in_params dictionary.
 
     :lc: the source LightCurve
+    :in_params: full set of input params for this lightcurve
     :returns: the list of processing instructions
     """
     # Filter segments to those with observations to prevent jktebop error (no datapoints for poly)
-    sf_segs =[s for s in lc.meta.get("sector_times", [(lc.time.min(), lc.time.max())])
+    sf_segs = [s for s in lc.meta.get("sector_times", [(lc.time.min(), lc.time.max())])
                         if any((min(s) <= lc.time) & (lc.time <= max(s)))]
-    return [""] + jktebop.build_poly_instructions(sf_segs, "sf", 1) + ["", "chif", ""]
+    return [""] + jktebop.build_poly_instructions(sf_segs, "sf", 1) \
+            + [""] + [f"lrat {l}" for l in in_params.get("lrats", [])] \
+            + ["", "chif", ""]
 
 
 def _fit_target(time: ArrayLike,
