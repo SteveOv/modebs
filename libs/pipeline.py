@@ -348,10 +348,13 @@ def arrange_sector_groups(lcs: LightCurveCollection,
     # Make sure the sectors are sorted by sector number for grouping to work
     lcs = LightCurveCollection(sorted(lcs, key=lambda l: l.sector))
     out_lcs = []
-    if groups_override:
+    if groups_override is not None:
+        if verbose:
+            print(f"Applying groups override: {groups_override}")
         for group in groups_override:
             # Conveniently isin supports each group as a single sector number or a list of sectors
-            out_lcs += [join_lightcurves(lcs[np.isin(lcs.sector, group)])]
+            if group or len(group):
+                out_lcs += [join_lightcurves(lcs[np.isin(lcs.sector, group)])]
     else:
         # Isolate the sectors into contiguous blocks; so [1,2,4,5,6,8] becomes [[1,2], [4,5,6], [8]]
         # By making a key of the sector number minus its list index, we have a value to group by
