@@ -19,6 +19,50 @@
         "sed_tabname_exclusions": ["B/denis/denis"]
     },
     "target_configs": {
+        "V436 Per": {
+            "search_term": "TIC 403625251",
+            "aka": "TIC 403625251, HD 11241",
+            "SpT": "B1.5 V",
+            "details": "2 short cadence sectors (18 & 85); eccentric orbit with eclipse depths of ~0.4 and ~0.15 mag; S18 has one of each and S58 has only one eclipse; Star B is both larger (k~1.1) and more luminous (J~1.04) than Star A; Southworth & Bowman found LC solutions where k=0.69(3), 0.84(2) and 1.10(3) and adopt the last; from EBOP MAVEN testing we find the solution where k~0.84 is highly attractive unless the fit is very well constrained;",
+            "notes": "not in TESS-ebs; the sectors override forces the use of sector despite only 2 eclipses; jktebop_overrides of LD params (from source), overriding predicted k & quality mask are key to getting LC fit similar to that published;",
+            "Teff_sys": 22000,
+            "sectors": [[18]],
+            "quality_masks": [[1790.0, 1792.0]],
+            "t0": 1813.2011,
+            "period": 25.935953,
+            "morph": 0.300,
+            "widthP": 0.025,
+            "widthS": 0.025,
+            "depthP": 0.400,
+            "depthS": 0.160,
+            "phiS": 0.413,
+            "jktebop_overrides": {
+                "k": 1.2,
+                "LDA": "quad", "LDA1": 0.046, "LDA2": 0.22, "LDA1_fit": 0,
+                "LDB": "quad", "LDB1": 0.046, "LDB2": 0.22, "LDB1_fit": 0
+            },
+            "labels": {
+                "citation_key": "SouthworthBowman22mnras",
+                "source": "Southworth & Bowman (2022MNRAS.513.3191S) Table 3.  Teffs reproduced from Janik+ (2003A&A...408..611J).",
+                "rA_plus_rB": 0.08015,  "rA_plus_rB_err": 0.00028,
+                "k": 1.097,             "k_err": 0.022,
+                "J": 1.041,             "J_err": 0.022,
+                "inc": 87.951,          "inc_err": 0.025,
+                "ecosw": -0.12838,      "ecosw_err": 0.00011,
+                "esinw": -0.3614,       "esinw_err": 0.0020,
+                "L3": -0.003,           "L3_err": 0.011,
+                "LR": 1.253,            "LR_err": 0.032,
+                "MA": 6.880,            "MA_err": 0.037,
+                "MB": 7.348,            "MB_err": 0.039,
+                "q": 1.068,             "q_err": 0.008,
+                "RA": 3.415,            "RA_err": 0.046,
+                "RB": 3.745,            "RB_err": 0.027,
+                "TeffA": 21500,         "TeffA_err": 1000,
+                "TeffB": 22000,         "TeffB_err": 1000,
+                "loggA": 4.209,         "loggA_err": 0.012,
+                "loggB": 4.157,         "loggB_err": 0.006      
+            }
+        },
         "V539 Ara": {
             "search_term": "TIC 396903513",
             "aka": "TIC 396903513, HD 161783",
@@ -557,7 +601,8 @@
                 "TeffR": 0.935,         "TeffR_err": 0.020,
                 "loggA": 4.306,         "loggA_err": 0.006,
                 "loggB": 4.279,         "loggB_err": 0.008,
-                "a": 5.881,             "a_err": 0.043
+                "a": 5.881,             "a_err": 0.043,
+                "E(B-V)": 0.05,         "E(B-V)_err": 0.01
             }
         },
         "GW Eri": {
@@ -766,6 +811,50 @@
                 "E(B-V)": 0.05,         "E(B-V)_err": 0.02,
                 "age": 2.2e9,           "age_err": 0.1e9,
                 "Z": 0.014
+            }
+        },
+        "V570 Per": {
+            "search_term": "TIC 116991977",
+            "aka": "TIC 116991977, HD 19457",
+            "SpT": "F3 V + F5 V",
+            "details": "2 short cadence sectors (18 & 58); an inclined circular orbit with variability due to starspots & evidence of the ellipsoidal effect; shallow eclipses of ~0.11 & ~0.10 mag; the source characterisation used a spectroscopic light ratio to constrain the fit;",
+            "notes": "not in TESS-ebs; requires the help of the lrat from Southworth23obsR14 to constrain the fit; Southworth23obsR14 uses E(B-V)=0.05+/-0.02 mag and gives a dist=117.2+/-2.3 pc; Teffs fit ~800 K below & radii ~0.2 R_sun above published values unless the GALEX:NUV & GALEX:FUV SED observations are excluded;",
+            "quality_masks": [[1790.0, 1792.5]],
+            "t0": 1808.957210950,
+            "period": 1.900928407,
+            "morph": 0.500,
+            "widthP": 0.080,
+            "widthS": 0.080,
+            "depthP": 0.100,
+            "depthS": 0.080,
+            "phiS": 0.500,
+            "jktebop_overrides": {
+                "lrats": ["1809.42 0.703 0.057"]
+            },
+            "labels": {
+                "citation_key": "Southworth23obsR14",
+                "source": "Southworth (2023Obs...143..165S) Rediscussion 14, Tables II & III",
+                "rA_plus_rB": 0.31715,  "rA_plus_rB_err": 0.00057,
+                "k": 0.877,             "k_err": 0.036,
+                "J": 0.8767,            "J_err": 0.0033,
+                "inc": 77.294,          "inc_err": 0.048,
+                "ecosw": 0.0,
+                "esinw": 0.0,
+                "L3": 0.0,
+                "LR": 0.683,            "LR_err": 0.060,
+                "MA": 1.4489,           "MA_err": 0.0063,
+                "MB": 1.3495,           "MB_err": 0.0062,
+                "q": 0.9314,            "q_err": 0.0026,
+                "RA": 1.538,            "RA_err": 0.035,
+                "RB": 1.349,            "RB_err": 0.032,
+                "TeffA": 6842,          "TeffA_err": 50,
+                "TeffB": 6562,          "TeffB_err": 50,
+                "loggA": 4.225,         "loggA_err": 0.020,
+                "loggB": 4.308,         "loggB_err": 0.021,
+                "a": 9.100,             "a_err": 0.013,
+                "E(B-V)": 0.05,         "E(B-V)_err": 0.02,
+                "age": 850e6,           "age_err": 50e6,
+                "Z": 0.020
             }
         },
         "AN Cam": {
@@ -1066,6 +1155,47 @@
                 "E(B-V)": 0.00,         "E(B-V)_err": 0.01,
                 "age": 5.5e9,
                 "Z": 0.020
+            }
+        },
+        "QR Hya": {
+            "search_term": "TIC 49003142",
+            "aka": "TIC 49003142, HD 94853",
+            "SpT": "G1 V",
+            "details": "3 short cadence sectors (9, 36 & 63); an inclined orbit with partial eclipses of ~0.30 & ~0.28 mag; variability from startspot activity;",
+            "notes": "corrected tess-ebs ephemeris for period & phiS; mean LC fits in reasonable agreement with published values when flattened and L3 fixed at zero (like with EBOP MAVEN tests);",
+            "t0": 1544.467434341,
+            "t0_err" : 0.000143752,
+            "period": 5.005865978,
+            "period_err": 0.000005448,
+            "morph": 0.455,
+            "widthP": 0.077,
+            "widthS": 0.077,
+            "depthP": 0.206,
+            "depthS": 0.206,
+            "phiS": 0.500,
+            "flatten": true,
+            "jktebop_overrides": { "L3": 0, "L3_fit": 0 },
+            "labels": {
+                "citation_key": "GraczykPietrzynski+22aa",
+                "source": "Graczyk et al. (2022A&A...666A.128G) Tables 8 & 9.",
+                "rA_plus_rB": 0.1561,   "rA_plus_rB_err": 0.0004,
+                "k": 0.936,             "k_err": 0.005,
+                "J": 0.94,
+                "inc": 86.087,          "inc_err": 0.007,
+                "ecosw": -0.00008,      "ecosw_err": 0.00008, 
+                "esinw": -0.00006,      "esinw_err": 0.00006, 
+                "L3": 0.0,
+                "LR": 0.8378,
+                "MA": 1.1002,           "MA_err": 0.0018,
+                "MB": 1.0673,           "MB_err": 0.0019,
+                "q": 0.9701,            "q_err": 0.0011,
+                "RA": 1.2844,           "RA_err": 0.0040,
+                "RB": 1.2028,           "RB_err": 0.0055,
+                "TeffA": 5925,          "TeffA_err": 75,
+                "TeffB": 5845,          "TeffB_err": 71,
+                "loggA": 4.262,         "loggA_err": 0.003,
+                "loggB": 4.306,         "loggB_err": 0.004,
+                "E(B-V)": 0.003,        "E(B-V)_err": 0.003
             }
         },
         "V530 Ori": {
