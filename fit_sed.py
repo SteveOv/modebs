@@ -418,7 +418,8 @@ if __name__ == "__main__":
                             ax.plot(_chain[:, :, ix], "tab:blue", alpha=0.05)
                             ax.axvspan(0, _burn_in_samples, color="silver")
                             ax.set(xlim=(0, len(_chain)), ylabel=theta_labels[fit_mask][ix])
-                        axes[-1].set(xlabel=f"step / {args.mcmc_thin_by}")
+                        axes[-1].set(xlabel="step" + \
+                                        (f" / {args.mcmc_thin_by}" if args.mcmc_thin_by>1 else ""))
                         fig.savefig(figs_dir/f"sed-mcmc-trails.{args.figs_type}", dpi=args.figs_dpi)
                         plt.close(fig)
                 else:
