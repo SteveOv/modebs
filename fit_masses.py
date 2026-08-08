@@ -98,7 +98,7 @@ if __name__ == "__main__":
                 target_id = trow.key
                 print("\n\n------------------------------------------------------------")
                 print(f"Processing target {fit_counter} of {to_fit_count}: {target_id}")
-                print("------------------------------------------------------------")
+                print("------------------------------------------------------------", flush=True)
                 config = targets_config.get_target_config(target_id)
                 known_vals = config.get("labels", {})
                 if args.plot_figs:
@@ -114,7 +114,7 @@ if __name__ == "__main__":
 
 
                 # Set up the priors and the corresponding function to evaluate them
-                print("\nSetting up the fitting priors and the ln_prior_func() callback.")
+                print("\nSetting up the fitting priors & the ln_prior_func() callback.", flush=True)
                 M_sys = trow.M_sys              # From SED fitting
                 eep_limits = get_eep_limits()
                 mass_limits = get_mass_limits()
@@ -141,7 +141,7 @@ if __name__ == "__main__":
                 # Estimate fit starting position with masses derived from M_sys & the expected mass
                 # ratio and an approximate mid main-sequence EEP for the more massive star.
                 print("\nSetting up the starting position/theta0 for fitting",
-                      "[" + ", ".join(theta_params_and_units[..., 0]) + "]")
+                      "[" + ", ".join(theta_params_and_units[..., 0]) + "]", flush=True)
                 if (qphot := trow.qphot) is None or nom_val(qphot) <= 0:
                     qphot = 1
                 theta_masses = np.array([M_sys / (1+qphot)] + [M_sys / (1 + 1/qphot)]*(NUM_STARS-1))
@@ -188,14 +188,14 @@ if __name__ == "__main__":
                     return ln_prior_val + ln_likelihood_func(model_y)
 
 
-                print("\nPerforming an initial 'quick' minimize fit for approximate values.")
+                print("\nPerforming initial 'quick' minimize fit for approximate values",flush=True)
                 theta_fit, _ = minimize_fit(ln_prob_func=ln_prob_func,
                                             theta0=theta0,
                                             verbose=True)
 
 
                 if args.do_mcmc_fit:
-                    print("\nPerforming a full MCMC for masses & eeps with uncertainties.")
+                    print("\nPerforming full MCMC for masses & eeps with uncertainties.",flush=True)
                     theta_fit, sampler = mcmc_fit(ln_prob_func=ln_prob_func,
                                                   ln_prior_func=ln_prior_func,
                                                   theta0=theta0,
@@ -211,7 +211,7 @@ if __name__ == "__main__":
 
 
                     if args.plot_figs:
-                        print("\nCreating MCMC corner and trails plots")
+                        print("\nCreating MCMC corner and trails plots", flush=True)
                         _data = samples_from_sampler(sampler, thin_by=args.mcmc_thin_by, flat=True)
                         fig = corner.corner(data=_data, show_titles=True, plot_datapoints=True,
                                             quantiles=[0.16, 0.5, 0.84], labels=theta_labels,
@@ -240,7 +240,7 @@ if __name__ == "__main__":
                 sys_age = np.mean(star_ages)
 
 
-                print(f"\nFinal fitted parameters for {target_id} ([known value])")
+                print(f"\nFinal fitted parameters for {target_id} ([known value])", flush=True)
                 high_uncert_params = []
                 write_params = {}
                 for (k, unit), val in zip(np.concatenate([theta_params_and_units, ages_and_units]),
@@ -262,7 +262,8 @@ if __name__ == "__main__":
 
 
                 # Finally, store the params and the flag that indicates fitting has completed
-                print(f"\nWriting fitted params for {list(write_params.keys())} to working-set.")
+                print(f"\nWriting fitted params for {list(write_params.keys())} to working-set.",
+                      flush=True)
                 trow.set_values(**write_params, fitted_masses=True, errors="")
 
 
@@ -273,6 +274,7 @@ if __name__ == "__main__":
                 trow.set_values(**write_params, fitted_masses=False, errors=type(exc).__name__)
 
             # Each row's values will be written to the underlying data store as it goes out of scope
+            log.flush()
 
         print("\n\n============================================================")
         print(f"Completed {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")

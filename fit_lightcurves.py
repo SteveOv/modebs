@@ -119,7 +119,7 @@ if __name__ == "__main__":
                 target_id = trow.key
                 print("\n\n------------------------------------------------------------")
                 print(f"Processing target {fit_counter} of {to_fit_count}: {target_id}")
-                print("------------------------------------------------------------")
+                print("------------------------------------------------------------", flush=True)
                 config = targets_config.get_target_config(target_id)
                 known_vals = config.get("labels", {})
                 if args.plot_figs:
@@ -131,7 +131,7 @@ if __name__ == "__main__":
                 print(fill(f"Details:{config.get('details', '')}", subsequent_indent="\t"))
                 print(fill(f"Notes:  {config.get('notes', '')}", subsequent_indent="\t"))
                 print(f"SpT:\t{trow.spt or config.get('SpT', '')}")
-                print(f"morph:\t{trow.morph or -1:.3f}\n")
+                print(f"morph:\t{trow.morph or -1:.3f}\n", flush=True)
 
                 # The quality bitmask excludes fluxes by their quality flag. If unset, choose on the
                 # period. For shorter periods we're more discriminating as orbital coverage is good.
@@ -165,7 +165,8 @@ if __name__ == "__main__":
                     select_mask = np.in1d([l.meta['TARGETID'] for l in lcs],
                                           [int(t) for t in trow.tics.split("|")])
                     lcs = lcs[select_mask]
-                print(f"Found {len(lcs)} lightcurves prior to applying any configured selections.")
+                print(f"Found {len(lcs)} lightcurves prior to applying any configured selections.",
+                      flush=True)
 
                 # Configured selections, exclusions 1st so they're overidden by mention in sectors
                 select_mask = np.ones(len(lcs), dtype=bool)
@@ -192,13 +193,13 @@ if __name__ == "__main__":
 
                 min_section_dur = config.get("min_lc_section_days", 2) * u.d
                 print("\nClipping the lightcurves' invalid fluxes, known distorted sections",
-                    f"& any isolated sections < {min_section_dur} in length.")
+                    f"& any isolated sections < {min_section_dur} in length.", flush=True)
                 pipeline.mask_lightcurves_unusable_fluxes(lcs, config.quality_masks or [],
                                                           min_section_dur=min_section_dur)
 
 
 
-                print("\nInspecting the lightcurves to find and characterise their eclipses")
+                print("\nInspecting lightcurves to find and characterise their eclipses",flush=True)
                 pipeline.add_eclipse_meta_to_lightcurves(lcs, trow.t0, trow.period,
                                                          trow.widthP, trow.widthS,
                                                          trow.depthP, trow.depthS,
@@ -206,7 +207,7 @@ if __name__ == "__main__":
 
 
                 if args.plot_figs:
-                    print("\nCreating plot of the lightcurves with the eclipses marked.")
+                    print("\nCreating plot of the lightcurves with the eclipses marked.",flush=True)
                     ax_titles=[f"S{l.sector} ({l.meta['FLUX_ORIGIN']} @ {l.meta['FRAMETIM']*l.meta['NUM_FRM']} s)" for l in lcs] # pylint: disable=line-too-long
                     fig = plots.plot_lightcurves(lcs, "flux", ax_titles, normalize_lcs=True,
                                                  cols=args.lc_fig_cols, ax_func=indicate_eclipses)
@@ -216,7 +217,8 @@ if __name__ == "__main__":
 
                 # Group lightcurves to ensure sufficient coverage for fitting. This will also
                 # drop lightcurves with insufficient coverage and which cannot be combined
-                print("\nSelecting lightcurves for orbital coverage required for fitting.")
+                print("\nSelecting lightcurves for orbital coverage required for fitting.",
+                      flush=True)
                 groups_override = config.sectors
                 ecl_complete_th = config.eclipse_complete_threshold
                 if config.sectors is None:
@@ -244,12 +246,11 @@ if __name__ == "__main__":
                 flatten_morph_th = config.get("flatten_morph_threshold", 0)
                 do_flatten = config.flatten \
                                 or (config.flatten is None and trow.morph <= flatten_morph_th)
+                print(flush=True)
                 if do_flatten:
                     print(f"\nFluxes for {target_id} (with morph={trow.morph:.3f})",
                         "will be flattened prior to detrending, as it has a",
                         "config override set." if config.flatten else f"morph<={flatten_morph_th}.")
-                else:
-                    print()
                 pipeline.append_mags_to_lightcurves_and_detrend(lcs,
                                                                 config.detrend_gap_threshold,
                                                                 config.detrend_poly_degree,
@@ -263,7 +264,7 @@ if __name__ == "__main__":
 
                 if args.plot_figs:
                     print("\nCreating plot of the prepared and grouped lightcurves" +
-                          (" showing the eclipse mask used." if do_flatten else "."))
+                          (" showing the eclipse mask used." if do_flatten else "."), flush=True)
                     fig = plots.plot_lightcurves(lcs, "delta_mag",  cols=args.lc_fig_cols,
                                                  ax_func=highlight_mask)
                     fig.savefig(figs_dir / f"lcs-prepared.{args.figs_type}", dpi=args.figs_dpi)
@@ -271,11 +272,11 @@ if __name__ == "__main__":
 
 
                 # EBOP MAVEN estimates of fitting input params. Requires phase folded & binned mags
-                print("\nPreparing phase-folded & binned copies of the lightcurves for EBOP MAVEN.")
+                print("\nPreparing phase-folded & binned lightcurves for EBOP MAVEN.", flush=True)
                 bins = estimator.mags_feature_bins
                 wrap_phase = u.Quantity(estimator.mags_feature_wrap_phase or (0.5 + trow.phiS / 2))
                 bin_folds = np.zeros(shape=(len(lcs), 2, bins), dtype=np.float32)
-                flcs = [None] * len(lcs) 
+                flcs = [None] * len(lcs)
                 for ix, lc in enumerate(lcs):
                     flcs[ix] = lc.fold(nom_val(trow.period)*u.d, lc.meta["t0"], 0, wrap_phase, True)
                     bin_folds[ix] = lightcurves.get_binned_phase_mags_data(flcs[ix],bins,wrap_phase)
@@ -289,7 +290,7 @@ if __name__ == "__main__":
                     fig.savefig(figs_dir / f"lcs-mag-feature.{args.figs_type}", dpi=args.figs_dpi)
                     plt.close(fig)
 
-                print("Estimating fitting input parameters with EBOP MAVEN.")
+                print("Estimating fitting input parameters with EBOP MAVEN.", flush=True)
                 if args.is_testing:
                     print("Testing flagged. Fixing the estimator's seed for repeatable predictions")
                     pipeline.force_seed_on_dropout_layers(estimator, 42)
@@ -392,7 +393,8 @@ if __name__ == "__main__":
                 print(f"\nWill fit {len(lcs)} lightcurve(s) with JKTEBOP task",
                     f"8 (MC) for {fit_iterations} iterations." if fit_task == 8 else f"{fit_task}.",
                     f"\nWill make up to {fit_attempts} attempt(s) to reach a good fit for each LC.",
-                    f"Each fit task will time out after {fit_timeout} s." if fit_timeout else "")
+                    f"Each fit task will time out after {fit_timeout} s." if fit_timeout else "",
+                    flush=True)
 
                 # Now we fit the lightcurves with JKTEBOP. If max_workers >1 progress updates
                 # will occur after each attempt is complete, but overall elapsed time is reduced.
@@ -424,7 +426,7 @@ if __name__ == "__main__":
                           "has warnings:", ", ".join(lc.meta["LABEL"] for lc in lcs[warn_mask]))
 
                 if args.plot_figs and fit_task == 3:
-                    print("\nCreating a plot of the fit and residual of each lightcurve.")
+                    print("\nCreating a plot of the fit & residual of each lightcurve.", flush=True)
                     if fail_count > 0:
                         print("Axes titles with a * suffix indicate fits that did not converge.")
                     out_files = [fitted_param_dicts[ix]["out_fname"] for ix in range(len(lcs))]
@@ -446,7 +448,7 @@ if __name__ == "__main__":
                 # Summarize the fits' params into single set of values. If possible, omit those
                 # which failed to converge. If there's 1 usable fit use the fitted vals directly,
                 # otherwise use the fits' median +/- 2-sigma of the scatter (the sample is small).
-                print()
+                print(flush=True)
                 use_mask = np.ones_like(conv_mask, bool)
                 if 0 < (conv_count := sum(conv_mask)) < len(lcs):
                     print(f"Excluding the {len(lcs)-conv_count} of {len(lcs)} LC(s) where the fit",
@@ -461,7 +463,7 @@ if __name__ == "__main__":
 
 
                 if args.plot_figs and fitted_params.size > 1:
-                    print("\nCreating plot of the scatter in the fitted params, by lightcurve.")
+                    print("\nCreating plot of the scatter in the fitted params.", flush=True)
                     xlim = (lcs.sector.min() - 2, lcs.sector.max() + 2)
                     def median_and_uncertainty(key, ax):
                         # pylint: disable=cell-var-from-loop, missing-function-docstring
@@ -499,7 +501,7 @@ if __name__ == "__main__":
                     if k in known_vals:
                         kval = ufloat(known_vals.get(k, np.NaN), known_vals.get(f"{k}_err", 0))
                     print(f"{k:>14s}:", format_value(final_params[k], None, kval, "12.6f"))
-                print("Calculated TeffR (Teff ratio) from LR and k")
+                print("Calculated TeffR (Teff ratio) from LR and k", flush=True)
                 TeffR = (final_params["LR"] / final_params["k"]**2)**0.25
                 kval = None
                 if "TeffR" in known_vals:
@@ -523,7 +525,7 @@ if __name__ == "__main__":
                 # Finally, store the params and the flag that indicates LC fitting has completed.
                 # Subsequent stages set to incomplete as this fit will have invalidated them.
                 print(f"\nWriting final values for {', '.join(k for k in write_keys)},",
-                      "TeffR, Teff_sys & logg_sys to working-set.")
+                      "TeffR, Teff_sys & logg_sys to working-set.", flush=True)
                 trow.set_values(**{ k: final_params[k] for k in write_keys }, TeffR=TeffR,
                                 Teff_sys=Teff_sys, logg_sys=logg_sys,
                                 fitted_lcs=True, fitted_sed=False, fitted_masses=False, errors="")
@@ -536,6 +538,7 @@ if __name__ == "__main__":
                 trow.set_values(fitted_lcs=False, errors=type(exc).__name__)
 
             # Each row's values will be written to the underlying data store as it goes out of scope
+            log.flush()
 
         print("\n\n============================================================")
         print(f"Completed {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")

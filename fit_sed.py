@@ -128,7 +128,7 @@ if __name__ == "__main__":
               f"Teff {model_grid.teff_range * model_grid.teff_unit:unicode},",
               f"logg {model_grid.logg_range * model_grid.logg_unit:unicode}",
               f"\nand metallicity {model_grid.metal_range * u.dimensionless_unscaled:unicode},",
-              f"with fluxes returned in units of {model_grid.flux_unit:unicode}")
+              f"with fluxes returned in units of {model_grid.flux_unit:unicode}", flush=True)
 
         # Fixed priors limits for fitting
         teff_limits = model_grid.teff_range
@@ -141,7 +141,7 @@ if __name__ == "__main__":
                 target_id = trow.key
                 print("\n\n------------------------------------------------------------")
                 print(f"Processing target {fit_counter} of {to_fit_count}: {target_id}")
-                print("------------------------------------------------------------")
+                print("------------------------------------------------------------", flush=True)
                 config = targets_config.get_target_config(target_id)
                 known_vals = config.get("labels", {})
                 if args.plot_figs:
@@ -165,7 +165,8 @@ if __name__ == "__main__":
 
 
                 # Get the extinction, based on the coords, prioritising the mean of reliable results
-                print(f"\nGetting extinction based on {target_id}", f"{coords}".replace("\n",""))
+                print(f"\nGetting extinction based on {target_id}",
+                      f"{coords}".replace("\n",""), flush=True)
                 Av, is_reliable_av = 0, False
                 avs = np.array([*extinction.iterate(coords, rv=Rv, verbose=True)]).T
                 if any(reliable_mask := np.array(avs[1], dtype=bool)):
@@ -191,7 +192,7 @@ if __name__ == "__main__":
 
 
                 # Get the SED for this target and de-duplicate (obs may appear multiple times).
-                print()
+                print(flush=True)
                 sed = get_sed_for_target(target_id, trow.search_term,
                                          radius=0.25, remove_duplicates=True, verbose=True)
                 if sed is None or len(sed) == 0:
@@ -225,7 +226,7 @@ if __name__ == "__main__":
                                     / ext_model.extinguish(sed["sed_wl"].to(u.um), Av=nom_val(Av))
 
                 if args.plot_figs:
-                    print("\nCreating SED observations plot")
+                    print("\nCreating SED observations plot", flush=True)
                     if fit_av:
                         fig = plots.plot_sed(sed["sed_wl"].quantity, [sed["sed_fit_flux"]],
                                              [sed["sed_eflux"]], fmts=["or"], labels=["observed"],
@@ -242,7 +243,7 @@ if __name__ == "__main__":
 
                 # Set up the MCMC fitting theta and priors. For now, hard coded to 2 stars.
                 # The ratios are wrt the primary components - the prior_func ignores the 0th item
-                print("\nSetting up the fitting priors and the ln_prior_func() callback.")
+                print("\nSetting up the fitting priors & the ln_prior_func() callback.", flush=True)
                 TeffR, radR = trow.TeffR, trow.k
                 TeffR_priors = tuple([1] + [ufloat(TeffR.n, TeffR.s or (TeffR.n * .05))]*(NSTARS-1))
                 radR_priors = tuple([1] + [ufloat(radR.n, radR.s or (radR.n * .05))]*(NSTARS-1))
@@ -288,7 +289,7 @@ if __name__ == "__main__":
                     return -0.5 * rval
 
 
-                print("\nSetting up the starting position (theta0) for fitting.")
+                print("\nSetting up the starting position (theta0) for fitting.", flush=True)
                 init_teff = max(teff_limits[0], min(nom_val(trow.Teff_sys), teff_limits[1]))
                 init_logg = max(logg_limits[0], min(nom_val(trow.logg_sys), logg_limits[1]))
                 init_rad = max(radius_limits[0], min(init_teff / 5500, radius_limits[1]))
@@ -315,7 +316,7 @@ if __name__ == "__main__":
 
 
                 # Minimize fits to do outlier pruning and optionally give a starting pos for MCMC
-                print("\nPerforming 'quick' minimize fits to prune outliers.")
+                print("\nPerforming 'quick' minimize fits to prune outliers.", flush=True)
                 theta_fit = None
                 retain_mask = np.ones_like(x, dtype=bool)
                 min_to_retain, improve_th = max(10, int(np.ceil(len(sed) * 0.75))), 0.8
@@ -374,7 +375,7 @@ if __name__ == "__main__":
 
 
                 if args.do_mcmc_fit:
-                    print("\nPerforming a full MCMC. Values marked * are free.")
+                    print("\nPerforming a full MCMC. Values marked * are free.", flush=True)
                     theta_fit, sampler = mcmc_fit(x=x[retain_mask],
                                                   y=y[retain_mask],
                                                   y_err=y_err[retain_mask],
@@ -394,7 +395,7 @@ if __name__ == "__main__":
 
 
                     if args.plot_figs:
-                        print("\nCreating MCMC corner and model vs SED observations plots")
+                        print("\nCreating MCMC corner & model v SED observations plots", flush=True)
                         _data = samples_from_sampler(sampler, thin_by=args.mcmc_thin_by, flat=True)
                         fig = corner.corner(data=_data, show_titles=True, plot_datapoints=True,
                                             quantiles=[0.16, 0.5, 0.84],
@@ -424,7 +425,7 @@ if __name__ == "__main__":
                     print("\nMCMC disabled. Will use params from minimize fit.")
 
 
-                print(f"\nFinal parameters for {target_id} ([known value])")
+                print(f"\nFinal parameters for {target_id} ([known value])", flush=True)
                 write_params = {}
                 for (k, unit), val, mask in zip(theta_params_and_units, theta_fit, fit_mask):
                     kval = None
@@ -466,7 +467,8 @@ if __name__ == "__main__":
 
                 # Finally, store the params and the flag that indicates SED fitting has completed.
                 # Subsequent stages set to incomplete as this fit will have invalidated them.
-                print(f"\nWriting fitted params for {list(write_params.keys())} to working-set.")
+                print(f"\nWriting fitted params for {list(write_params.keys())} to working-set.",
+                      flush=True)
                 trow.set_values(**write_params, fitted_sed=True, fitted_masses=False, errors="")
 
 
@@ -478,6 +480,7 @@ if __name__ == "__main__":
                 trow.set_values(fitted_sed=False, errors=type(exc).__name__)
 
             # Each row's values will be written to the underlying data store as it goes out of scope
+            log.flush()
 
         print("\n\n============================================================")
         print(f"Completed {THIS_STEM} at {datetime.now():%Y-%m-%d %H:%M:%S%z %Z}")
