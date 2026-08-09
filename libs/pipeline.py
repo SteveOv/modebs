@@ -619,7 +619,8 @@ def median_params(input_params: ArrayLike,
             agg_params[k][0] = None
         else:
             lo, med, hi = np.quantile(noms, q=quantiles)
-            agg_params[k][0] = ufloat(med, max(np.mean([med-lo, hi-med]), med * min_uncertainty_pc))
+            agg_params[k][0] = ufloat(med, max(np.mean([med-lo, hi-med]),
+                                               abs(med * min_uncertainty_pc)))
     return agg_params[0]
 
 
@@ -651,7 +652,7 @@ def mean_params(input_params: ArrayLike,
             agg_params[k][0] = None
         else:
             val = np.mean(vals)
-            agg_params[k][0] = ufloat(val.n, max(val.s, val.n * min_uncertainty_pc))
+            agg_params[k][0] = ufloat(val.n, max(val.s, abs(val.n * min_uncertainty_pc)))
     return agg_params[0]
 
 
