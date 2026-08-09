@@ -11,8 +11,8 @@ from itertools import groupby
 
 import numpy as np
 from numpy.typing import ArrayLike
-from uncertainties import UFloat, ufloat, nominal_value
-from uncertainties.unumpy import nominal_values
+from uncertainties import UFloat, ufloat, nominal_value as nom_val
+from uncertainties.unumpy import nominal_values as nom_vals
 import astropy.units as u
 from astropy.time import Time
 from astropy.io import ascii as io_ascii
@@ -438,8 +438,8 @@ def append_mags_to_lightcurves_and_detrend(lcs: LightCurveCollection,
     if flatten and (durp is None or durs is None):
         raise ValueError("durp and durs required if flatten == True")
     if flatten:
-        durp = nominal_value(durp) * 1.1
-        durs = nominal_value(durs) * 1.1
+        durp = nom_val(durp) * 1.1
+        durs = nom_val(durs) * 1.1
     if not isinstance(detrend_gap_th, u.Quantity):
         detrend_gap_th = detrend_gap_th * u.d
 
@@ -602,13 +602,13 @@ def median_params(input_params: ArrayLike,
     :quant_size: the size of the inter-quantile range used to derive uncertainties
     :exclude_outliers: whether to exclude any outliers before calculating the median and
     uncertainties, with outliers being values outside the inter-quartile range (IQR) +/- 1.5*IQR
-    :min_uncertainty_pc: optional minimum uncertainty as a percentage of the median
+    :min_uncertainty_pc: optional minimum uncertainty as a percentage of the nominal
     :return: a single row of a corresponding structured array containing UFloats
     """
     quantiles = (0.5 - quant_size/2, 0.5, 0.5 + quant_size/2)
     agg_params = np.empty((1,), dtype=input_params.dtype)
     for k in input_params.dtype.names:
-        noms = nominal_values(input_params[k])
+        noms = nom_vals(input_params[k])
 
         if exclude_outliers:
             q1, q3 = np.quantile(noms, q=(0.25, 0.75))
@@ -620,6 +620,38 @@ def median_params(input_params: ArrayLike,
         else:
             lo, med, hi = np.quantile(noms, q=quantiles)
             agg_params[k][0] = ufloat(med, max(np.mean([med-lo, hi-med]), med * min_uncertainty_pc))
+    return agg_params[0]
+
+
+def mean_params(input_params: ArrayLike,
+                exclude_outliers: bool=False,
+                min_uncertainty_pc: float=0.) -> ArrayLike:
+    """
+    Produce aggregated values for the input structured array of param values.
+    The returned values are the mean of the input.
+
+    :fitted_params: a structured array containing the source fitted parameter values
+    :exclude_outliers: whether to exclude any outliers before calculating the mean and
+    uncertainties, with outliers being values outside the inter-quartile range (IQR) +/- 1.5*IQR
+    :min_uncertainty_pc: optional minimum uncertainty as a percentage of the nominal
+    :return: a single row of a corresponding structured array containing UFloats
+    """
+    agg_params = np.empty((1,), dtype=input_params.dtype)
+    mask = np.ones((input_params.size), dtype=bool)
+
+    for k in input_params.dtype.names:
+        if exclude_outliers:
+            noms = nom_vals(input_params[k])
+            q1, q3 = np.quantile(noms, q=(0.25, 0.75))
+            whisker_len = 1.5 * (q3 - q1)
+            mask = (q1 - whisker_len <= noms) & (noms <= q3 + whisker_len)
+
+        vals = input_params[k][mask]
+        if vals is None or len(vals) == 0:
+            agg_params[k][0] = None
+        else:
+            val = np.mean(vals)
+            agg_params[k][0] = ufloat(val.n, max(val.s, val.n * min_uncertainty_pc))
     return agg_params[0]
 
 
