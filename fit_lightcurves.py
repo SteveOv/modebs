@@ -484,9 +484,10 @@ if __name__ == "__main__":
                     xlim = (lcs.sector.min() - 2, lcs.sector.max() + 2)
                     def median_and_uncertainty(key, ax):
                         # pylint: disable=cell-var-from-loop, missing-function-docstring
-                        v = final_params[key]
-                        ax.hlines([v.n], *xlim, "k", "-", lw=1.0, label=nom_label)
-                        ax.axhspan(v.n-v.s, v.n+v.s, color="silver", zorder=-50, label=unc_label)
+                        nom, sig = nom_val(final_params[key]), std_dev(final_params[key])
+                        ax.hlines([nom], *xlim, "k", "-", lw=1.0, label=nom_label)
+                        if sig:
+                            ax.axhspan(nom-sig, nom+sig, color="silver", zorder=-50,label=unc_label)
 
                     fig = plots.plot_parameter_scatter(fitted_params[use_mask],
                                                        lcs.sector[use_mask], write_keys,

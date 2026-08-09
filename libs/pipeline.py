@@ -816,6 +816,7 @@ def _fit_target(time: ArrayLike,
     msgs = []
     all_keys = list(jktebop._param_file_line_beginswith.keys()) # pylint: disable=protected-access
     stdout_to_log = StringIO()
+    task = input_params.get("task", 3)
 
     # JKTEBOP will fail if it finds files from a previous fitting
     fit_dir = jktebop.get_jktebop_dir()
@@ -868,7 +869,7 @@ def _fit_target(time: ArrayLike,
             # Blocks on the JKTEBOP task until we can parse the newly written par file contents
             # to read out the revised values for the superset of potentially fitted parameters.
             plines = jktebop.run_jktebop_task(in_fname, par_fname, None, stdout_inspect, timeout)
-            att_out_params = jktebop.read_fitted_params_from_par_lines(plines, all_keys, True)
+            att_out_params = jktebop.read_fitted_params_from_par_lines(plines, all_keys, True, task)
             converged = not stdout_inspect.inspect_flag
 
             att_file_params["warn_msgs"] = jktebop.read_warnings_from_par_file(par_fname)

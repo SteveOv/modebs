@@ -28,47 +28,54 @@ _jktebop_directory = \
     Path(os.environ.get("JKTEBOP_DIR", "~/jktebop/")).expanduser().absolute()
 _jktebop_support_negative_l3 = os.environ.get("JKTEBOP_SUPPORT_NEG_L3", "") == "True"
 
-_regex_pattern_val_and_err = r"^[\s]*(?:{0})[\w\d\s]*[\s]+" \
-                             r"(?P<val>[\-\+]?[0-9]+[\.]?[0-9]*)"\
-                             r"[\s]*(?:\+\/\-)?[\s]*"\
-                             r"(?P<err>[0-9]+[\.]?[0-9]*)?"
+_regex_val_and_err_patterns = [
+    # pylint: disable=line-too-long
+    # For the "Results from ... Monte Carlo" block populated by tasks 8 or 9
+    # This also includes the extended median, +err+, -err and confidence percentage
+    r"^(?:{0})[\s]*(?P<val>[\-\+]?[0-9]+[\.]?[0-9]*)(?:[\s]?\+\/\-[\s]*)(?P<err>[0-9]+[\.]?[0-9]*)" \
+        r"(?:[\s]+)(?P<median>[\-\+]?[0-9]+[\.]?[0-9]*)(?:[\s]?\+[\s]*)(?P<err_up>[0-9]+[\.]?[0-9]*)" \
+        r"(?:[\s]?\-[\s]*)(?P<err_dn>[0-9]+[\.]?[0-9]*)[\s]+[\(]?[\s]*(?P<conf>[0-9]+[\.]?[0-9]*%)?[\s]*[\)]?",
+    # For the "Final values of the parameters: " block populated by tasks 3, 8 & 9
+    r"^(?:{0})[\w\d\s]*[\s]+(?P<val>[\-\+]?[0-9]+[\.]?[0-9]*)[\s]*(?:\+\/\-)?[\s]*(?P<err>[0-9]+[\.]?[0-9]*)?",
+]
 
 # These should be "escaped" here as they're placed in the 1st non-capturing group in the above regex
 _param_file_line_beginswith = {
-    "J":                r"1  Surf. bright. ratio",
-    "rA_plus_rB":       r"2  Sum of frac radii",
-    "k":                r"3  Ratio of the radii",
-    "LDA1":             r"4  Limb darkening A1",
-    "LDB1":             r"5  Limb darkening B1",
-    "inc":              r"6  Orbit",
-    "ecosw":            r"7  ecc \* cos\(omega\)",
-    "esinw":            r"8  ecc \* sin\(omega\)",
-    "gravA":            r"9  Grav darkening A",
-    "gravB":            r"10  Grav darkening B",
-    "reflA":            r"11  Reflected light A",
-    "reflB":            r"12  Reflected light B",
-    "qphot":            r"13  Phot mass ratio",
-    "L3":               r"15  Third light \(L_3\)",
-    "period":           r"19  Orbital period \(P\)",
-    "primary_epoch":    r"20  Ephemeris",
-    "pe":               r"20  Ephemeris",
-    "t0":               r"20  Ephemeris",
-    "LDA2":             r"21  Limb darkening A2",
-    "LDB2":             r"24  Limb darkening B2",
-    "rA":               r"Fractional primary radius:",
-    "rB":               r"Fractional secondary radius:",
-    "ecc":              r"Orbital eccentricity e:",
-    "omega":            r"Periastron longitude omega \(degree\):",
-    "bP":               r"Impact parameter \(primary eclipse\):",
-    "bS":               r"Impact paramtr \(secondary eclipse\):",
-    "phiS":             r"Phase of secondary eclipse:",
-    "LA":               r"Primary contribut'n to system light:",
-    "LB":               r"Secondary contrib'n to system light:",
-    "light_ratio":      r"Stellar light ratio \(phase [\d.]+\):",
-    "LR":               r"Stellar light ratio \(phase [\d.]+\):",
-    "chisq":            r"Total chisq of the fit:",
-    "red_chisq":        r"Reduced chisq of the fit:",
-    "rms_resids":       r"rms of the LC residuals \(mmag\):",
+    # token         results block for task 8|9      task 3 and fallback
+    "J":                (r"  1     J",              r"  1  Surf. bright. ratio"),
+    "rA_plus_rB":       (r"  2 rA\+rB",             r"  2  Sum of frac radii"),
+    "k":                (r"  3     k",              r"  3  Ratio of the radii"),
+    "LDA1":             (r"  4 LD_A1",              r"  4  Limb darkening A1"),
+    "LDB1":             (r"  5 LD_B1",              r"  5  Limb darkening B1"),
+    "inc":              (r"  6   inc",              r"  6  Orbit"),
+    "ecosw":            (r"  7 ecosw",              r"  7  ecc \* cos\(omega\)"),
+    "esinw":            (r"  8 esinw",              r"  8  ecc \* sin\(omega\)"),
+    "gravA":            (r"  9  GD_A",              r"  9  Grav darkening A"),
+    "gravB":            (r" 10  GD_B",              r" 10  Grav darkening B"),
+    "reflA":            (r" 11 reflA",              r" 11  Reflected light A"),
+    "reflB":            (r" 12 reflB",              r" 12  Reflected light B"),
+    "qphot":            (r" 13 qphot",              r" 13  Phot mass ratio"),
+    "L3":               (r" 15   L_3",              r" 15  Third light \(L_3\)"),
+    "period":           (r" 19 P_orb",              r" 19  Orbital period \(P\)"),
+    "primary_epoch":    (r" 20   T_0",              r" 20  Ephemeris"),
+    "pe":               (r" 20   T_0",              r" 20  Ephemeris"),
+    "t0":               (r" 20   T_0",              r" 20  Ephemeris"),
+    "LDA2":             (r" 21 LD_A2",              r" 21  Limb darkening A2"),
+    "LDB2":             (r" 24 LD_B2",              r" 24  Limb darkening B2"),
+    "rA":               (r"      r_A",              r"Fractional primary radius:"),
+    "rB":               (r"      r_B",              r"Fractional secondary radius:"),
+    "ecc":              (r"        e",              r"Orbital eccentricity e:"),
+    "omega":            (r"    omega",              r"Periastron longitude omega \(degree\):"),
+    "bP":               (r"    b_pri",              r"Impact parameter \(primary eclipse\):"),
+    "bS":               (r"    b_sec",              r"Impact paramtr \(secondary eclipse\):"),
+    "phiS":             (None,                      r"Phase of secondary eclipse:"),
+    "LA":               (None,                      r"Primary contribut'n to system light:"),
+    "LB":               (None,                      r"Secondary contrib'n to system light:"),
+    "light_ratio":      (r"    LB\/LA",             r"Stellar light ratio \(phase [\d.]+\):"),
+    "LR":               (r"    LB\/LA",             r"Stellar light ratio \(phase [\d.]+\):"),
+    "chisq":            (None,                      r"Total chisq of the fit:"),
+    "red_chisq":        (r"    Rchi2",              r"Reduced chisq of the fit:"),
+    "rms_resids":       (None,                      r"rms of the LC residuals \(mmag\):"),
 }
 
 # Defines the "columns" of the structured array returned by generate_model_light_curve()
@@ -362,42 +369,54 @@ def write_light_curve_to_dat_file(lc: LightCurve,
 
 
 def read_fitted_params_from_par_file(par_filename: Path,
-                                     params: List[str]) -> Dict[str, UFloat]:
+                                     params: List[str],
+                                     task: int=3) -> Dict[str, UFloat]:
     """
     Will retrieve the final values of the requested parameters from the
     indicated JKTEBOP Task 3 parameter output file (.par).
 
     :par_filename: path of the file to read
     :params: the list of params to read (see _param_file_line_beginswith for those supported)
+    :task: which task was run - informs where in the file the params are read from
     :returns: a dict with the value and any associated error for those parameters found
     """
     return read_fitted_params_from_par_lines(
-        _yield_file_lines(par_filename, after="Final values of the parameters:"), params)
+        _yield_file_lines(par_filename, after="Final values of the parameters:"), params,True,task)
 
 
 def read_fitted_params_from_par_lines(par_lines: Iterable[str],
                                       params: List[str],
-                                      as_ufloat: bool=False) -> Dict[str, UFloat]:
+                                      as_ufloat: bool=False,
+                                      task: int=3) -> Dict[str, UFloat]:
     """
     Will retrieve the final values of the requested parameters from the
-    passed on contents of a JKTEBOP Task 3 parameter output file (par)
+    passed on contents of a JKTEBOP parameter output file (par)
 
     :par_lines: the content of the file
-    :params: the list of params to read (see _param_file_line_beginswith for those supported)
+    :params: the list of params to read (see _regex_val_and_err_patterns for those supported)
     :as_ufloat: if true values will output as UFloats, otherwise as Tuple[val, err]
+    :task: which task was run - informs where in the file the params are read from
     :returns: a dict with the value and any associated error for those parameters found
     """
     results = {}
     lines = list(par_lines)  # Get them out of a generator as we need to go through more than once
+    re_slice = slice(0, None) if task in [8, 9] else slice(-1, None)
+
     for param in params:
-        beginswith = _param_file_line_beginswith.get(param, "") # don't escape; may contain tokens
-        if beginswith:
-            pattern = re.compile(_regex_pattern_val_and_err.format(beginswith), re.IGNORECASE)
-            for line in lines:
-                match = pattern.match(line)
-                if match and "val" in match.groupdict():
-                    val, err = float(match.group("val")), match.group("err") or 0
-                    results[param] = ufloat(val, float(err)) if as_ufloat else (val, float(err))
+        if beginswith := _param_file_line_beginswith.get(param, None):
+            # These are set up in the order [task8|9, task3]
+            for pattern, bw in zip(_regex_val_and_err_patterns[re_slice], beginswith[re_slice]):
+                if bw is not None and param not in results:
+                    regex = re.compile(pattern.format(bw), re.IGNORECASE)
+                    for line in lines:
+                        match = regex.match(line)
+                        if match and "val" in match.groupdict():
+                            val, err = float(match.group("val")), match.group("err") or 0
+                            if as_ufloat:
+                                results[param] = ufloat(val, float(err))
+                            else:
+                                results[param] = (val, float(err))
+                            break
     return results
 
 
