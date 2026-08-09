@@ -454,12 +454,29 @@ if __name__ == "__main__":
                     print(f"Excluding the {len(lcs)-conv_count} of {len(lcs)} LC(s) where the fit",
                           "did not converge from the calculations for the final set of parameters.")
                     use_mask &= conv_mask
-                if sum(use_mask) > 1: # 0.9545 for 2-sig, 0.6827 for 1-sig
-                    final_params = pipeline.median_params(fitted_params[use_mask], 0.9545, True)
-                    print(f"Using the fits' median & 2-sigma scatter from {sum(use_mask)} LCs.")
+
+                nom_label, unc_label = "mean", r"$\pm1\sigma$"
+                if fit_task == 3:
+                    if sum(use_mask) > 1:
+                        # We have lower confidence in the task 3 results. The error bars are formal
+                        # uncertainties and are likely to be overly optimistic, so we ignore them.
+                        # Instead take the median +/- sigma of the scatter and impose a minimum too.
+                        # For 2-sigma use quant_size=0.9545, for 1-sigma use 0.6827
+                        nom_label, unc_label = "median", r"$\pm2\sigma$"
+                        print(f"Using medians & scatter from {sum(use_mask)} LCs fitted", end=" ")
+                        final_params = pipeline.median_params(fitted_params[use_mask],
+                                                              quant_size=0.9545,
+                                                              exclude_outliers=True,
+                                                              min_uncertainty_pc=0.02)
+                    else:
+                        print("Using values & formal uncertainties from 1 LC fitted", end=" ")
+                        final_params = pipeline.mean_params(fitted_params[use_mask],
+                                                            min_uncertainty_pc=0.02)
+                    print(f"with task 3 while imposing a minimum uncertainty of {0.02:.1%}.")
                 else:
-                    final_params = fitted_params[use_mask][0]
-                    print("Using fitted values and formal error bars from 1 fitted lightcurve.")
+                    print(f"Using means from {sum(use_mask)} LCs fitted with task {fit_task}.")
+                    final_params = pipeline.mean_params(fitted_params[use_mask],
+                                                        exclude_outliers=True)
 
 
                 if args.plot_figs and fitted_params.size > 1:
@@ -468,8 +485,8 @@ if __name__ == "__main__":
                     def median_and_uncertainty(key, ax):
                         # pylint: disable=cell-var-from-loop, missing-function-docstring
                         v = final_params[key]
-                        ax.hlines([v.n], *xlim, "k", "-", lw=1.0, label="median")
-                        ax.axhspan(v.n-v.s, v.n+v.s,color="silver",zorder=-50,label=r"$\pm2\sigma$")
+                        ax.hlines([v.n], *xlim, "k", "-", lw=1.0, label=nom_label)
+                        ax.axhspan(v.n-v.s, v.n+v.s, color="silver", zorder=-50, label=unc_label)
 
                     fig = plots.plot_parameter_scatter(fitted_params[use_mask],
                                                        lcs.sector[use_mask], write_keys,
@@ -478,20 +495,6 @@ if __name__ == "__main__":
                                                        legend_loc="upper right", legend_ncol=2)
                     fig.savefig(figs_dir / f"lcs-fit-scatter.{args.figs_type}", dpi=args.figs_dpi)
                     plt.close(fig)
-
-
-                # Where error bars are likely over-optimistic we increase them to a defined minimum
-                # Alternatively, a criterion based on a minimum #LCs being reliable
-                if fit_task == 3 and True is True:
-                    min_err_pc = 0.02
-                    print(f"\nApplying a minimum of {min_err_pc:.0%} to the uncertainties.",end=" ")
-                    kup = []
-                    for k in (n for n in final_params.dtype.names if final_params[n] is not None):
-                        nom, err = nom_val(final_params[k]), std_dev(final_params[k])
-                        if err < (new_err:= abs(nom * min_err_pc)):
-                            kup += [k]
-                            final_params[k] = ufloat(nom, new_err)
-                    print(f"Revised {', '.join(k for k in kup)}." if len(kup)>0 else "No changes.")
 
 
                 # Report on the final, fitted params & uncertainties.
