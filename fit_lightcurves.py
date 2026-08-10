@@ -445,38 +445,37 @@ if __name__ == "__main__":
                         fitted_params[ix][k] = fitted_param_dicts[ix][k]
 
 
-                # Summarize the fits' params into single set of values. If possible, omit those
-                # which failed to converge. If there's 1 usable fit use the fitted vals directly,
-                # otherwise use the fits' median +/- 2-sigma of the scatter (the sample is small).
+                # Summarize the fits' params into single set of values.
+                # If possible, omit those fits which failed to converge.
                 print(flush=True)
-                use_mask = np.ones_like(conv_mask, bool)
+                usemask = np.ones_like(conv_mask, bool)
                 if 0 < (conv_count := sum(conv_mask)) < len(lcs):
                     print(f"Excluding the {len(lcs)-conv_count} of {len(lcs)} LC(s) where the fit",
                           "did not converge from the calculations for the final set of parameters.")
-                    use_mask &= conv_mask
+                    usemask &= conv_mask
 
-                nom_label, unc_label = "mean", r"$\pm1\sigma$"
+                nom_label, unc_label = "mean", "uncertainty"
                 if fit_task == 3:
-                    if sum(use_mask) > 1:
-                        # We have lower confidence in the task 3 results. The error bars are formal
-                        # uncertainties and are likely to be overly optimistic, so we ignore them.
-                        # Instead take the median +/- sigma of the scatter and impose a minimum too.
+                    if sum(usemask) > 1:
+                        # We have lower confidence in the task 3 results. The uncertainties are
+                        # formal & likely to be overly optimistic so we ignore them and instead take
+                        # the median +/- sigma of the scatter. Also impose a minimum 2% uncertainty.
                         # For 2-sigma use quant_size=0.9545, for 1-sigma use 0.6827
-                        nom_label, unc_label = "median", r"$\pm2\sigma$"
-                        print(f"Using medians & scatter from {sum(use_mask)} LCs fitted", end=" ")
-                        final_params = pipeline.median_params(fitted_params[use_mask],
+                        print(f"Using medians & scatter of {sum(usemask)} LCs fitted", end=" ")
+                        nom_label = "median"
+                        final_params = pipeline.median_params(fitted_params[usemask],
                                                               quant_size=0.9545,
                                                               exclude_outliers=True,
                                                               min_uncertainty_pc=0.02)
                     else:
-                        print("Using values & formal uncertainties from 1 LC fitted", end=" ")
-                        final_params = pipeline.mean_params(fitted_params[use_mask],
-                                                            min_uncertainty_pc=0.02)
+                        print("Using values & formal uncertainties of 1 LC fitted", end=" ")
+                        final_params = pipeline.aggregate_params(fitted_params[usemask],
+                                                                 min_uncertainty_pc=0.02)
                     print(f"with task 3 while imposing a minimum uncertainty of {0.02:.1%}.")
                 else:
-                    print(f"Using means from {sum(use_mask)} LCs fitted with task {fit_task}.")
-                    final_params = pipeline.mean_params(fitted_params[use_mask],
-                                                        exclude_outliers=True)
+                    print(f"Using weighted means of {sum(usemask)} LCs fitted with task {fit_task}")
+                    final_params = pipeline.aggregate_params(fitted_params[usemask],
+                                                             agg_func=pipeline.weighted_mean)
 
 
                 if args.plot_figs and fitted_params.size > 1:
@@ -489,8 +488,8 @@ if __name__ == "__main__":
                         if sig:
                             ax.axhspan(nom-sig, nom+sig, color="silver", zorder=-50,label=unc_label)
 
-                    fig = plots.plot_parameter_scatter(fitted_params[use_mask],
-                                                       lcs.sector[use_mask], write_keys,
+                    fig = plots.plot_parameter_scatter(fitted_params[usemask],
+                                                       lcs.sector[usemask], write_keys,
                                                        suptitle="Scatter in fitted params",
                                                        ax_func=median_and_uncertainty, xlim=xlim,
                                                        legend_loc="upper right", legend_ncol=2)

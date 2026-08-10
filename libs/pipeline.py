@@ -1,6 +1,6 @@
 """ Functions which directly support the various pipeline steps. """
 # pylint: disable=no-member, too-many-arguments, too-many-positional-arguments
-from typing import Union, Tuple, Dict, List
+from typing import Union, Tuple, Dict, List, Callable
 from numbers import Number
 from io import TextIOBase, StringIO
 from sys import stdout
@@ -11,8 +11,8 @@ from itertools import groupby
 
 import numpy as np
 from numpy.typing import ArrayLike
-from uncertainties import UFloat, ufloat, nominal_value as nom_val
-from uncertainties.unumpy import nominal_values as nom_vals
+from uncertainties import UFloat, ufloat, nominal_value as nom_val, std_dev
+from uncertainties.unumpy import nominal_values as nom_vals, std_devs
 import astropy.units as u
 from astropy.time import Time
 from astropy.io import ascii as io_ascii
@@ -624,17 +624,47 @@ def median_params(input_params: ArrayLike,
     return agg_params[0]
 
 
-def mean_params(input_params: ArrayLike,
-                exclude_outliers: bool=False,
-                min_uncertainty_pc: float=0.) -> ArrayLike:
+def weighted_mean(x: ArrayLike) -> UFloat:
+    """
+    Calculates the weighted mean of the passed parameter values and uncertainties with
+    a weighted mean algorithm. The weights are the reciprocal of the input variances
+    and so gives greater weight to values with smaller uncertainties.
+
+    :x: the sample values to find the mean of
+    :returns: the weighted mean of the values
+    """
+    x_i, sig_i = nom_vals(x), std_devs(x)
+    sig_i[sig_i == 0] = 1e-21 # Avoid div by zero
+
+    # The weights are the reciprocal of variances: w_i = 1/σ_i^2
+    w_i = np.divide(1, np.power(sig_i, 2))
+    sum_w = np.sum(w_i)
+
+    # The weighted mean: μ* = ∑(w_i * x_i) / ∑w_i
+    mu_star = np.divide(np.sum(np.multiply(w_i, x_i)), sum_w)
+
+    # σ^2 =  ∑(w_i * (x_i - μ*)^2) / ∑w_i
+    w_variance = np.divide(np.sum(np.multiply(w_i, np.power((x_i - mu_star), 2))), sum_w)
+    return ufloat(mu_star, np.sqrt(w_variance))
+
+def aggregate_params(input_params: ArrayLike,
+                     exclude_outliers: bool=False,
+                     min_uncertainty_pc: float=0.,
+                     agg_func: Callable[[ArrayLike], UFloat]=weighted_mean,
+                     **agg_func_kwargs)\
+                        -> ArrayLike:
     """
     Produce aggregated values for the input structured array of param values.
-    The returned values are the mean of the input.
+    The returned values are the agg_func value of each of the input params, unless
+    there is only one value for an input param in which case that value is returned.
+    Uncertainties less than nominal * min_uncertainty_pc will be increased to this value.
 
     :fitted_params: a structured array containing the source fitted parameter values
     :exclude_outliers: whether to exclude any outliers before calculating the mean and
     uncertainties, with outliers being values outside the inter-quartile range (IQR) +/- 1.5*IQR
     :min_uncertainty_pc: optional minimum uncertainty as a percentage of the nominal
+    :agg_func: the function to aggregate each param from an array of ufloats returning single ufloat
+    :agg_func_kwargs: any kwargs to pass on to the aggregate func
     :return: a single row of a corresponding structured array containing UFloats
     """
     agg_params = np.empty((1,), dtype=input_params.dtype)
@@ -651,8 +681,9 @@ def mean_params(input_params: ArrayLike,
         if vals is None or len(vals) == 0:
             agg_params[k][0] = None
         else:
-            val = np.mean(vals)
-            agg_params[k][0] = ufloat(val.n, max(val.s, abs(val.n * min_uncertainty_pc)))
+            val = vals[0] if len(vals) == 1 else agg_func(vals, **agg_func_kwargs)
+            nom, sig = nom_val(val), std_dev(val)
+            agg_params[k][0] = ufloat(nom, max(sig, abs(nom * min_uncertainty_pc)))
     return agg_params[0]
 
 
