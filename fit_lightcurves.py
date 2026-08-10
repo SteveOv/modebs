@@ -22,6 +22,7 @@ from matplotlib import use as mpl_use
 import matplotlib.pyplot as plt
 
 from ebop_maven.estimator import Estimator
+from deblib.orbital import orbital_inclination
 
 from libs import pipeline, lightcurves, plots
 from libs.pipeline import PipelineError
@@ -456,22 +457,30 @@ if __name__ == "__main__":
 
                 nom_label, unc_label = "mean", "uncertainty"
                 if fit_task == 3:
+                    # We have lower confidence in the task 3 results. The uncertainties are formal
+                    # and likely to be overly optimistic, so we ignore them and instead take the
+                    # median +/- sigma of the scatter. We also impose a minimum uncertainty %.
+                    min_unc_pc = 0.02
                     if sum(usemask) > 1:
-                        # We have lower confidence in the task 3 results. The uncertainties are
-                        # formal & likely to be overly optimistic so we ignore them and instead take
-                        # the median +/- sigma of the scatter. Also impose a minimum 2% uncertainty.
                         # For 2-sigma use quant_size=0.9545, for 1-sigma use 0.6827
                         print(f"Using medians & scatter of {sum(usemask)} LCs fitted", end=" ")
                         nom_label = "median"
                         final_params = pipeline.median_params(fitted_params[usemask],
                                                               quant_size=0.9545,
                                                               exclude_outliers=True,
-                                                              min_uncertainty_pc=0.02)
+                                                              min_uncertainty_pc=min_unc_pc)
                     else:
                         print("Using values & formal uncertainties of 1 LC fitted", end=" ")
                         final_params = pipeline.aggregate_params(fitted_params[usemask],
-                                                                 min_uncertainty_pc=0.02)
-                    print(f"with task 3 while imposing a minimum uncertainty of {0.02:.1%}.")
+                                                                 min_uncertainty_pc=min_unc_pc)
+                    print(f"with task 3 while imposing a minimum uncertainty of {min_unc_pc:.1%}.")
+
+                    if min_unc_pc:
+                        # Recalculate inc as a direct uncertainty % on this is likely over inflated.
+                        rA = final_params["rA_plus_rB"] / (1 + final_params["k"])
+                        final_params["inc"] = orbital_inclination(rA, final_params["bP"],
+                                                                  final_params["ecc"],
+                                                                  final_params["esinw"])
                 else:
                     print(f"Using weighted means of {sum(usemask)} LCs fitted with task {fit_task}")
                     final_params = pipeline.aggregate_params(fitted_params[usemask],
