@@ -455,7 +455,6 @@ if __name__ == "__main__":
                           "did not converge from the calculations for the final set of parameters.")
                     usemask &= conv_mask
 
-                nom_label, unc_label = "mean", "uncertainty"
                 if fit_task == 3:
                     # We have lower confidence in the task 3 results. The uncertainties are formal
                     # and likely to be overly optimistic, so we ignore them and instead take the
@@ -464,7 +463,6 @@ if __name__ == "__main__":
                     if sum(usemask) > 1:
                         # For 2-sigma use quant_size=0.9545, for 1-sigma use 0.6827
                         print(f"Using medians & scatter of {sum(usemask)} LCs fitted", end=" ")
-                        nom_label = "median"
                         final_params = pipeline.median_params(fitted_params[usemask],
                                                               quant_size=0.9545,
                                                               exclude_outliers=True,
@@ -490,17 +488,17 @@ if __name__ == "__main__":
                 if args.plot_figs and fitted_params.size > 1:
                     print("\nCreating plot of the scatter in the fitted params.", flush=True)
                     xlim = (lcs.sector.min() - 2, lcs.sector.max() + 2)
-                    def median_and_uncertainty(key, ax):
+                    def adopted_and_uncertainty(key, ax):
                         # pylint: disable=cell-var-from-loop, missing-function-docstring
-                        nom, sig = nom_val(final_params[key]), std_dev(final_params[key])
-                        ax.hlines([nom], *xlim, "k", "-", lw=1.0, label=nom_label)
+                        n, sig = nom_val(final_params[key]), std_dev(final_params[key])
+                        ax.hlines([n], *xlim, "k", "-", lw=1.0, label="adopted")
                         if sig:
-                            ax.axhspan(nom-sig, nom+sig, color="silver", zorder=-50,label=unc_label)
+                            ax.axhspan(n-sig, n+sig, color="silver",zorder=-50,label="uncertainty")
 
                     fig = plots.plot_parameter_scatter(fitted_params[usemask],
                                                        lcs.sector[usemask], write_keys,
                                                        suptitle="Scatter in fitted params",
-                                                       ax_func=median_and_uncertainty, xlim=xlim,
+                                                       ax_func=adopted_and_uncertainty, xlim=xlim,
                                                        legend_loc="upper right", legend_ncol=2)
                     fig.savefig(figs_dir / f"lcs-fit-scatter.{args.figs_type}", dpi=args.figs_dpi)
                     plt.close(fig)
