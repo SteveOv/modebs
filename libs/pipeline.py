@@ -627,8 +627,9 @@ def median_params(input_params: ArrayLike,
 def weighted_mean(x: ArrayLike) -> UFloat:
     """
     Calculates the weighted mean of the passed parameter values and uncertainties with
-    a weighted mean algorithm. The weights are the reciprocal of the input variances
-    and so gives greater weight to values with smaller uncertainties.
+    a biased sample weighted mean algorithm. The weights are the reciprocal of the input
+    variances and so gives greater weight to values with smaller uncertainties.
+    The uncertainty of the result is the square root of the weighted sample variance.
 
     :x: the sample values to find the mean of
     :returns: the weighted mean of the values
@@ -643,8 +644,8 @@ def weighted_mean(x: ArrayLike) -> UFloat:
     # The weighted mean: μ* = ∑(w_i * x_i) / ∑w_i
     mu_star = np.divide(np.sum(np.multiply(w_i, x_i)), sum_w)
 
-    # σ^2 =  ∑(w_i * (x_i - μ*)^2) / ∑w_i
-    w_variance = np.divide(np.sum(np.multiply(w_i, np.power((x_i - mu_star), 2))), sum_w)
+    # The weighted sample variance: σ^2_w =  ∑(w_i * (x_i - μ*)^2) / ∑w_i
+    w_variance = np.divide(np.sum(np.multiply(w_i, np.power(x_i - mu_star, 2))), sum_w)
     return ufloat(mu_star, np.sqrt(w_variance))
 
 def aggregate_params(input_params: ArrayLike,
