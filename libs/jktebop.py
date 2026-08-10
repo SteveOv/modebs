@@ -402,13 +402,20 @@ def read_fitted_params_from_par_lines(par_lines: Iterable[str],
     lines = list(par_lines)  # Get them out of a generator as we need to go through more than once
     re_slice = slice(0, None) if task in [8, 9] else slice(-1, None)
 
+    # We want to move over the input values
+    results_start_ix = 0
+    for ix, line in enumerate(lines):
+        if line.startswith("Final values of the parameters:"):
+            results_start_ix = ix+1
+            break
+
     for param in params:
         if beginswith := _param_file_line_beginswith.get(param, None):
             # These are set up in the order [task8|9, task3]
             for pattern, bw in zip(_regex_val_and_err_patterns[re_slice], beginswith[re_slice]):
                 if bw is not None and param not in results:
                     regex = re.compile(pattern.format(bw), re.IGNORECASE)
-                    for line in lines:
+                    for line in lines[results_start_ix:]:
                         match = regex.match(line)
                         if match and "val" in match.groupdict():
                             val, err = float(match.group("val")), match.group("err") or 0
