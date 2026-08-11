@@ -21,6 +21,7 @@ from libs.utils import grouper
 from libs.iohelpers import Tee
 from libs.targets import Targets
 from libs.pipeline_dal import create_dal
+from libs.catalogues import query_tess_ebs_ephemeris
 
 THIS_STEM = Path(getsourcefile(lambda: 0)).stem
 
@@ -142,6 +143,12 @@ if __name__ == "__main__":
             target_id = row.key
             cols_and_values = {}
 
+            if len(tics := (row.tics or "").split("|")) > 0:
+                # Rows with TICs may have ephemeris in the TESS-ebs catalogue. t0 & per as ufloats.
+                if (tebs_data := query_tess_ebs_ephemeris(tics)) is not None:
+                    ephem_tebs_keys = [k for k in tebs_data if k in ephem_keys]
+                    print(f"{target_id}: copying TESS-ebs ephemeris values for {ephem_tebs_keys}")
+
             config = targets_config.get_target_config(target_id)
             if len(ephem_config_keys := [k for k in ephem_keys if config.has_value(k)]) > 0:
                 print(f"{target_id}: copying ephemeris values for {ephem_config_keys} from config")
@@ -152,8 +159,8 @@ if __name__ == "__main__":
                         cols_and_values[k] = config.get(k)
 
             if missing_ephem_keys := [k for k in ephem_keys if k not in cols_and_values]:
-                print(f"** Warning the following ephemeris values were not in {target_id} config:",
-                      ",".join(k for k in missing_ephem_keys))
+                print(f"** Warning the following ephemeris values for {target_id} were not",
+                      "found in TESS-ebs or config:", ",".join(k for k in missing_ephem_keys))
                 row.append_warning("incomplete ephemeris")
 
             row.set_values(**cols_and_values)
