@@ -263,7 +263,7 @@ def slice_lightcurve(src_lc: LightCurve, slices: List[slice]) -> LightCurveColle
 def arrange_sector_groups(lcs: LightCurveCollection,
                           completeness_th: float=0.8,
                           min_eclipses: Union[Tuple[int, int], int]=(2, 1),
-                          max_crowdsap_var: float=1e-4,
+                          max_crowdsap_sigma: float=0.01,
                           max_group_size: int=None,
                           groups_override: List[List[int]]=None,
                           allow_slice: bool=False,
@@ -285,7 +285,7 @@ def arrange_sector_groups(lcs: LightCurveCollection,
     :lcs: the LightCurveCollection containing our potential fitting targets
     :completness_th: threshold percentage of an eclipse we require to consider it complete/usable
     :min_eclipses: the minimum eclipse count criteria for a usable group or subsector
-    :max_crowdsap_var: maximum variance in CROWDSAP allowed when forming a group
+    :max_crowdsap_sigma: maximum 1-sigma deviation in CROWDSAP allowed when forming a group
     :max_group_size: the maximum number of sectors to combine for a group, or no max if None
     :groups_override: if set, the grouping logic will be bypassed, and these used (no slice support)
     :allow_slice: whether to allow sectors to be sliced into sections, subject to eclipse criteria
@@ -319,7 +319,7 @@ def arrange_sector_groups(lcs: LightCurveCollection,
     def is_usable_group(ecl_counts, crowdsaps, min_ecl=min_eclipses) -> bool:
         ecl_sums = np.sum(ecl_counts, axis=0)
         return (max(ecl_sums) >= max(min_ecl) and min(ecl_sums) >= min(min_ecl)) \
-                and (len(crowdsaps) < 2 or np.var(crowdsaps) <= max_crowdsap_var)
+                and (len(crowdsaps) < 2 or np.std(crowdsaps) <= max_crowdsap_sigma)
 
     def is_usable_slice(lc, section_slice) -> bool:
         return is_usable_group([count_eclipses(lc, section_slice)], [], min_slice_eclipses)
