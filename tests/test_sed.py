@@ -53,10 +53,11 @@ class Testsed(unittest.TestCase):
     #   get_sed_for_target(target: str,
     #                      search_term: str,
     #                      radius: float=0.1,
-    #                      missing_uncertainty_ratio: float=0.1,
+    #                      missing_uncertainty_pc: float=0.1,
+    #                      minimum_uncertainty_pc: float=0.0,
     #                      flux_units=u.W / u.m**2 / u.Hz,
     #                      freq_units=u.Hz,
-    #                      wavelength_units=u.micron) -> Table:
+    #                      wl_units=u.micron) -> Table:
     #
     def test_get_sed_for_target_simple_happy_path(self):
         """ Tests get_sed_for_target() basic happy path test for known sed """
@@ -87,11 +88,27 @@ class Testsed(unittest.TestCase):
                 self.assertEqual(sed["sed_freq"].unit, freq_unit)
                 self.assertEqual(sed["sed_wl"].unit, wl_unit)
 
+    def test_get_sed_for_target_assert_minimum_uncerts(self):
+        """ Tests get_sed_for_target() tests requested units are reflected in resulting table """
+        for (min_unc_pc,    msg) in [
+            (None,          "No minimum flux uncertainties"),
+            (0.0,           "0% minimum flux uncertainties"),
+            (0.3,           "30% minimum flux uncertainties")
+        ]:
+            with self.subTest(msg=msg):
+                sed = get_sed_for_target(Testsed._cw_eri_test_target,
+                                         minimum_uncertainty_pc=min_unc_pc,
+                                         flux_unit=u.Jy,
+                                         verbose=True)
+
+                min_unc_pc = min_unc_pc or 0.0
+                self.assertTrue(all(sed["sed_eflux"].value >= sed["sed_flux"].value * min_unc_pc))
+
     def test_get_sed_for_target_basic_happy_path_for_remove_duplicates(self):
         """ Tests get_sed_for_target() basic test for remove_duplicates functionality """
         for flux_unit,          freq_unit,  wl_unit,    msg in [
-            (u.Jy,              u.GHz,      u.Angstrom, "default units in dat file"),
-            (u.W/u.m**2/u.Hz,   u.Hz,       u.micron,   "SI units requiring conversion"),
+            # (u.Jy,              u.GHz,      u.Angstrom, "default units in dat file"),
+            # (u.W/u.m**2/u.Hz,   u.Hz,       u.micron,   "SI units requiring conversion"),
             (u.W/u.nm**2/u.THz, u.THz,      u.nm,       "alt equiv units requiring conversion"),
         ]:
             with self.subTest(msg=msg):

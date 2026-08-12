@@ -26,7 +26,8 @@ from deblib.vmath import exp, log10
 def get_sed_for_target(target: str,
                        search_term: str=None,
                        radius: float=0.1,
-                       missing_uncertainty_ratio: float=0.1,
+                       missing_uncertainty_pc: float=0.1,
+                       minimum_uncertainty_pc: float=0.0,
                        remove_duplicates: bool=False,
                        flux_unit=u.W / u.m**2 / u.Hz,
                        freq_unit=u.Hz,
@@ -51,7 +52,8 @@ def get_sed_for_target(target: str,
     :target: the name of the target object
     :search_term: optional search term, or leave as None to use the target value
     :radius: the search radius in arcsec
-    :missing_uncertainty_rate: uncertainty, as a ratio of the fluxes, to apply where none recorded
+    :missing_uncertainty_pc: uncertainty, as a % of the fluxes, to apply where none recorded
+    :minimum_uncertainty_pc: minimum uncertainty, as a % of the fluxes, to apply to all fluxes
     :remove_duplicates: if True, only the first row for each combination of sed_filter, sed_freq,
     sed_flux and sed_eflux will be included in the returned table
     :flux_unit: the unit of the returned sed_flux field (must support conversion from u.Jy)
@@ -106,16 +108,23 @@ def get_sed_for_target(target: str,
     # Add wavelength which will be useful downstream
     sed["sed_wl"] = sed["sed_freq"].to(wl_unit, equivalencies=u.spectral())
 
-    # Set flux uncertainties where none given
-    mask_no_err = (sed["sed_eflux"].value == 0) | np.isnan(sed["sed_eflux"])
-    sed["sed_eflux"][mask_no_err] = sed["sed_flux"][mask_no_err] * missing_uncertainty_ratio
-
     # Get the data into desired units
     if sed["sed_flux"].unit != flux_unit: # It's actually flux density, usually received in Jy
         sed["sed_flux"].convert_unit_to(flux_unit, equivalencies=u.spectral_density(sed["sed_wl"]))
+    if sed["sed_eflux"].unit != flux_unit:
         sed["sed_eflux"].convert_unit_to(flux_unit, equivalencies=u.spectral_density(sed["sed_wl"]))
     if sed["sed_freq"].unit != freq_unit:
         sed["sed_freq"].convert_unit_to(freq_unit, equivalencies=u.spectral())
+
+    # Set flux uncertainties where masked (otherwise the de-dupe fails as it cannot index a column
+    # that has masked values). This was happening as a side effect of the previous code, so it's
+    # now made explicit. Also set flux uncertainties where no value given/zero (but not masked).
+    mask_no_err = np.ma.getmask(sed["sed_eflux"])
+    mask_no_err |= (sed["sed_eflux"].value == 0) | np.isnan(sed["sed_eflux"])
+    sed["sed_eflux"][mask_no_err] = sed["sed_flux"][mask_no_err] * (missing_uncertainty_pc or 0)
+    # And handle the option to set a minimum on all uncertainties
+    if (minimum_uncertainty_pc or 0) > 0:
+        sed["sed_eflux"] = sed["sed_flux"] * minimum_uncertainty_pc
 
     if remove_duplicates:
         sed = unique(sed, keep="first",
