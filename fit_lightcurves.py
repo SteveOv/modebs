@@ -346,14 +346,15 @@ if __name__ == "__main__":
                 refl_fit = 1
 
                 # Mass ratio can be -1 (force spherical) or specific value. Only used for LC effects
-                if do_flatten:
-                    qphot = -1
-                elif np.prod(nom_vals([preds_dict[k] for k in ["k", "J"]]) - 1) <= -0.04:
-                    # k & J differ significantly either side of 1. Potentially evolved component
-                    # with the M-S approximation is invalid, so default to spherical.
+                if np.prod(diff_one := nom_vals([preds_dict[k] for k in ["k", "J"]]) - 1) < 0 \
+                        and min(abs(diff_one)) > 0.05:
+                    # k & J are significantly separated either side of 1, so potentially an evolved
+                    # component where the M-S approximation is invalid. Default to spherical.
                     if "qphot" not in fit_overrides:
-                        print("Predicted k & J indicate potentially evolved component: qphot = -1")
+                        print("Predicted k & J indicate potentially evolved component, so qphot=-1")
                     trow.append_warning("evolved?")
+                    qphot = -1
+                elif do_flatten:
                     qphot = -1
                 else:
                     # Assume M-S components and use approximation of qphot \sim k^1.4
