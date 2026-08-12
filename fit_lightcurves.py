@@ -22,7 +22,6 @@ from matplotlib import use as mpl_use
 import matplotlib.pyplot as plt
 
 from ebop_maven.estimator import Estimator
-from deblib.orbital import orbital_inclination
 
 from libs import pipeline, lightcurves, plots
 from libs.pipeline import PipelineError
@@ -475,10 +474,12 @@ if __name__ == "__main__":
 
                     if min_unc_pc:
                         # Recalculate inc as a direct uncertainty % on this is likely over inflated.
-                        rA = final_params["rA_plus_rB"] / (1 + final_params["k"])
-                        final_params["inc"] = orbital_inclination(rA, final_params["bP"],
-                                                                  final_params["ecc"],
-                                                                  final_params["esinw"])
+                        # pylint: disable=line-too-long
+                        final_params["inc"] = pipeline.calculate_orbital_inclination(final_params["rA_plus_rB"],
+                                                                                     final_params["k"],
+                                                                                     final_params["ecosw"],
+                                                                                     final_params["esinw"],
+                                                                                     final_params["bP"])
                 else:
                     print(f"Using weighted means of {sum(usemask)} LCs fitted with task {fit_task}")
                     final_params = pipeline.aggregate_params(fitted_params[usemask],
