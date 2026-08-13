@@ -463,12 +463,15 @@ if __name__ == "__main__":
                     if sum(usemask) > 1:
                         # For 2-sigma use quant_size=0.9545, for 1-sigma use 0.6827
                         print(f"Using medians & scatter of {sum(usemask)} LCs fitted", end=" ")
-                        final_params = pipeline.median_params(fitted_params[usemask],
-                                                              quant_size=0.9545,
-                                                              exclude_outliers=True,
-                                                              min_uncertainty_pc=min_unc_pc)
+                        final_params = pipeline.aggregate_params(fitted_params[usemask],
+                                                               exclude_outliers=True,
+                                                               min_uncertainty_pc=min_unc_pc,
+                                                               agg_func=pipeline.median_and_scatter,
+                                                               quant_size=0.9545)
                     else:
                         print("Using values & formal uncertainties of 1 LC fitted", end=" ")
+                        # As only 1 LC this will not apply the aggregate func. It takes the values
+                        # & uncertainties of the only fit, but it will apply any min uncertainty %.
                         final_params = pipeline.aggregate_params(fitted_params[usemask],
                                                                  min_uncertainty_pc=min_unc_pc)
                     print(f"with task 3 while imposing a minimum uncertainty of {min_unc_pc:.1%}.")

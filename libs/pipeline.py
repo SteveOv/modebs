@@ -585,49 +585,56 @@ def pop_and_complete_ld_config(source_cfg: dict[str, any],
     return params
 
 
-def median_params(input_params: ArrayLike,
-                  quant_size: float=0.5,
-                  exclude_outliers: bool=False,
-                  min_uncertainty_pc: float=0.) -> ArrayLike:
+def median_and_scatter(x: ArrayLike, quant_size: float=0.6827) -> UFloat:
     """
-    Produce aggregated values for the input structured array of param values.
-    The returned values are the median of the nominal values of the input with
-    uncertainties derived from the mean extent of requested quantile range.
+    Calculates the median and uncertainty based on the scatter in the passed parameter values.
+    For this, any uncertainties in the input values are ignored.
 
-    This approach makes the assumption that any inidividual uncertainties in the
-    input params are negligible when compared with the scatter in the values,
-    with the scatter approximating a normal distribution.
-
-    :fitted_params: a structured array containing the source fitted parameter values
-    :quant_size: the size of the inter-quantile range used to derive uncertainties
-    :exclude_outliers: whether to exclude any outliers before calculating the median and
-    uncertainties, with outliers being values outside the inter-quartile range (IQR) +/- 1.5*IQR
-    :min_uncertainty_pc: optional minimum uncertainty as a percentage of the nominal
-    :return: a single row of a corresponding structured array containing UFloats
+    :x: the sample values from which to find the median and scatter
+    :quant_size: size of the uncertainty's inter-quantile range; i.e. 0.6827 (1 sig), 0.9545 (2 sig)
+    :returns: the median and uncertainty of the values
     """
-    quantiles = (0.5 - quant_size/2, 0.5, 0.5 + quant_size/2)
-    agg_params = np.empty((1,), dtype=input_params.dtype)
-    for k in input_params.dtype.names:
-        noms = nom_vals(input_params[k])
+    lo, med, hi = np.quantile(nom_vals(x), q=(0.5 - quant_size/2, 0.5, 0.5 + quant_size/2))
+    return ufloat(med, np.mean([med-lo, hi-med]))
 
-        if exclude_outliers:
-            q1, q3 = np.quantile(noms, q=(0.25, 0.75))
-            whisker_len = 1.5 * (q3 - q1)
-            noms = noms[(q1 - whisker_len <= noms) & (noms <= q3 + whisker_len)]
 
-        if noms is None or len(noms) == 0:
-            agg_params[k][0] = None
-        else:
-            lo, med, hi = np.quantile(noms, q=quantiles)
-            agg_params[k][0] = ufloat(med, max(np.mean([med-lo, hi-med]),
-                                               abs(med * min_uncertainty_pc)))
-    return agg_params[0]
+def unbiased_weighted_sample_mean(x: ArrayLike) -> UFloat:
+    """
+    Calculates the weighted mean of the passed parameter values and uncertainties with
+    an unbiased weighted mean algorithm. The weights are the reciprocal of the input
+    variances and so gives greater weight to values with smaller uncertainties. The uncertainty
+    of the result is the square root of the values' unbiased weighted sample variance.
+
+    :x: the sample values to find the mean of
+    :returns: the weighted mean of the values
+    """
+    x_i, sig_i = nom_vals(x), std_devs(x)
+    sig_i[sig_i == 0] = 1e-21 # Avoid div by zero
+
+    # The weightings are the reciprocal of variances: w_i = 1/σ_i^2
+    w_i = np.divide(1, np.power(sig_i, 2))
+    sum_w_i = np.sum(w_i)
+
+    # The weighted mean: μ* = ∑(w_i*x_i) / ∑w_i
+    mu_star = np.divide(np.sum(np.multiply(w_i, x_i)), sum_w_i)
+
+    # The ubiased weighted sample variance:
+    # σ^2 = ∑w_i(x_i-μ*)^2 *        ∑w_i
+    #                        ------------------
+    #                        (∑w_i)^2 - ∑w_i^2
+    w_variance = np.multiply(
+        np.sum(np.multiply(w_i, np.power(np.subtract(x_i, mu_star), 2))),
+        np.divide(
+            sum_w_i,
+            np.subtract(np.power(sum_w_i, 2), np.sum(np.power(w_i, 2)))
+        ))
+    return ufloat(mu_star, np.sqrt(w_variance))
 
 
 def weighted_mean(x: ArrayLike) -> UFloat:
     """
     Calculates the weighted mean of the passed parameter values and uncertainties with
-    a biased sample weighted mean algorithm. The weights are the reciprocal of the input
+    a biased weighted sample mean algorithm. The weights are the reciprocal of the input
     variances and so gives greater weight to values with smaller uncertainties.
     The uncertainty of the result is the square root of the weighted sample variance.
 
@@ -648,6 +655,7 @@ def weighted_mean(x: ArrayLike) -> UFloat:
     w_variance = np.divide(np.sum(np.multiply(w_i, np.power(x_i - mu_star, 2))), sum_w)
     return ufloat(mu_star, np.sqrt(w_variance))
 
+
 def aggregate_params(input_params: ArrayLike,
                      exclude_outliers: bool=False,
                      min_uncertainty_pc: float=0.,
@@ -659,6 +667,11 @@ def aggregate_params(input_params: ArrayLike,
     The returned values are the agg_func value of each of the input params, unless
     there is only one value for an input param in which case that value is returned.
     Uncertainties less than nominal * min_uncertainty_pc will be increased to this value.
+
+    The agg_func must be a function which will accept an ArrayLike of floats or UFloats as its
+    first argument and returns a single calculated float or UFloat value as its result. Suitable
+    options are the np.mean func, for a simple arithmetic mean, and the weighted_mean,
+    unbiased_weighted_sample_mean and median_and_scatter funcs in this module.
 
     :fitted_params: a structured array containing the source fitted parameter values
     :exclude_outliers: whether to exclude any outliers before calculating the mean and
