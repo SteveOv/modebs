@@ -487,7 +487,7 @@ if __name__ == "__main__":
                 else:
                     print(f"Using weighted means of {sum(usemask)} LCs fitted with task {fit_task}")
                     final_params = pipeline.aggregate_params(fitted_params[usemask],
-                                                             agg_func=pipeline.weighted_mean)
+                                                    agg_func=pipeline.unbiased_weighted_sample_mean)
 
 
                 if args.plot_figs and fitted_params.size > 1:
