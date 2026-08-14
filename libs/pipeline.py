@@ -598,84 +598,102 @@ def median_and_scatter(x: ArrayLike, quant_size: float=0.6827) -> UFloat:
     return ufloat(med, np.mean([med-lo, hi-med]))
 
 
+def arithmetic_sample_mean(x: ArrayLike) -> UFloat:
+    """
+    Calculates the arithmetic sample mean of the values of x (ignoring any input uncertainties).
+    This is the simple mean (i.e.: SUM(x_i)/N) of the sample values and an uncertainty from their
+    standard deviation. Appropriate when N is large (>10) (Ivezic+ 2014sdmm.book.....I, pp77-78).
+
+        xbar = 1/N * SUM(x_i),  sig_xbar = s/SQRT(N)
+    where s is the **standard deviation of the sample**, given by
+        s = SQRT( 1/(N-1) * SUM((x_i - xbar)^2) )
+
+    :x: the sample values to find the mean of
+    :returns: the mean and the uncertainty of the mean
+    """
+    x_i = nom_vals(x)
+    n = len(x_i)
+    xbar = np.divide(np.sum(x_i), n)
+    s = np.sqrt(np.divide(np.sum(np.square(x_i - xbar)), n - 1))
+    return ufloat(xbar, np.divide(s, np.sqrt(n)))
+
+
+def biased_weighted_sample_mean(x: ArrayLike) -> UFloat:
+    """
+    Calculates the weighted mean and uncertainty of the passed sample of values. The weights are the
+    reciprocal of the input variances, so gives greater weight to values with smaller uncertainties.
+    The uncertainty of the result is the square root of the **biased weighted sample variance**.
+    
+    The (reliability) weights: w_i = 1 / sig_i^2 and W = SUM(w_i)
+
+    The **weighted sample mean**: xbar_w = 1/W * SUM(w_i * x_i)
+
+    The **biased weighted sample variance**: sig2_w = 1/W * SUM(w_i * (x_i - xbar_w)^2)
+    
+    :x: the sample values to find the mean of
+    :returns: the weighted mean of the values as UFloat(xbar_w, sqrt(sig2_w))
+    """
+    x_i, sig_i = nom_vals(x), std_devs(x)
+    sig_i[sig_i == 0] = 1e-21 # Avoid div by zero
+
+    w_i = np.divide(1, np.power(sig_i, 2))
+    big_w = np.sum(w_i)
+
+    xbar_w = np.divide(np.sum(np.multiply(w_i, x_i)), big_w)
+    sig2_w = np.divide(np.sum(np.multiply(w_i, np.power(x_i - xbar_w, 2))), big_w)
+    return ufloat(xbar_w, np.sqrt(sig2_w))
+
+
 def unbiased_weighted_sample_mean(x: ArrayLike) -> UFloat:
     """
-    Calculates the weighted mean of the passed parameter values and uncertainties with
-    an unbiased weighted mean algorithm. The weights are the reciprocal of the input
-    variances and so gives greater weight to values with smaller uncertainties. The uncertainty
-    of the result is the square root of the values' unbiased weighted sample variance.
+    Calculates the weighted mean and uncertainty of the passed sample of values. The weights are the
+    reciprocal of the input variances, so gives greater weight to values with smaller uncertainties.
+    The uncertainty of the result is the square root of the **unbiased weighted sample variance**.
+    
+    The (reliability) weights: w_i = 1 / sig_i^2 and W = SUM(w_i) and V = SUM(w_i^2)
+
+    The **weighted sample mean**: xbar_w = 1/W * SUM(w_i * x_i)
+
+    The biased weighted sample variance: sig2_w = 1/W * SUM(w_i * (x_i - xbar_w)^2)
+    
+    The **unbiased weighted sample variance**: s2_w = sig2_w / (1 - (V / W^2))
 
     :x: the sample values to find the mean of
-    :returns: the weighted mean of the values
+    :returns: the weighted mean of the values as UFloat(xbar_w, sqrt(s2_w))
     """
     x_i, sig_i = nom_vals(x), std_devs(x)
     sig_i[sig_i == 0] = 1e-21 # Avoid div by zero
 
-    # The weightings are the reciprocal of variances: w_i = 1/σ_i^2
     w_i = np.divide(1, np.power(sig_i, 2))
-    sum_w_i = np.sum(w_i)
+    big_w = np.sum(w_i)
+    big_v = np.sum(np.square(w_i))
 
-    # The weighted mean: μ* = ∑(w_i*x_i) / ∑w_i
-    mu_star = np.divide(np.sum(np.multiply(w_i, x_i)), sum_w_i)
-
-    # The ubiased weighted sample variance:
-    # σ^2 = ∑w_i(x_i-μ*)^2 *        ∑w_i
-    #                        ------------------
-    #                        (∑w_i)^2 - ∑w_i^2
-    w_variance = np.multiply(
-        np.sum(np.multiply(w_i, np.power(np.subtract(x_i, mu_star), 2))),
-        np.divide(
-            sum_w_i,
-            np.subtract(np.power(sum_w_i, 2), np.sum(np.power(w_i, 2)))
-        ))
-    return ufloat(mu_star, np.sqrt(w_variance))
-
-
-def weighted_mean(x: ArrayLike) -> UFloat:
-    """
-    Calculates the weighted mean of the passed parameter values and uncertainties with
-    a biased weighted sample mean algorithm. The weights are the reciprocal of the input
-    variances and so gives greater weight to values with smaller uncertainties.
-    The uncertainty of the result is the square root of the weighted sample variance.
-
-    :x: the sample values to find the mean of
-    :returns: the weighted mean of the values
-    """
-    x_i, sig_i = nom_vals(x), std_devs(x)
-    sig_i[sig_i == 0] = 1e-21 # Avoid div by zero
-
-    # The weights are the reciprocal of variances: w_i = 1/σ_i^2
-    w_i = np.divide(1, np.power(sig_i, 2))
-    sum_w = np.sum(w_i)
-
-    # The weighted mean: μ* = ∑(w_i * x_i) / ∑w_i
-    mu_star = np.divide(np.sum(np.multiply(w_i, x_i)), sum_w)
-
-    # The weighted sample variance: σ^2_w =  ∑(w_i * (x_i - μ*)^2) / ∑w_i
-    w_variance = np.divide(np.sum(np.multiply(w_i, np.power(x_i - mu_star, 2))), sum_w)
-    return ufloat(mu_star, np.sqrt(w_variance))
+    xbar_w = np.divide(np.sum(np.multiply(w_i, x_i)), big_w)
+    sig2_w = np.divide(np.sum(np.multiply(w_i, np.power(x_i - xbar_w, 2))), big_w)
+    s2_w = np.divide(sig2_w, np.subtract(1, np.divide(big_v, np.square(big_w))))
+    return ufloat(xbar_w, np.sqrt(s2_w))
 
 
 def aggregate_params(input_params: ArrayLike,
                      exclude_outliers: bool=False,
                      min_uncertainty_pc: float=0.,
-                     agg_func: Callable[[ArrayLike], UFloat]=weighted_mean,
+                     agg_func: Callable[[ArrayLike], UFloat]=arithmetic_sample_mean,
                      **agg_func_kwargs)\
                         -> ArrayLike:
     """
     Produce aggregated values for the input structured array of param values.
     The returned values are the agg_func value of each of the input params, unless
-    there is only one value for an input param in which case that value is returned.
+    there is only one value for an input param in which case that value is used as is.
     Uncertainties less than nominal * min_uncertainty_pc will be increased to this value.
 
-    The agg_func must be a function which will accept an ArrayLike of floats or UFloats as its
-    first argument and returns a single calculated float or UFloat value as its result. Suitable
-    options are the np.mean func, for a simple arithmetic mean, and the weighted_mean,
+    The agg_func must be a function which will accept an ArrayLike of floats or UFloats as
+    its first argument and returns a single calculated UFloat value as its result. Suitable
+    options are numpy's mean func, or the arithmetic_sample_mean, biased_weighted_sample_mean,
     unbiased_weighted_sample_mean and median_and_scatter funcs in this module.
 
     :fitted_params: a structured array containing the source fitted parameter values
-    :exclude_outliers: whether to exclude any outliers before calculating the mean and
-    uncertainties, with outliers being values outside the inter-quartile range (IQR) +/- 1.5*IQR
+    :exclude_outliers: whether to exclude any outliers before calculating the aggregate
+    value, with outliers being values outside the inter-quartile range (IQR) +/- 1.5*IQR
     :min_uncertainty_pc: optional minimum uncertainty as a percentage of the nominal
     :agg_func: the function to aggregate each param from an array of ufloats returning single ufloat
     :agg_func_kwargs: any kwargs to pass on to the aggregate func
