@@ -233,6 +233,10 @@ class DalDataRow(_AbstractContextManager):
             if new_warn_msg not in warn_msgs:
                 self["warnings"] = self._sep.join(w for w in warn_msgs + [new_warn_msg] if len(w))
 
+    def __contains__(self, col):
+        """ Support for "in" syntax """
+        return self.has_col(col)
+
     def __getattr__(self, col: str) -> any:
         """
         Handles the default get behaviour for attributes. Gets the value of the correspondingly
