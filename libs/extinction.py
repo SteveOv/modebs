@@ -16,6 +16,7 @@ from astropy.coordinates import SkyCoord, Galactic
 from astroquery.vizier import Vizier
 
 from dustmaps import config, bayestar, decaps, edenhofer2023    # Bayestar and other exinction maps
+from dustmaps.fetch_utils import DownloadError
 from pyvo import registry, DALServiceError                      # Vergeley at al. extinction catalogue
 
 # Parent dir for cached dustmaps files
@@ -108,7 +109,11 @@ def _get_bayestar_query(version: str) -> bayestar.BayestarQuery:
     # Creates/confirms local cache of Bayestar data within the .cache directory
     # Now we can use the local cache for the lookup - this takes some time to set up
     print(f"Setting up query object for the {version.capitalize()} extinction map")
-    bayestar.fetch(version=version)
+    try:
+        bayestar.fetch(version=version)
+    except (DownloadError, ValueError) as exc:
+        print(f"*** Caught a {exc.__class__.__name__} ('{exc}') on fetch/verify of Bayestar cache.",
+              "Will attempt to use any existing cached data, however this is unverified.")
     return bayestar.BayestarQuery(version=version)
 
 
