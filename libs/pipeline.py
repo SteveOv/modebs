@@ -412,7 +412,7 @@ def append_mags_to_lightcurves_and_detrend(lcs: LightCurveCollection,
                                            flatten: bool=False,
                                            durp: Union[float, UFloat]=None,
                                            durs: Union[float, UFloat]=None,
-                                           override_poly_on_flatten: bool=True,
+                                           override_poly_on_flatten: bool=False,
                                            verbose: bool=False):
     """
     Append delta_mag and delta_mag_err columns calculated from normalized fluxes to each

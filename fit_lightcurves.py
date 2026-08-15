@@ -243,7 +243,7 @@ if __name__ == "__main__":
 
                 # Flatten (optional depending on morph), append delta_mag & delta_mag_err columns
                 # and then detrend & rectify the mags to zero by subtracting a low order polynomial
-                flatten_morph_th = config.get("flatten_morph_threshold", 0)
+                flatten_morph_th = config.get("flatten_morph_threshold", 0.2)
                 do_flatten = config.flatten \
                                 or (config.flatten is None and trow.morph <= flatten_morph_th)
                 print(flush=True)
@@ -258,7 +258,6 @@ if __name__ == "__main__":
                                                                 do_flatten,
                                                                 nom_val(trow.widthP * trow.period),
                                                                 nom_val(trow.widthS * trow.period),
-                                                                override_poly_on_flatten=True,
                                                                 verbose=True)
 
 
