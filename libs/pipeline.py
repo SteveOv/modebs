@@ -508,26 +508,6 @@ def calculate_orbital_inclination(sum_r: ArrayLike,
         return degrees(arccos(cosi))
 
 
-def predictions_to_mean_dict(preds: np.ndarray[UFloat],
-                             calculate_inc: bool=False,
-                             inc_key: str="inc") -> dict[str, UFloat]:
-    """
-    Takes an array of predictions and will produce a corresponding dictionary of mean values
-    for use as JKTEBOP input params. Optionally this includes the orbital inclination which
-    is calculated from the other values.
-    
-    :preds: the prediction structured array as produced by the EBOP MAVEN estimator
-    :calculate_inc: whether or not to calculate and append an orbital inclination value
-    :inc_key: the key to give the orbital inclination value
-    :returns: a dictionary with field names and mean values for keys and values
-    """
-    pd = { k: preds[k].mean() for k in preds.dtype.names }
-    if calculate_inc and inc_key is not None:
-        pd[inc_key] = calculate_orbital_inclination(pd["rA_plus_rB"], pd["k"],
-                                                    pd["ecosw"], pd["esinw"], pd["bP"])
-    return pd
-
-
 def pop_and_complete_ld_config(source_cfg: dict[str, any],
                                teffa: float, teffb: float,
                                logga: float, loggb: float,
@@ -734,6 +714,29 @@ def force_seed_on_dropout_layers(estimator: Estimator, seed: int=42):
         sg = layer.seed_generator
         new_seed = sg.backend.convert_to_tensor(np.array([0, seed*ix], dtype=sg.state.dtype))
         sg.state.assign(new_seed)
+
+
+def predictions_to_mean_dict(preds: np.ndarray[UFloat],
+                             calculate_inc: bool=False,
+                             inc_key: str="inc",
+                             agg_func=unbiased_weighted_sample_mean) -> dict[str, UFloat]:
+    """
+    Takes an array of Estimator predictions and will produce a corresponding dictionary of
+    mean values for use as JKTEBOP input params. Optionally this may append the orbital
+    inclination which will be calculated from the other values.
+    
+    :preds: the prediction structured array as produced by the EBOP MAVEN estimator
+    :calculate_inc: whether or not to calculate and append an orbital inclination value
+    :inc_key: the key to give the orbital inclination value
+    :agg_func: the function to aggregate each param from an array of ufloats returning single ufloat
+    :returns: a dictionary with field names and mean values for keys and values
+    """
+    pd = dict(zip(preds.dtype.names, aggregate_params(preds, agg_func=agg_func)))
+    if calculate_inc and inc_key is not None:
+        incs = calculate_orbital_inclination(preds["rA_plus_rB"], preds["k"],
+                                             preds["ecosw"], preds["esinw"], preds["bP"])
+        pd[inc_key] = incs[0] if len(incs) == 1 else agg_func(incs)
+    return pd
 
 
 def fit_target_lightcurves(lcs: LightCurveCollection,
