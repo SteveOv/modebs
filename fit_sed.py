@@ -245,17 +245,14 @@ if __name__ == "__main__":
                 # The ratios are wrt the primary components - the prior_func ignores the 0th item
                 print("\nSetting up the fitting priors & the ln_prior_func() callback.", flush=True)
                 TeffR, radR = trow.TeffR, trow.k
-                TeffR_priors = tuple([1] + [ufloat(TeffR.n, TeffR.s or (TeffR.n * .05))]*(NSTARS-1))
-                radR_priors = tuple([1] + [ufloat(radR.n, radR.s or (radR.n * .05))]*(NSTARS-1))
-                av_prior = 0
-                if fit_av:
-                    av_prior = ufloat(nom_val(Av), std_dev(Av) or (nom_val(Av) * .05))
-                dist_prior = 1000 / trow.parallax
-                if not isinstance(dist_prior, UFloat) or not dist_prior.s:
-                    dist_prior = ufloat(nom_val(dist_prior), nom_val(dist_prior) * .05)
+                TeffR_priors =tuple([1] + [ufloat(TeffR.n, TeffR.s or (TeffR.n * 0.05))]*(NSTARS-1))
+                radR_priors = tuple([1] + [ufloat(radR.n, radR.s or (radR.n * 0.05))]*(NSTARS-1))
+                av_prior = ufloat(nom_val(Av), std_dev(Av) or (nom_val(Av) * 0.05))
+                d_prior = 1000 / trow.parallax
+                d_prior = ufloat(nom_val(d_prior), std_dev(d_prior) or (nom_val(d_prior) * 0.05))
                 print(f"Priors: TeffR=({', '.join(f'{r:.3f}' for r in TeffR_priors)}),",
                       f"radR=({', '.join(f'{r:.3f}' for r in radR_priors)}),",
-                      f"dist={dist_prior:.3f}, Av={av_prior:.3f},",
+                      f"dist={d_prior:.3f}, Av={av_prior:.3f},",
                       f"Teff_limits={teff_limits}, radius_limits={radius_limits}")
 
                 def ln_prior_func(theta: np.ndarray[float]) -> float:
@@ -283,7 +280,7 @@ if __name__ == "__main__":
                     for c in range(1, NSTARS):
                         rval += ((teffs[c]/teffs[0] - TeffR_priors[c].n) / TeffR_priors[c].s)**2
                         rval += ((radii[c]/radii[0] - radR_priors[c].n) / radR_priors[c].s)**2
-                    rval += ((dist - dist_prior.n) / dist_prior.s)**2
+                    rval += ((dist - d_prior.n) / d_prior.s)**2
                     if fit_av:
                         rval += ((av - av_prior.n) / av_prior.s)**2
                     return -0.5 * rval
