@@ -438,10 +438,8 @@ if __name__ == "__main__":
                     print(f"{k:>12s}{'*' if mask else ' ':s} =", format_value(val, unit, kval))
                     write_params[k] = val
 
-                print("Calculated system mass from fractional radii, radii and period")
-                rA = trow.rA_plus_rB / (trow.k + 1)
-                rB = trow.rA_plus_rB / ((1 / trow.k) + 1)
-                a = np.mean([write_params["RA"] / rA, write_params["RB"] / rB])
+                print("Calculated system mass from radii, sum of the fractional radii and period")
+                a = (write_params["RA"] + write_params["RB"]) / trow.rA_plus_rB
                 M_sys = (4 * np.pi**2 * (a * R_sun)**3) / (G * (trow.period * 86400)**2) / M_sun
                 kval = None
                 if "a" in known_vals:
