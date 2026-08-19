@@ -18,7 +18,7 @@ from astropy.coordinates import SkyCoord
 
 # pylint: disable=line-too-long, wrong-import-position
 warnings.filterwarnings("ignore", "Using UFloat objects with std_dev==0 may give unexpected results.", category=UserWarning)
-from uncertainties import ufloat, UFloat, nominal_value as nom_val, std_dev
+from uncertainties import ufloat, nominal_value as nom_val, std_dev
 from uncertainties.unumpy import nominal_values as nom_vals
 
 # Dereddening of SEDS
@@ -26,7 +26,7 @@ from dust_extinction.parameter_averages import G23
 
 import corner
 from deblib.constants import G, R_sun, M_sun
-from sed_fit.stellar_grids import get_stellar_grid
+from sed_fit.stellar_grids import StellarGrid
 from sed_fit.fitter import create_theta, minimize_fit, mcmc_fit, model_func
 from sed_fit.generic_fitter import samples_from_sampler, print_theta
 
@@ -120,9 +120,9 @@ if __name__ == "__main__":
 
         # Model SED grid based on atmosphere models with known filters pre-applied to non-reddened
         # fluxes. Available grids: BtSettlGrid, KuruczGrid or BlackBodyGrid
-        model_grid = get_stellar_grid(targets_config.get("stellar_grid", "BtSettlGrid"),
-                                      extinction_model=ext_model,
-                                      use_quick_mode=use_quick_mode, verbose=True)
+        model_grid = StellarGrid.get_instance(targets_config.get("stellar_grid", "BtSettlGrid"),
+                                              extinction_model=ext_model,
+                                              use_quick_mode=use_quick_mode, verbose=True)
         print(f"Loaded the {model_grid.__class__.__name__} which covers the ranges:")
         print(f"wavelength {model_grid.wavelength_range * model_grid.wavelength_unit:unicode},",
               f"Teff {model_grid.teff_range * model_grid.teff_unit:unicode},",
