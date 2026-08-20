@@ -111,7 +111,7 @@ def _get_bayestar_query(version: str) -> bayestar.BayestarQuery:
     print(f"Setting up query object for the {version.capitalize()} extinction map")
     try:
         bayestar.fetch(version=version)
-    except (DownloadError, ValueError) as exc:
+    except (DownloadError, ValueError, HTTPError) as exc:
         print(f"*** Caught a {exc.__class__.__name__} ('{exc}') on fetch/verify of Bayestar cache.",
               "Will attempt to use any existing cached data, however this is unverified.")
     return bayestar.BayestarQuery(version=version)
