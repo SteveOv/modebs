@@ -105,26 +105,24 @@ def get_sed_for_target(target: str,
     rcount = len(sed)
     if verbose: print(f"Opened SED table {sed_fname.name} containing {rcount} row(s).")
 
-    # Add wavelength which will be useful downstream
-    sed["sed_wl"] = sed["sed_freq"].to(wl_unit, equivalencies=u.spectral())
+    with u.set_enabled_equivalencies(u.spectral_density(sed["sed_freq"].quantity) + u.spectral()):
+        # Add wavelength which will be useful downstream
+        sed["sed_wl"] = sed["sed_freq"].to(wl_unit)
 
-    # Get the data into desired units
-    if sed["sed_flux"].unit != flux_unit: # It's actually flux density, usually received in Jy
-        sed["sed_flux"].convert_unit_to(flux_unit, equivalencies=u.spectral_density(sed["sed_wl"]))
-    if sed["sed_eflux"].unit != flux_unit:
-        sed["sed_eflux"].convert_unit_to(flux_unit, equivalencies=u.spectral_density(sed["sed_wl"]))
-    if sed["sed_freq"].unit != freq_unit:
-        sed["sed_freq"].convert_unit_to(freq_unit, equivalencies=u.spectral())
+        # Get the data into desired units
+        if sed["sed_flux"].unit != flux_unit: # It's actually flux density, usually received in Jy
+            sed["sed_flux"].convert_unit_to(flux_unit)
+        if sed["sed_eflux"].unit != flux_unit:
+            sed["sed_eflux"].convert_unit_to(flux_unit)
+        if sed["sed_freq"].unit != freq_unit:
+            sed["sed_freq"].convert_unit_to(freq_unit)
 
     # Set flux uncertainties where masked (otherwise the de-dupe fails as it cannot index a column
     # that has masked values). This was happening as a side effect of the previous code, so it's
     # now made explicit. Also set flux uncertainties where no value given/zero (but not masked).
-    mask_no_err = np.ma.getmask(sed["sed_eflux"])
-    mask_no_err |= (sed["sed_eflux"].value == 0) | np.isnan(sed["sed_eflux"])
-    sed["sed_eflux"][mask_no_err] = sed["sed_flux"][mask_no_err] * (missing_uncertainty_pc or 0)
-    # And handle the option to set a minimum on all uncertainties
-    if (minimum_uncertainty_pc or 0) > 0:
-        sed["sed_eflux"] = sed["sed_flux"] * minimum_uncertainty_pc
+    mask_nerr = np.ma.getmask(sed["sed_eflux"])
+    mask_nerr |= (sed["sed_eflux"].value == 0) | np.isnan(sed["sed_eflux"])
+    sed["sed_eflux"][mask_nerr] =sed["sed_flux"][mask_nerr].quantity * max(0,missing_uncertainty_pc)
 
     if remove_duplicates:
         sed = unique(sed, keep="first",
@@ -132,6 +130,14 @@ def get_sed_for_target(target: str,
         ucount = len(sed)
         if verbose: print(f"Dropped {rcount-ucount} duplicate(s) leaving {ucount} unique row(s).")
         sed.sort(["sed_freq"], reverse=True)
+
+    # And handle the option to set a minimum on all uncertainties
+    if (minimum_uncertainty_pc or 0) > 0:
+        mask_low = sed["sed_eflux"].value < sed["sed_flux"].value * minimum_uncertainty_pc
+        if any(mask_low):
+            sed["sed_eflux"][mask_low] = sed["sed_flux"][mask_low].quantity * minimum_uncertainty_pc
+            if verbose:
+                print(f"Increased {sum(mask_low)} rows uncertainty to {minimum_uncertainty_pc:.1%}")
     return sed
 
 
