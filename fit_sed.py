@@ -193,8 +193,8 @@ if __name__ == "__main__":
 
                 # Get the SED for this target and de-duplicate (obs may appear multiple times).
                 print(flush=True)
-                sed = get_sed_for_target(target_id, trow.search_term,
-                                         radius=0.25, remove_duplicates=True, verbose=True)
+                sed = get_sed_for_target(target_id, trow.search_term, radius=0.25,
+                                         remove_duplicates=True, verbose=True)
                 if sed is None or len(sed) == 0:
                     raise PipelineError(target_id, f"No SED observations for '{trow.search_term}'")
 
@@ -314,9 +314,9 @@ if __name__ == "__main__":
                     y_err = sed["sed_eflux"].quantity.to(model_grid.flux_unit).value
 
 
-                # Minimize fits to do outlier pruning and optionally give a starting pos for MCMC
-                print("\nPerforming 'quick' minimize fits to prune outliers.", flush=True)
-                theta_fit = None
+                # Outlier pruning with minimize fits. Common y_err so all of y has the same weight.
+                print("\nOutlier pruning using minimize fits with equal err/weights.", flush=True)
+                y_err_same = np.full_like(y_err, fill_value=np.mean(y_err))
                 retain_mask = np.ones_like(x, dtype=bool)
                 min_to_retain, improve_th = max(10, int(np.ceil(len(sed) * 0.75))), 0.8
                 print(f"Outliers pruned when doing so improves fit stat > {1-improve_th:.0%}")
@@ -324,7 +324,7 @@ if __name__ == "__main__":
                 for out_ix in range(len(sed)):
                     cand_theta, result = minimize_fit(x=x[cand_mask],
                                                       y=y[cand_mask],
-                                                      y_err=y_err[cand_mask],
+                                                      y_err=y_err_same[cand_mask],
                                                       theta0=theta0,
                                                       fit_mask=fit_mask,
                                                       stellar_grid=model_grid,
@@ -332,37 +332,44 @@ if __name__ == "__main__":
 
                     this_stat = result.fun
                     print(f"[{out_ix:03d}] stat={this_stat:.3e}", end="; ")
-                    if out_ix == 0:
-                        theta_fit = cand_theta
-                    else:
-                        # Decide outcome on overall stat from test fit with candidate excluded
+                    if out_ix > 0:
+                        # Decide outcome on full stat from test fit with candidate excluded
                         if this_stat >= prev_stat * improve_th:
                             print("rejected for insufficient improvement and now stopping.")
                             break
-                        theta_fit, retain_mask, prev_stat = cand_theta, cand_mask.copy(), this_stat
+                        retain_mask = cand_mask.copy()
                         print(f"accepted leaving {sum(retain_mask)}/{len(retain_mask)}", end="; ")
+                    prev_stat = this_stat
 
                     if sum(retain_mask) <= min_to_retain:
                         print(f"stopping as #rows at or below the minimum of {min_to_retain}.")
                         break
 
-                    if this_stat < 1:
-                        print("stopping as stat is < 1.0.")
-                        break
-
                     # Now select the first/next candidate, which is farthest outlier from this fit.
                     y_mdl = model_func(cand_theta, x[cand_mask], model_grid, combine=True)
-                    resids = ((y_mdl - y[cand_mask]) / y_err[cand_mask])**2
+                    resids = ((y_mdl - y[cand_mask]) / y_err_same[cand_mask])**2
                     max_resid_ix = np.argmax(resids)
                     cand_ix = cand_mask.nonzero()[0][max_resid_ix]
-                    print(f"max outlier [{cand_ix}] {sed['sed_filter'][cand_ix]}", end="; ")
-                    if resids[max_resid_ix] < min(100, sum(resids) / 2):
+                    print(f"max outlier [{cand_ix}] {sed['sed_filter'][cand_ix]}",
+                          f"({resids[max_resid_ix]/sum(resids):.1%})", end="; ")
+                    # Need higher significance when fewer observations and there's a hard min of 10.
+                    # These rules are empirical but behave consistently across targets & flux units.
+                    if resids[max_resid_ix] > max(sum(resids) * 4 / len(resids), 10):
+                        cand_mask[cand_ix] = False
+                    else:
                         print("not significant and now stopping.")
                         break
                     print()
-                    cand_mask[cand_ix] = False
 
-                print_theta(theta_fit, fit_mask, "Minimize fit yielded theta=")
+                # Fit with real y_err to review pruning result and as a potential start pos for MCMC
+                theta_fit, _ = minimize_fit(x=x[retain_mask],
+                                            y=y[retain_mask],
+                                            y_err=y_err[retain_mask],
+                                            theta0=theta0,
+                                            fit_mask=fit_mask,
+                                            stellar_grid=model_grid,
+                                            ln_prior_func=ln_prior_func)
+                print_theta(theta_fit, fit_mask, f"Fit of {sum(retain_mask)} fluxes yielded theta=")
 
                 if args.plot_figs:
                     print("\nCreating retained SED observations and minimize fit plot")

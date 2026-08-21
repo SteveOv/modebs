@@ -16,7 +16,8 @@
         "lc_fit_mc_iterations": 100,
         "lc_fit_retries": 2,
         "lc_fit_timeout": 900,
-        "sed_tabname_exclusions": ["B/denis/denis"]
+        "sed_filter_exclusions": [],
+        "sed_tabname_exclusions": []
     },
     "target_configs": {
         "V436 Per": {
@@ -287,7 +288,7 @@
             "aka": "TIC 125754991, HD 23642",
             "SpT": "A0 Vp(Si) + Am",
             "details": "5 short cadence sectors (42-44 & 70-71); an inclined, circular orbit with shallow primary (~0.10 mag) and secondary (~0.05 mag) partial eclipses, reflection and ellipsoidal effects;",
-            "notes": "not in TESS-ebs; unusable SEDs make auto outlier masking difficult (see exclusions); SouthworthMurphy+23mnrasl use an lrat (to mitigate shallow partial eclipses) and circular orbit in LC fit; SouthworthMurphy+23mnrasl give E(B-V)=0.04+/-0.01 mag & dist(K-band)=134.7+/-2.0 pc; SouthworthMurphy+23mnrasl find agreement with PARSEC models with solar metallicity and an age 170+/-20 Myr; disable slicing LCs for fitting as this tends to increase scatter for this target;",
+            "notes": "not in TESS-ebs; SouthworthMurphy+23mnrasl use an lrat (to mitigate shallow partial eclipses) and circular orbit in LC fit; SouthworthMurphy+23mnrasl give E(B-V)=0.04+/-0.01 mag & dist(K-band)=134.7+/-2.0 pc; SouthworthMurphy+23mnrasl find agreement with PARSEC models with solar metallicity and an age 170+/-20 Myr; disable slicing LCs for fitting as this tends to increase scatter for this target;",
             "do_not_slice_lcs": true,
             "t0": 2464.981943071,
             "period": 2.461126371,
@@ -297,7 +298,6 @@
             "depthP": 0.100,
             "depthS": 0.050,
             "phiS": 0.500,
-            "sed_tabname_exclusions": ["J/AJ/153/95/table3", "IV/34/epic", "J/A+A/622/A133/cparam"],
             "labels": {
                 "citation_key": "SouthworthMurphy+23mnrasl, AbtLevato78pasp",
                 "source": "Southworth et al. (2023MNRAS.520L..53S), Table I. SpT originally from Abt & Levato (1978PASP...90..201A)",
