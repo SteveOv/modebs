@@ -193,7 +193,9 @@ if __name__ == "__main__":
 
                 # Get the SED for this target and de-duplicate (obs may appear multiple times).
                 print(flush=True)
+                missing_uncertainty_pc = config.get("sed_missing_uncertainty_pc", 0.10)
                 sed = get_sed_for_target(target_id, trow.search_term, radius=0.25,
+                                         missing_uncertainty_pc=missing_uncertainty_pc,
                                          remove_duplicates=True, verbose=True)
                 if sed is None or len(sed) == 0:
                     raise PipelineError(target_id, f"No SED observations for '{trow.search_term}'")
@@ -211,10 +213,16 @@ if __name__ == "__main__":
                             & (sed["sed_wl"] <= max(model_grid.wavelength_range))
                 sed = sed[model_mask]
                 sed.sort(["sed_wl"])
-                print(f"{len(sed)} unique SED observation(s) retained after range & exclusion",
+                print(f"{len(sed)} unique SED observation(s) remain after range & exclusion",
                       "filtering, and\nthe retention of only the 'closest' observation to the",
                       "target for each Filter.\nThe units for flux, frequency and wavelength are:",
                       ", ".join(f"{sed[f].unit:unicode}" for f in ["sed_flux","sed_freq","sed_wl"]))            
+
+                if (min_uncertainty_pc := config.get("sed_min_uncertainty_pc", 0)) > 0:
+                    # Do this after de-duping, choice & exclusions so as not to affect selection.
+                    print(f"Lifting minimum SED flux uncertainty to {min_uncertainty_pc:.1%}.")
+                    sed["sed_eflux"] = np.maximum(sed["sed_eflux"].quantity,
+                                                  sed["sed_flux"].quantity * min_uncertainty_pc)
 
 
                 if fit_av:
