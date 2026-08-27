@@ -1243,7 +1243,7 @@
         "CM Dra": {
             "search_term": "TIC 199574208",
             "aka": "TIC 199574208",
-            "SpT": "M4.5",
+            "SpT": "dM4.5 + dM4.5",
             "details": "25 short cadence sectors (16, 19, 22-26, 49-52, 56-59, 76-80 & 82-86); many sectors at slower cadences; a pair of M-dwarfs in a nearly circular, slightly inclined 1.27 d orbit; eclipses are ~0.76 and ~0.73 mag deep; frequent flares however these appear to have little affect on the fit;",
             "notes": "many sectors and short cadence with a good fit easily achieved on most;",
             "t0": 1739.9292706720819,
