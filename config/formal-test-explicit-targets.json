@@ -312,7 +312,7 @@
                 "MB": 1.595,            "MB_err": 0.008,
                 "q": 0.702,             "q_err": 0.005,
                 "RA": 1.799,            "RA_err": 0.019,
-                "RB": 1.1410,           "RB_err": 0.021,
+                "RB": 1.410,            "RB_err": 0.021,
                 "TeffA": 10200,         "TeffA_err": 90,
                 "TeffB": 7670,          "TeffB_err": 85,
                 "TeffR": 0.752,         "TeffR_err": 0.011,
