@@ -25,10 +25,13 @@ class Testsed(unittest.TestCase):
     _cache_dir = _this_dir / "../.cache/.sed/"
     _cm_dra_test_target = "testsed CM Dra"
     _cm_dra_test_file = _cache_dir / "testsed-cm-dra-0.1.vot"
+    _cm_dra_test_tic = "TIC 199574208"
     _zz_boo_test_target = "testsed ZZ Boo"
     _zz_boo_test_file = _cache_dir / "testsed-zz-boo-0.1.vot"
+    _zz_boo_test_tic = "TIC 357358259"
     _cw_eri_test_target = "testsed CW Eri"
     _cw_eri_test_file = _cache_dir / "testsed-cw-eri-0.1.vot"
+    _cw_eri_test_tic = "TIC 98853987"
 
     @classmethod
     def setUpClass(cls):
@@ -61,7 +64,9 @@ class Testsed(unittest.TestCase):
     #
     def test_get_sed_for_target_simple_happy_path(self):
         """ Tests get_sed_for_target() basic happy path test for known sed """
-        sed = get_sed_for_target(Testsed._cw_eri_test_target, verbose=True)
+        sed = get_sed_for_target(Testsed._cm_dra_test_target,
+                                 search_term=Testsed._cw_eri_test_tic,
+                                 verbose=True)
         self.assertIsNotNone(sed)
         self.assertTrue(isinstance(sed, Table))
         self.assertTrue(len(sed) > 0)
@@ -70,6 +75,7 @@ class Testsed(unittest.TestCase):
         self.assertIn("sed_freq", sed.colnames)
         self.assertIn("sed_filter", sed.colnames)
         self.assertIn("sed_wl", sed.colnames)       # These apended once downloaded
+        self.assertIn("_r", sed.colnames)           # Additional col from -out=_r query string
 
     def test_get_sed_for_target_assert_units(self):
         """ Tests get_sed_for_target() tests requested units are reflected in resulting table """

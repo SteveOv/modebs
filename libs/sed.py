@@ -85,8 +85,10 @@ def get_sed_for_target(target: str,
         max_attempts = 1 + max(0, retries)
         for attempt in range(1, max_attempts+1):
             try:
+                # -c=centre of search, -c.rs=radius in arcsec & -out.add=cols (_r dist from centre)
                 t = quote_plus(search_term or target)
-                sed = Table.read(f"https://vizier.cds.unistra.fr/viz-bin/sed?-c={t}&-c.rs={radius}")
+                sed = Table.read(
+                    f"https://vizier.cds.unistra.fr/viz-bin/sed?-c={t}&-c.rs={radius}&-out.add=_r")
                 # votable matches that published in link above
                 sed.write(sed_fname, format="votable", overwrite=True)
                 break
@@ -151,12 +153,28 @@ def retain_closest_observations(sed: Table, target_coords: SkyCoord) -> Table:
     :target_coordinates: the target's coordinates
     :returns: the revised SED table, sorted on the sed_wl field
     """
-    sed["dist_r"] = np.sqrt((target_coords.ra.to(u.deg).value - sed['_RAJ2000'])**2
-                            + (target_coords.dec.to(u.deg).value - sed['_DEJ2000'])**2)
-    sed.sort(["sed_filter", "dist_r"])
+    if "_r" in sed.colnames:
+        dist_col = "_r"
+    else:
+        dist_col = "dist_r"
+        sed[dist_col] = _angular_distances(sed["_RAJ2000"].value, sed["_DEJ2000"].value,
+                                           target_coords.fk5)
+
+    sed.sort(["sed_filter", dist_col])
     sed = unique(sed, keys=["sed_filter"], keep="first")
     sed.sort(["sed_wl"])
+    if dist_col != "_r":
+        sed.remove_column(dist_col)
     return sed
+
+def _angular_distances(ra: np.ndarray, dec: np.ndarray, target_coords: SkyCoord) -> np.ndarray:
+    """ Calculates the angular distances in arcsec between the target and the ra & dec arrays """
+    # Using the small angle approximation as deltas are << 1 rad
+    ra_a = np.deg2rad(ra)
+    dec_a = np.deg2rad(dec)
+    ra_b = target_coords.ra.to(u.rad).value
+    dec_b = target_coords.dec.to(u.rad).value
+    return np.sqrt(((ra_a - ra_b) * np.cos(dec_a))**2 + (dec_a - dec_b)**2) * 206265 # rad to arcsec
 
 
 def calculate_vfv(sed: Table,

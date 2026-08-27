@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Produced with astropy.io.votable version 7.0.1
+<!-- Produced with astropy.io.votable version 7.2.2
      http://www.astropy.org/ -->
 <VOTABLE version="1.4" xmlns="http://www.ivoa.net/xml/VOTable/v1.3" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.ivoa.net/xml/VOTable/v1.3 http://www.ivoa.net/xml/VOTable/VOTable-1.4.xsd">
  <RESOURCE type="results">
@@ -19,13 +19,13 @@
      taken into account
     </DESCRIPTION>
    </FIELD>
-   <FIELD ID="_tabname" arraysize="32" datatype="char" name="_tabname" ucd="meta.table">
+   <FIELD ID="_tabname" arraysize="32*" datatype="char" name="_tabname" ucd="meta.table">
     <DESCRIPTION>
      Table name
     </DESCRIPTION>
     <LINK href="http://vizier.cds.unistra.fr/viz-bin/VizieR-5?-info=XML&amp;-out.add=.&amp;-source=${_tabname}&amp;${_ID}"/>
    </FIELD>
-   <FIELD ID="_ID" arraysize="64" datatype="char" name="_ID" ucd="meta.id">
+   <FIELD ID="_ID" arraysize="128*" datatype="char" name="_ID" ucd="meta.id">
     <DESCRIPTION>
      String which identifies the row
     </DESCRIPTION>
@@ -38,6 +38,12 @@
    <FIELD ID="_etime" datatype="double" name="_etime" precision="1" ucd="stat.error;time.epoch" width="7">
     <DESCRIPTION>
      time error (uncertainty and time conversion)
+    </DESCRIPTION>
+   </FIELD>
+   <FIELD ID="_r" datatype="double" name="_r" precision="3" ucd="pos.angDistance" width="5">
+    <DESCRIPTION>
+     Distance from center (248.58470944000+57.16232470000)[FK5/J2000],
+     at Epoch=J2000.0
     </DESCRIPTION>
    </FIELD>
    <FIELD ID="sed_freq" datatype="double" name="sed_freq" precision="E6" ucd="em.freq" unit="GHz" width="10">
@@ -55,14 +61,14 @@
      Mean error (standard deviations) of flux density
     </DESCRIPTION>
    </FIELD>
-   <FIELD ID="sed_filter" arraysize="32" datatype="char" name="sed_filter" ucd="meta.id;instr.filter" unit="---" width="32">
+   <FIELD ID="sed_filter" arraysize="32*" datatype="char" name="sed_filter" ucd="meta.id;instr.filter" unit="" width="32">
     <DESCRIPTION>
      Filter designation, in the form photoSystem:filterName; a
      designation starting by ':=' is an assumed monochromatic point;
      this column is empty when the frequency is specified for each
      data point.
     </DESCRIPTION>
-    <LINK href="http://cdsarc.u-strasbg.fr/viz-bin/metafilter?${_sed_filter}"/>
+    <LINK href="https://cdsarc.cds.unistra.fr/viz-bin/metafilter?${_sed_filter}"/>
    </FIELD>
    <DATA>
     <TABLEDATA>
@@ -73,6 +79,7 @@
       <TD>-c=248.58470795746 +57.16232376286,eq=J2000&amp;-c.rs=0.004</TD>
       <TD/>
       <TD>    0.0</TD>
+      <TD>0.004</TD>
       <TD>    138550</TD>
       <TD>    0.514</TD>
       <TD>    0.01</TD>
@@ -85,6 +92,7 @@
       <TD>-c=248.58470795746 +57.16232376286,eq=J2000&amp;-c.rs=0.004</TD>
       <TD/>
       <TD>    0.0</TD>
+      <TD>0.004</TD>
       <TD>    183920</TD>
       <TD>    0.633</TD>
       <TD>   0.015</TD>
@@ -97,6 +105,7 @@
       <TD>-c=248.58470795746 +57.16232376286,eq=J2000&amp;-c.rs=0.004</TD>
       <TD/>
       <TD>    0.0</TD>
+      <TD>0.004</TD>
       <TD>    239830</TD>
       <TD>     0.64</TD>
       <TD>   0.012</TD>
@@ -109,6 +118,7 @@
       <TD>-c=248.58470795746 +57.16232376286,eq=J2000&amp;-c.rs=0.004</TD>
       <TD/>
       <TD>    0.0</TD>
+      <TD>0.004</TD>
       <TD>    445460</TD>
       <TD>    0.076</TD>
       <TD>       0</TD>
@@ -121,6 +131,7 @@
       <TD>-c=248.58470795746 +57.16232376286,eq=J2000&amp;-c.rs=0.004</TD>
       <TD/>
       <TD>    0.0</TD>
+      <TD>0.004</TD>
       <TD>    541430</TD>
       <TD>   0.0166</TD>
       <TD>  0.0031</TD>
@@ -133,6 +144,7 @@
       <TD>-c=248.58470795746 +57.16232376286,eq=J2000&amp;-c.rs=0.004</TD>
       <TD/>
       <TD>    0.0</TD>
+      <TD>0.004</TD>
       <TD>    138550</TD>
       <TD>    0.514</TD>
       <TD>    0.01</TD>
@@ -145,6 +157,7 @@
       <TD>-c=248.58470795746 +57.16232376286,eq=J2000&amp;-c.rs=0.004</TD>
       <TD/>
       <TD>    0.0</TD>
+      <TD>0.004</TD>
       <TD>    183920</TD>
       <TD>    0.633</TD>
       <TD>   0.015</TD>
@@ -157,6 +170,7 @@
       <TD>-c=248.58470795746 +57.16232376286,eq=J2000&amp;-c.rs=0.004</TD>
       <TD/>
       <TD>    0.0</TD>
+      <TD>0.004</TD>
       <TD>    239830</TD>
       <TD>     0.64</TD>
       <TD>   0.012</TD>
@@ -169,6 +183,7 @@
       <TD>-c=248.58470795746 +57.16232376286,eq=J2000&amp;-c.rs=0.004</TD>
       <TD/>
       <TD>    0.0</TD>
+      <TD>0.004</TD>
       <TD>    445460</TD>
       <TD>    0.076</TD>
       <TD>       0</TD>
@@ -181,10 +196,713 @@
       <TD>-c=248.58470795746 +57.16232376286,eq=J2000&amp;-c.rs=0.004</TD>
       <TD/>
       <TD>    0.0</TD>
+      <TD>0.004</TD>
       <TD>    541430</TD>
       <TD>   0.0166</TD>
       <TD>  0.0031</TD>
       <TD>Johnson:V</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=1159709</TD>
+      <TD>2460031.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=1159710</TD>
+      <TD>2460031.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=1278867</TD>
+      <TD>2460066.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=1278868</TD>
+      <TD>2460066.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=1339201</TD>
+      <TD>2460097.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=1339202</TD>
+      <TD>2460097.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=1372745</TD>
+      <TD>2460101.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=1372746</TD>
+      <TD>2460101.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=1470354</TD>
+      <TD>2460101.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=1470406</TD>
+      <TD>2460101.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=1470459</TD>
+      <TD>2460101.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=1470516</TD>
+      <TD>2460101.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=1470572</TD>
+      <TD>2460101.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=1470623</TD>
+      <TD>2460101.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=1470673</TD>
+      <TD>2460101.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=1470696</TD>
+      <TD>2460101.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=1482287</TD>
+      <TD>2460101.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=1482328</TD>
+      <TD>2460101.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=1482369</TD>
+      <TD>2460101.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=1482456</TD>
+      <TD>2460101.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=1482501</TD>
+      <TD>2460101.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=1482518</TD>
+      <TD>2460101.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=1483194</TD>
+      <TD>2460101.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=1483327</TD>
+      <TD>2460101.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=40999744</TD>
+      <TD>2460097.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=40999858</TD>
+      <TD>2460097.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41000512</TD>
+      <TD>2460097.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41000546</TD>
+      <TD>2460097.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41000577</TD>
+      <TD>2460097.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41000607</TD>
+      <TD>2460097.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41000629</TD>
+      <TD>2460097.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41010898</TD>
+      <TD>2460097.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41010938</TD>
+      <TD>2460097.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41010974</TD>
+      <TD>2460097.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41011011</TD>
+      <TD>2460097.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41011050</TD>
+      <TD>2460097.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41011080</TD>
+      <TD>2460097.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41011105</TD>
+      <TD>2460097.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41203818</TD>
+      <TD>2460066.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41203917</TD>
+      <TD>2460066.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41203929</TD>
+      <TD>2460066.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41203976</TD>
+      <TD>2460066.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41210567</TD>
+      <TD>2460066.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41210695</TD>
+      <TD>2460066.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41210731</TD>
+      <TD>2460066.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41210757</TD>
+      <TD>2460066.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41639321</TD>
+      <TD>2460031.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41639322</TD>
+      <TD>2460031.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41639342</TD>
+      <TD>2460031.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41639615</TD>
+      <TD>2460031.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41645317</TD>
+      <TD>2460031.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41645626</TD>
+      <TD>2460031.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41645643</TD>
+      <TD>2460031.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847100000000</TD>
+      <TD> 57.1623250000000</TD>
+      <TD>V/162/dr11m</TD>
+      <TD>recno=41645953</TD>
+      <TD>2460031.500000</TD>
+      <TD>87500.0</TD>
+      <TD>0.002</TD>
+      <TD>    445460</TD>
+      <TD>  2.6e-05</TD>
+      <TD/>
+      <TD>Gaia:G</TD>
      </TR>
      <TR>
       <TD>248.5847081000000</TD>
@@ -193,6 +911,7 @@
       <TD>recno=732</TD>
       <TD/>
       <TD>    0.0</TD>
+      <TD>0.000</TD>
       <TD>    239830</TD>
       <TD>    0.641</TD>
       <TD/>
@@ -205,6 +924,7 @@
       <TD>recno=10451</TD>
       <TD/>
       <TD>    0.0</TD>
+      <TD>0.000</TD>
       <TD>    239830</TD>
       <TD>    0.641</TD>
       <TD/>
@@ -216,7 +936,8 @@
       <TD>J/ApJS/271/55/table4</TD>
       <TD>recno=3008</TD>
       <TD/>
-      <TD/>
+      <TD>    0.0</TD>
+      <TD>0.000</TD>
       <TD>     13571</TD>
       <TD>      8.3</TD>
       <TD/>
@@ -228,7 +949,8 @@
       <TD>J/ApJS/271/55/table4</TD>
       <TD>recno=3009</TD>
       <TD/>
-      <TD/>
+      <TD>    0.0</TD>
+      <TD>0.000</TD>
       <TD>     13571</TD>
       <TD>      8.3</TD>
       <TD>    0.35</TD>
@@ -240,7 +962,8 @@
       <TD>J/ApJS/271/55/table4</TD>
       <TD>recno=3009</TD>
       <TD/>
-      <TD/>
+      <TD>    0.0</TD>
+      <TD>0.000</TD>
       <TD>     25934</TD>
       <TD>   0.0358</TD>
       <TD>  0.0005</TD>
@@ -252,7 +975,8 @@
       <TD>J/ApJS/271/55/table4</TD>
       <TD>recno=3009</TD>
       <TD/>
-      <TD/>
+      <TD>    0.0</TD>
+      <TD>0.000</TD>
       <TD>     65172</TD>
       <TD>    0.188</TD>
       <TD>   0.003</TD>
@@ -264,7 +988,8 @@
       <TD>J/ApJS/271/55/table4</TD>
       <TD>recno=3009</TD>
       <TD/>
-      <TD/>
+      <TD>    0.0</TD>
+      <TD>0.000</TD>
       <TD>     89490</TD>
       <TD>     0.28</TD>
       <TD>   0.006</TD>
@@ -276,7 +1001,8 @@
       <TD>J/ApJS/271/55/table4</TD>
       <TD>recno=3009</TD>
       <TD/>
-      <TD/>
+      <TD>    0.0</TD>
+      <TD>0.000</TD>
       <TD>    181750</TD>
       <TD>    0.639</TD>
       <TD>   0.015</TD>
@@ -288,7 +1014,8 @@
       <TD>J/ApJS/271/55/table4</TD>
       <TD>recno=3009</TD>
       <TD/>
-      <TD/>
+      <TD>    0.0</TD>
+      <TD>0.000</TD>
       <TD>    241960</TD>
       <TD>    0.627</TD>
       <TD>   0.012</TD>
@@ -300,7 +1027,8 @@
       <TD>J/ApJS/271/55/table4</TD>
       <TD>recno=3009</TD>
       <TD/>
-      <TD/>
+      <TD>    0.0</TD>
+      <TD>0.000</TD>
       <TD>    445460</TD>
       <TD>   0.0764</TD>
       <TD>  0.0002</TD>
@@ -312,7 +1040,8 @@
       <TD>J/ApJS/271/55/table4</TD>
       <TD>recno=3010</TD>
       <TD/>
-      <TD/>
+      <TD>    0.0</TD>
+      <TD>0.000</TD>
       <TD>     13571</TD>
       <TD>      8.3</TD>
       <TD/>
@@ -324,11 +1053,90 @@
       <TD>J/ApJS/271/55/table4</TD>
       <TD>recno=3011</TD>
       <TD/>
-      <TD/>
+      <TD>    0.0</TD>
+      <TD>0.000</TD>
       <TD>     13571</TD>
       <TD>      8.3</TD>
       <TD/>
       <TD>WISE:W4</TD>
+     </TR>
+     <TR>
+      <TD>248.5847094000000</TD>
+      <TD> 57.1623247000000</TD>
+      <TD>J/ApJS/276/47/table1</TD>
+      <TD>recno=465</TD>
+      <TD/>
+      <TD>    0.0</TD>
+      <TD>0.000</TD>
+      <TD>    138550</TD>
+      <TD>    0.512</TD>
+      <TD>   0.009</TD>
+      <TD>2MASS:Ks</TD>
+     </TR>
+     <TR>
+      <TD>248.5847094000000</TD>
+      <TD> 57.1623247000000</TD>
+      <TD>J/ApJS/276/47/table1</TD>
+      <TD>recno=465</TD>
+      <TD/>
+      <TD>    0.0</TD>
+      <TD>0.000</TD>
+      <TD>    181750</TD>
+      <TD>    0.639</TD>
+      <TD>   0.018</TD>
+      <TD>2MASS:H</TD>
+     </TR>
+     <TR>
+      <TD>248.5847094000000</TD>
+      <TD> 57.1623247000000</TD>
+      <TD>J/ApJS/276/47/table1</TD>
+      <TD>recno=465</TD>
+      <TD/>
+      <TD>    0.0</TD>
+      <TD>0.000</TD>
+      <TD>    241960</TD>
+      <TD>    0.628</TD>
+      <TD>   0.012</TD>
+      <TD>2MASS:J</TD>
+     </TR>
+     <TR>
+      <TD>248.5847094000000</TD>
+      <TD> 57.1623247000000</TD>
+      <TD>J/ApJS/276/47/table1</TD>
+      <TD>recno=466</TD>
+      <TD/>
+      <TD>    0.0</TD>
+      <TD>0.000</TD>
+      <TD>    138550</TD>
+      <TD>    0.512</TD>
+      <TD>   0.009</TD>
+      <TD>2MASS:Ks</TD>
+     </TR>
+     <TR>
+      <TD>248.5847094000000</TD>
+      <TD> 57.1623247000000</TD>
+      <TD>J/ApJS/276/47/table1</TD>
+      <TD>recno=466</TD>
+      <TD/>
+      <TD>    0.0</TD>
+      <TD>0.000</TD>
+      <TD>    181750</TD>
+      <TD>    0.639</TD>
+      <TD>   0.018</TD>
+      <TD>2MASS:H</TD>
+     </TR>
+     <TR>
+      <TD>248.5847094000000</TD>
+      <TD> 57.1623247000000</TD>
+      <TD>J/ApJS/276/47/table1</TD>
+      <TD>recno=466</TD>
+      <TD/>
+      <TD>    0.0</TD>
+      <TD>0.000</TD>
+      <TD>    241960</TD>
+      <TD>    0.628</TD>
+      <TD>   0.012</TD>
+      <TD>2MASS:J</TD>
      </TR>
      <TR>
       <TD>248.5847083000000</TD>
@@ -337,6 +1145,7 @@
       <TD>recno=264</TD>
       <TD/>
       <TD>    0.0</TD>
+      <TD>0.030</TD>
       <TD>    239830</TD>
       <TD>    0.641</TD>
       <TD/>
@@ -349,6 +1158,7 @@
       <TD>recno=924</TD>
       <TD/>
       <TD>    0.0</TD>
+      <TD>0.000</TD>
       <TD>    136890</TD>
       <TD>    0.497</TD>
       <TD>    0.01</TD>
@@ -361,6 +1171,7 @@
       <TD>recno=924</TD>
       <TD/>
       <TD>    0.0</TD>
+      <TD>0.000</TD>
       <TD>    445460</TD>
       <TD>    0.242</TD>
       <TD>   0.001</TD>
@@ -373,6 +1184,7 @@
       <TD>recno=924</TD>
       <TD/>
       <TD>    0.0</TD>
+      <TD>0.000</TD>
       <TD>    445460</TD>
       <TD>   0.0164</TD>
       <TD>  0.0001</TD>
@@ -385,6 +1197,7 @@
       <TD>recno=924</TD>
       <TD/>
       <TD>    0.0</TD>
+      <TD>0.000</TD>
       <TD>    445460</TD>
       <TD>   0.0764</TD>
       <TD>  0.0002</TD>
@@ -397,10 +1210,141 @@
       <TD>recno=809</TD>
       <TD/>
       <TD>    0.0</TD>
+      <TD>0.000</TD>
       <TD>    445460</TD>
       <TD>   0.0758</TD>
       <TD/>
       <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847080600000</TD>
+      <TD> 57.1623238900000</TD>
+      <TD>J/AJ/167/139/t_hpic</TD>
+      <TD>recno=8127</TD>
+      <TD/>
+      <TD>    0.0</TD>
+      <TD>0.004</TD>
+      <TD>    138550</TD>
+      <TD>    0.514</TD>
+      <TD>    0.01</TD>
+      <TD>2MASS:Ks</TD>
+     </TR>
+     <TR>
+      <TD>248.5847080600000</TD>
+      <TD> 57.1623238900000</TD>
+      <TD>J/AJ/167/139/t_hpic</TD>
+      <TD>recno=8127</TD>
+      <TD/>
+      <TD>    0.0</TD>
+      <TD>0.004</TD>
+      <TD>    181750</TD>
+      <TD>    0.639</TD>
+      <TD>   0.015</TD>
+      <TD>2MASS:H</TD>
+     </TR>
+     <TR>
+      <TD>248.5847080600000</TD>
+      <TD> 57.1623238900000</TD>
+      <TD>J/AJ/167/139/t_hpic</TD>
+      <TD>recno=8127</TD>
+      <TD/>
+      <TD>    0.0</TD>
+      <TD>0.004</TD>
+      <TD>    241960</TD>
+      <TD>    0.627</TD>
+      <TD>   0.012</TD>
+      <TD>2MASS:J</TD>
+     </TR>
+     <TR>
+      <TD>248.5847080600000</TD>
+      <TD> 57.1623238900000</TD>
+      <TD>J/AJ/167/139/t_hpic</TD>
+      <TD>recno=8127</TD>
+      <TD/>
+      <TD>    0.0</TD>
+      <TD>0.004</TD>
+      <TD>    380160</TD>
+      <TD>    0.504</TD>
+      <TD/>
+      <TD>Cousins:I</TD>
+     </TR>
+     <TR>
+      <TD>248.5847080600000</TD>
+      <TD> 57.1623238900000</TD>
+      <TD>J/AJ/167/139/t_hpic</TD>
+      <TD>recno=8127</TD>
+      <TD/>
+      <TD>    0.0</TD>
+      <TD>0.004</TD>
+      <TD>    402100</TD>
+      <TD>    0.214</TD>
+      <TD>   0.001</TD>
+      <TD>TESS/TESS:Red</TD>
+     </TR>
+     <TR>
+      <TD>248.5847080600000</TD>
+      <TD> 57.1623238900000</TD>
+      <TD>J/AJ/167/139/t_hpic</TD>
+      <TD>recno=8127</TD>
+      <TD/>
+      <TD>    0.0</TD>
+      <TD>0.004</TD>
+      <TD>    445460</TD>
+      <TD>   0.0764</TD>
+      <TD>  0.0002</TD>
+      <TD>Gaia:G</TD>
+     </TR>
+     <TR>
+      <TD>248.5847080600000</TD>
+      <TD> 57.1623238900000</TD>
+      <TD>J/AJ/167/139/t_hpic</TD>
+      <TD>recno=8127</TD>
+      <TD/>
+      <TD>    0.0</TD>
+      <TD>0.004</TD>
+      <TD>    463430</TD>
+      <TD>    0.141</TD>
+      <TD/>
+      <TD>Cousins:R</TD>
+     </TR>
+     <TR>
+      <TD>248.5847080600000</TD>
+      <TD> 57.1623238900000</TD>
+      <TD>J/AJ/167/139/t_hpic</TD>
+      <TD>recno=8127</TD>
+      <TD/>
+      <TD>    0.0</TD>
+      <TD>0.004</TD>
+      <TD>    541430</TD>
+      <TD>   0.0259</TD>
+      <TD/>
+      <TD>Johnson:V</TD>
+     </TR>
+     <TR>
+      <TD>248.5847080600000</TD>
+      <TD> 57.1623238900000</TD>
+      <TD>J/AJ/167/139/t_hpic</TD>
+      <TD>recno=8127</TD>
+      <TD/>
+      <TD>    0.0</TD>
+      <TD>0.004</TD>
+      <TD>    674900</TD>
+      <TD>  0.00675</TD>
+      <TD/>
+      <TD>Johnson:B</TD>
+     </TR>
+     <TR>
+      <TD>248.5847079574600</TD>
+      <TD> 57.1623237628600</TD>
+      <TD>J/PASP/137/J4402/list2025</TD>
+      <TD>recno=8168</TD>
+      <TD/>
+      <TD>    0.0</TD>
+      <TD>0.004</TD>
+      <TD>    541430</TD>
+      <TD>   0.0259</TD>
+      <TD/>
+      <TD>Johnson:V</TD>
      </TR>
     </TABLEDATA>
    </DATA>
